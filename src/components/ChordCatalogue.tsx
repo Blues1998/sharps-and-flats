@@ -1,50 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { ChordCard } from './ChordCard';
+import { ChordTile } from './ChordTile';
 import { Segmented } from './Segmented';
-import { IconComfort } from './Icons';
 import {
-  FLAT_NAMES,
   GROUP_LABEL,
   allChords,
   chipLabel,
   groupChords,
-  keyGroup,
   type ChordGroup,
   type GroupBy
 } from '../utils/catalogue';
-import { NOTE_NAMES, SCALE_FORMULAS } from '../utils/musicTheory';
-import { COMFORT_LABEL, comfortOf, tally, type ChordComfort } from '../utils/chordbook';
+import { COMFORT_LABEL, comfortOf, tally, voicingsFor, type ChordComfort } from '../utils/chordbook';
+import { normalizeChordSymbol } from '../utils/songText';
+import { go } from '../hooks/useRoute';
 
-type Only = 'all' | ChordComfort;
-
-
-// A filter names one of the states the cards are marked with, so it shows the
-// same ring the cards show. Without it the row of words and the rings under
-// them are two vocabularies for one idea.
-const comfortOption = (value: ChordComfort, label: string) => (
-  <span className="filter-mark"><IconComfort state={value} />{label}</span>
-);
-
-const ONLY: { value: Only; label: React.ReactNode }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'solid', label: comfortOption('solid', 'Solid') },
-  { value: 'shaky', label: comfortOption('shaky', 'Shaky') },
-  { value: 'none', label: comfortOption('none', 'Not yet') }
-];
-
-// Scale names short enough to sit on a chip. The full name is the chip's title
-// and the heading of the group it opens.
-const SCALE_SHORT: Record<string, string> = {
-  'Major (Ionian)': 'Major',
-  'Natural Minor (Aeolian)': 'Minor',
-  'Harmonic Minor': 'Harmonic minor',
-  'Pentatonic Major': 'Pent. major',
-  'Pentatonic Minor': 'Pent. minor',
-  'Blues Scale': 'Blues'
-};
-
+// Chords in a key are Theory's Chords tab. Here they are arranged by what a
+// chord is: its root, its quality, or how hard it is to hold.
 const GROUPS: { value: GroupBy; label: string }[] =
-  (['key', 'root', 'quality', 'difficulty'] as GroupBy[]).map(value => ({ value, label: GROUP_LABEL[value] }));
+  (['root', 'quality', 'difficulty'] as GroupBy[]).map(value => ({ value, label: GROUP_LABEL[value] }));
 
 /**
  * How many chips a shut row builds.
@@ -57,130 +29,98 @@ const GROUPS: { value: GroupBy; label: string }[] =
 const PEEK = 16;
 
 interface ChordCatalogueProps {
-  /** Whether a chord is already in the bucket. Undefined means no bucket. */
-  isPicked?: (symbol: string) => boolean;
-  onToggle?: (symbol: string) => void;
+  onOpen: (symbol: string) => void;
+  /** Put a chord found by name into your chords. */
+  onAdd: (symbol: string) => void;
+  /** Whether a chord is already one of yours. */
+  isMine: (symbol: string) => boolean;
+  isLooped: (symbol: string) => boolean;
 }
 
 /**
- * The whole catalogue, arranged four ways.
+ * Every chord there is, looked up by name first and browsed second.
  *
- * Groups are collapsed rather than paged. A collapsed group still shows its
- * tally, so the page answers "how much of A minor do I have" without opening
- * anything, and a hundred and thirty-two chord diagrams are not built until
- * something is actually being looked at.
+ * Most visits here are a lookup: a sheet says F#m7 and you want the shape.
+ * So the field is first, and it understands a chord the way a chord sheet
+ * writes one. Browsing is under it, collapsed groups that still show their
+ * tally, so a hundred and thirty diagrams are not built until asked for.
  */
-export const ChordCatalogue: React.FC<ChordCatalogueProps> = ({ isPicked, onToggle }) => {
-  const [by, setBy] = useState<GroupBy>('key');
-  const [only, setOnly] = useState<Only>('all');
-  const [rootPc, setRootPc] = useState(9);           // A, where a guitarist starts
-  const [scaleName, setScaleName] = useState(SCALE_FORMULAS[1].name);   // natural minor
-  const [sevenths, setSevenths] = useState(false);
+export const ChordCatalogue: React.FC<ChordCatalogueProps> = ({ onOpen, onAdd, isMine, isLooped }) => {
+  const [by, setBy] = useState<GroupBy>('root');
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
 
-  const groups = useMemo<ChordGroup[]>(() => {
-    if (by === 'key') {
-      const group = keyGroup({ rootPc, scaleName, sevenths });
-      return group ? [group] : [];
-    }
-    return groupChords(allChords(), by);
-  }, [by, rootPc, scaleName, sevenths]);
+  const found = useMemo(() => {
+    const q = query.trim();
+    if (!q) return null;
+    const exact = normalizeChordSymbol(q);
+    const known = exact && voicingsFor(exact).length > 0 ? exact : null;
+    const lower = q.toLowerCase();
+    const near = allChords()
+      .filter(c => c.symbol.toLowerCase().startsWith(lower) && c.symbol !== known)
+      .slice(0, known ? 7 : 8)
+      .map(c => c.symbol);
+    return { known, list: known ? [known, ...near] : near };
+  }, [query]);
 
-  // One group is a page, not a list, a key opens on its own.
-  const singleton = groups.length === 1;
+  const groups = useMemo<ChordGroup[]>(() => groupChords(allChords(), by), [by]);
+  const shown = groups.filter(group => group.chords.length > 0);
 
-  const shown = useMemo(
-    () => groups
-      .map(group => ({
-        ...group,
-        chords: only === 'all' ? group.chords : group.chords.filter(c => comfortOf(c.symbol) === only)
-      }))
-      .filter(group => group.chords.length > 0),
-    [groups, only]
-  );
-
-  const isOpen = (id: string) => singleton || open.has(id);
+  const isOpen = (id: string) => open.has(id);
   const toggle = (id: string) => setOpen(prev => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
 
-  const allOpen = shown.every(g => isOpen(g.id));
 
   return (
     <div className={`catalogue by-${by}`}>
+      <div className="catalogue-find">
+        <input
+          className="text-field"
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Find any chord, like F#m7"
+          aria-label="Find any chord"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+      </div>
+
+      {found && (
+        <section className="catalogue-found">
+          {found.list.length === 0 ? (
+            <p className="song-empty">No chord called "{query.trim()}".</p>
+          ) : (
+            <div className="ctiles">
+              {found.list.map(symbol => (
+                <ChordTile key={symbol} symbol={symbol} inLoop={isLooped(symbol)} onOpen={onOpen} />
+              ))}
+            </div>
+          )}
+          {found.known && !isMine(found.known) && (
+            <button type="button" className="btn catalogue-add" onClick={() => { onAdd(found.known!); setQuery(''); }}>
+              + Add {found.known} to my chords
+            </button>
+          )}
+        </section>
+      )}
+
+      {!found && (
+      <>
       <div className="catalogue-bar">
-        <label className="catalogue-field">
-          <span className="field-label">Arrange by</span>
-          <Segmented<GroupBy> value={by} onChange={setBy} options={GROUPS} ariaLabel="Arrange chords by" size="sm" />
-        </label>
-
-        {/* The key, as the twelve notes laid out to tap, a dropdown hid
-            eleven of them behind a system menu. Sharps carry their flat name
-            under them, since a song in E♭ should not have to be found as D♯. */}
-        {by === 'key' && (
-          <div className="keypick">
-            <div className="keypick-grid" role="radiogroup" aria-label="Key">
-              {NOTE_NAMES.map((name, pc) => (
-                <button
-                  key={name}
-                  type="button"
-                  role="radio"
-                  aria-checked={rootPc === pc}
-                  className={`keypick-note${rootPc === pc ? ' is-on' : ''}${FLAT_NAMES[name] ? ' is-accidental' : ''}`}
-                  onClick={() => setRootPc(pc)}
-                >
-                  <span>{name.replace('#', '♯')}</span>
-                  {FLAT_NAMES[name] && <span className="keypick-flat">{FLAT_NAMES[name]}</span>}
-                </button>
-              ))}
-            </div>
-            <div className="keypick-scales" role="radiogroup" aria-label="Scale">
-              {SCALE_FORMULAS.map(sc => (
-                <button
-                  key={sc.name}
-                  type="button"
-                  role="radio"
-                  aria-checked={scaleName === sc.name}
-                  className={`chip-toggle${scaleName === sc.name ? ' is-on' : ''}`}
-                  title={sc.name}
-                  onClick={() => setScaleName(sc.name)}
-                >
-                  {SCALE_SHORT[sc.name] ?? sc.name}
-                </button>
-              ))}
-              <button
-                type="button"
-                aria-pressed={sevenths}
-                className={`chip-toggle is-switch${sevenths ? ' is-on' : ''}`}
-                onClick={() => setSevenths(v => !v)}
-              >
-                {sevenths ? '✓ ' : '+ '}Sevenths
-              </button>
-            </div>
-          </div>
-        )}
-
-        <label className="catalogue-field catalogue-only">
-          <span className="field-label">Show</span>
-          <Segmented<Only> value={only} onChange={setOnly} options={ONLY} ariaLabel="Filter by comfort" size="sm" />
-        </label>
-
-        {!singleton && (
-          <button
-            type="button"
-            className="btn catalogue-expand"
-            onClick={() => setOpen(allOpen ? new Set() : new Set(shown.map(g => g.id)))}
-          >
-            {allOpen ? 'Collapse all' : 'Expand all'}
-          </button>
-        )}
+        <Segmented<GroupBy> value={by} onChange={setBy} options={GROUPS} ariaLabel="Arrange chords by" size="sm" />
+        <button type="button" className="linklike catalogue-theory" onClick={() => go({ tab: 'theory', songId: null })}>
+          Chords in a key: Theory
+        </button>
       </div>
 
       {shown.length === 0 ? (
         <p className="song-empty">
-          {only === 'all' ? 'Nothing to show here.' : `No ${COMFORT_LABEL[only].toLowerCase()} chords in this arrangement.`}
+          Nothing to show here.
         </p>
       ) : shown.map(group => {
         const counts = tally(group.chords.map(c => c.symbol));
@@ -192,13 +132,10 @@ export const ChordCatalogue: React.FC<ChordCatalogueProps> = ({ isPicked, onTogg
               className="catgroup-head"
               onClick={() => toggle(group.id)}
               aria-expanded={opened}
-              disabled={singleton}
             >
-              {!singleton && (
-                <svg className="catgroup-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg className="catgroup-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="9 5 16 12 9 19" />
                 </svg>
-              )}
               <span className="catgroup-lead">
                 <span className="catgroup-title">{group.title}</span>
                 {group.subtitle && <span className="catgroup-sub readout">{group.subtitle}</span>}
@@ -241,17 +178,14 @@ export const ChordCatalogue: React.FC<ChordCatalogueProps> = ({ isPicked, onTogg
             </button>
 
             {opened && (
-              <div className="chordcards chordcards-book">
+              <div className="ctiles">
                 {group.chords.map(chord => (
-                  <ChordCard
+                  <ChordTile
                     key={chord.symbol + (chord.numeral ?? '')}
                     symbol={chord.symbol}
-                    markable
-                    shapes
-                    scale={0.66}
-                    picked={isPicked?.(chord.symbol)}
-                    onToggle={onToggle}
-                    meta={chord.numeral ?? chord.typeName}
+                    meta={by === 'difficulty' ? chord.typeName : undefined}
+                    inLoop={isLooped(chord.symbol)}
+                    onOpen={onOpen}
                   />
                 ))}
               </div>
@@ -259,6 +193,8 @@ export const ChordCatalogue: React.FC<ChordCatalogueProps> = ({ isPicked, onTogg
           </section>
         );
       })}
+      </>
+      )}
     </div>
   );
 };

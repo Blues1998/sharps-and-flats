@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChordDiagram } from './ChordDiagram';
 import { IconBeats, IconMetronome, IconPause, IconPlay, IconStop, IconTap, IconX } from './Icons';
+import { useBackToClose } from '../utils/nativeShell';
 import { StrumChip } from './StrumChip';
 import { LoopShelf, type LoopSetup } from './LoopShelf';
 import { LoopResult, type RunResult } from './LoopResult';
@@ -52,6 +54,16 @@ interface QuickPlayProps {
    * of what a loop is, which is its tempo, its metre and what it was called.
    */
   preset?: Handoff | null;
+  /**
+   * Where the compact player goes: a bar docked above the tab bar, so the loop
+   * can be seen and stopped from anywhere on the page while the panel itself
+   * stays shut. Without one the panel is all there is.
+   */
+  dock?: HTMLElement | null;
+  /** The full panel is showing (a sheet on a phone; always open on a desk). */
+  expanded?: boolean;
+  /** Show the full panel, from the docked bar. */
+  onExpand?: () => void;
 }
 
 /**
@@ -62,7 +74,18 @@ interface QuickPlayProps {
  * picker there. What the panel is for is everything after that, the order,
  * how long each chord is held, the tempo, and the strumming hand.
  */
-export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, order, onPhase, preset }) => {
+export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, order, onPhase, preset, dock = null, expanded = true, onExpand }) => {
+  useBackToClose(!!dock && expanded, onClose);
+  // On a phone the sheet has to sit above the tab bar, which the lab's own
+  // stacking layer cannot reach, so it is portaled to the body there. On a
+  // desk it stays in its column.
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1000px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1000px)');
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
   const [tempo, setTempo] = useState(80);
   const [beatsPerBar, setBeatsPerBar] = useState(4);
   // The pattern as written, not as resolved: what somebody typed is what the
@@ -412,7 +435,77 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
   const held = picking === null ? undefined : slots.find(slot => slot.symbol === picking);
   const chosen = held ? slotVoicing(held)?.label ?? null : null;
 
-  return (
+  // The compact player, docked. Shut, it names the loop and plays it; while
+  // it plays it shows the chord under your hand large, the next one small, and
+  // the beat, so following along never needs the panel.
+  const nowSlot = nowIndex >= 0 ? slots[nowIndex] : null;
+  const nextSlot = nowIndex >= 0 && slots.length > 0 ? slots[(nowIndex + 1) % slots.length] : null;
+  const nowShape = nowSlot ? slotVoicing(nowSlot) : null;
+  const nextShape = nextSlot ? slotVoicing(nextSlot) : null;
+  const docked = dock && createPortal(
+    <div className={`cdock${running ? ' is-live' : ''}`}>
+      {running && (
+        <div className="cdock-live" aria-live="off">
+          {countIn > 0 ? (
+            <span className="cdock-count readout">{countIn}</span>
+          ) : nowSlot && (
+            <>
+              <span className="cdock-now">
+                {nowShape && <ChordDiagram frets={nowShape.frets} fingers={nowShape.fingers} scale={0.62} />}
+                <span className="cdock-now-name">{nowSlot.symbol}</span>
+              </span>
+              {nextSlot && slots.length > 1 && (
+                <span className="cdock-next">
+                  {nextShape && <ChordDiagram frets={nextShape.frets} fingers={nextShape.fingers} scale={0.36} />}
+                  <span>then {nextSlot.symbol}</span>
+                </span>
+              )}
+            </>
+          )}
+          <span className="cdock-beats" aria-hidden="true">
+            {Array.from({ length: beatsPerBar }, (_, i) => (
+              <i key={i} className={moving && phase === 'playing' && i === pulse ? 'is-on' : ''} />
+            ))}
+          </span>
+        </div>
+      )}
+      <div className="cdock-row">
+        <button type="button" className="cdock-open" onClick={onExpand} aria-label="Open the loop">
+          {slots.length === 0 ? (
+            <span className="cdock-title">Build a loop</span>
+          ) : (
+            <span className="cdock-seq">
+              {slots.map((sl, i) => (
+                <span key={sl.id} className={i === nowIndex ? 'is-now' : ''}>{sl.symbol}</span>
+              ))}
+            </span>
+          )}
+          <span className="cdock-sub readout">
+            {slots.length === 0 ? 'Add chords from any chord, or start from a template' : `Loop · ${tempo} bpm · ${bars} bar${bars === 1 ? '' : 's'}`}
+          </span>
+        </button>
+        {running && (
+          <button type="button" className="cdock-stop" onClick={stop} aria-label="Stop">
+            <IconStop size={13} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          className="cdock-play"
+          onClick={moving ? pause : phase === 'paused' ? resume : start}
+          disabled={slots.length === 0}
+          aria-label={moving ? 'Pause' : phase === 'paused' ? 'Resume' : 'Play the loop'}
+        >
+          {moving
+            ? <IconPause size={16} fill="currentColor" strokeWidth={1} aria-hidden="true" />
+            : <IconPlay size={16} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />}
+        </button>
+      </div>
+    </div>,
+    dock
+  );
+
+  const panel = (
     <section className={`quickplay${moving ? ' is-running' : ''}`} aria-label="Quick play">
       <div className="quickplay-head">
         <span className="surface-label">Quick play</span>
@@ -421,13 +514,13 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
             ? 'empty'
             : `${slots.length} chord${slots.length === 1 ? '' : 's'} · ${bars} bar${bars === 1 ? '' : 's'} · ${seconds.toFixed(1)}s a lap`}
         </span>
-        <button type="button" className="quickplay-close" onClick={onClose} aria-label="Close quick play" title="Close">
+        <button type="button" className="quickplay-close" onClick={onClose} aria-label={dock ? 'Close the loop' : 'Close quick play'} title="Close">
           <IconX size={14} />
         </button>
       </div>
 
       {slots.length === 0 ? (
-        <p className="quickplay-empty">Tick any chord on the page to add it, or take one from the shelf below.</p>
+        <p className="quickplay-empty">{dock ? 'Open any chord and add it to the loop, or start from the shelf below.' : 'Tick any chord on the page to add it, or take one from the shelf below.'}</p>
       ) : (
         <ol className={`quickplay-seq${running ? ' is-compact' : ''}`}>
           {slots.map((slot, i) => {
@@ -732,6 +825,26 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
       )}
 
     </section>
+  );
+
+  if (!dock) return panel;
+
+  // Mounted all the time, so the loop keeps playing while the panel is shut.
+  // On a phone the panel is a sheet over the page; on a desk CSS keeps it
+  // open in its column and hides the docked bar.
+  const sheet = (
+    <div
+      className={`loopsheet${expanded ? ' is-open' : ''}`}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="loopsheet-panel" role={narrow ? 'dialog' : undefined} aria-modal={narrow && expanded ? true : undefined}>{panel}</div>
+    </div>
+  );
+  return (
+    <>
+      {narrow ? createPortal(sheet, document.body) : sheet}
+      {docked}
+    </>
   );
 };
 

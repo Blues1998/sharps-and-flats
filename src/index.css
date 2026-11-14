@@ -6438,18 +6438,863 @@ button.progression-chord:hover {
   min-width: 0;
 }
 
-.chordbook-add {
+/* ===== Chords: three tabs, a docked loop, a sheet per chord =====
+   Learn (rate new chords, the next one to learn), My chords (yours, in
+   sections), All chords (look anything up). The loop is one player that
+   keeps going across tabs: a bar docked above the tab bar on a phone, a
+   column on the right on a desk. */
+.cb-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.cb-head .lab-title { margin: 0; }
+
+.cb-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cb-summary strong {
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.cb-tabs {
+  position: sticky;
+  top: var(--sticky-top, 0px);
+  z-index: 12;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--toolbar-bg, var(--surface-1));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.cb-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.7rem 0.25rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font: 500 0.9rem var(--font-ui);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cb-tab.is-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--primary);
+}
+
+.cb-tab-n {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.cb-layout {
+  display: block;
+}
+
+.cb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (min-width: 1001px) {
+  .cb-tabs {
+    grid-template-columns: repeat(3, max-content);
+    gap: 1.6rem;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    position: static;
+  }
+
+  .cb-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .cb-side {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+/* ----- Tiles ----- */
+.ctiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.5rem;
+}
+
+.ctile {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.6rem 0.35rem 0.55rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--elevated-bg);
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.22s cubic-bezier(0.3, 1.5, 0.6, 1);
+}
+
+.ctile:hover { background: var(--elevated-bg-hover); }
+.ctile:active { transform: scale(0.97); transition-duration: 0.06s; }
+
+/* The rating, as the colour of the top edge. */
+.ctile::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+}
+
+.ctile.is-solid::before { background: var(--success); }
+.ctile.is-shaky::before { background: var(--warning); }
+.ctile.is-none::before { background: var(--text-muted); opacity: 0.6; }
+
+.ctile.is-looped { border-color: var(--primary); }
+
+.ctile-loop {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.ctile-name {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ctile-meta {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.ctile-noshape {
+  padding: 1.4rem 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ----- My chords ----- */
+.cb-find { max-width: 22rem; }
+
+.cb-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.cb-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cb-sec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.cb-sec.is-solid .cb-sec-dot { background: var(--success); }
+.cb-sec.is-shaky .cb-sec-dot { background: var(--warning); }
+.cb-sec.is-unrated .cb-sec-dot { background: transparent; border: 1.5px dashed var(--text-muted); }
+
+.cb-sec-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.cb-sec-n {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.cb-sec-caret {
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.cb-sec.is-shut .cb-sec-caret { transform: rotate(-90deg); }
+
+/* ----- Learn: the stack ----- */
+.rstack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1rem 1rem 0.9rem;
+  border-radius: 16px;
+  background: var(--elevated-bg);
+  box-shadow: var(--elevation);
+  overflow: hidden;
+}
+
+.rstack-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.rstack-top .surface-label { margin: 0; }
+
+.rstack-count {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.rstack-dots {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.rstack-dots i {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.rstack-dots i.is-done { background: var(--text-muted); }
+.rstack-dots i.is-now { background: var(--primary); }
+
+.rstack-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  animation: rstackIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes rstackIn {
+  from { opacity: 0; transform: translateX(28px) rotate(1.5deg); }
+  to { opacity: 1; transform: none; }
+}
+
+.rstack-shape {
+  padding: 0.2rem;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+}
+
+.rstack-name {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  line-height: 1.05;
+  color: var(--text-primary);
+}
+
+.rstack-why {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.rstack-hear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  padding: 0.25rem 0.4rem;
+  border: none;
+  background: none;
+  font: 600 0.8rem var(--font-ui);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.rstack-answers {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.rstack-answer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.65rem 0.25rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.3, 1.5, 0.6, 1), border-color 0.15s ease;
+}
+
+.rstack-answer:active { transform: scale(0.96); transition-duration: 0.06s; }
+.rstack-answer b { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
+.rstack-answer.is-solid b { color: var(--success); }
+.rstack-answer.is-shaky b { color: var(--warning); }
+.rstack-answer.is-solid:hover { border-color: var(--success); }
+.rstack-answer.is-shaky:hover { border-color: var(--warning); }
+.rstack-answer.is-none:hover { border-color: var(--text-muted); }
+
+.rstack-answer small {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.rstack .rstack-skip {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration-color: color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
+/* The top bar already names the page on a phone. */
+@media (max-width: 1000px) {
+  .cb-head .lab-title { display: none; }
+}
+
+.rstack.is-done {
+  flex-direction: row;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+}
+
+.rstack-tick {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--success-glow);
+  color: var(--success);
+}
+
+.rstack-said {
+  flex: 1;
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+/* ----- Learn: the next chord ----- */
+.cb-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--elevated-bg));
+  box-shadow: var(--elevation);
+}
+
+.cb-focus .surface-label { margin: 0; }
+
+.cb-focus-body {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cb-focus-shape {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.cb-focus-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.cb-focus-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.cb-focus-why {
+  font-size: 0.86rem;
+  color: var(--primary);
+}
+
+.cb-focus-pair {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cb-focus-pair i {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.cb-focus-go {
+  justify-content: center;
+  min-height: 44px;
+}
+
+.cb-later {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.cb-later-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.cb-later-chip small {
+  font-weight: 400;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+/* ----- All chords ----- */
+.catalogue-find .text-field { width: 100%; max-width: 26rem; }
+
+.catalogue-found {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.catalogue-found .ctiles { width: 100%; }
+
+.catalogue-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+}
+
+.catalogue-theory { font-size: 0.8rem; }
+.catgroup .ctiles { padding: 0.2rem 0.8rem 0.9rem; }
+
+/* ----- The chord sheet ----- */
+.csheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding-top: 0.5rem;
+}
+
+.csheet-grab {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.csheet-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.csheet-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  color: var(--text-primary);
+}
+
+.csheet-state {
+  margin-left: auto;
+  padding: 0.15rem 0.55rem;
+  border-radius: 7px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.csheet-state.is-solid { background: var(--success-glow); color: var(--success); }
+.csheet-state.is-shaky { background: var(--warning-glow); color: var(--warning); }
+.csheet-state.is-unrated { background: none; border: 1px dashed var(--text-muted); color: var(--text-muted); }
+
+.csheet-shapes {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 0.15rem;
+}
+
+.csheet-shapes::-webkit-scrollbar { display: none; }
+
+.csheet-shape {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.55rem 0.6rem 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.csheet-shape.is-on { border-color: var(--primary); }
+
+.csheet-shape-name {
+  max-width: 7.5rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.csheet-tier {
+  font-size: 0.62rem;
+  text-transform: capitalize;
+  color: var(--text-muted);
+}
+
+.csheet-shape.is-on .csheet-tier { color: var(--primary); font-weight: 600; }
+
+.csheet-hint {
+  margin: -0.35rem 0 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.csheet-used {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.csheet-used strong { font-weight: 500; color: var(--text-primary); }
+
+.csheet-rate {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
 }
 
-.chordbook-add .text-field {
-  width: 11rem;
+.csheet-rate-btn {
+  padding: 0.6rem 0.2rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 11px;
+  background: var(--surface-2);
+  font: 600 0.84rem var(--font-ui);
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
-.chordbook-queue {
-  box-shadow: inset 2px 0 0 var(--primary);
+.csheet-rate-btn.is-solid { color: var(--success); }
+.csheet-rate-btn.is-shaky { color: var(--warning); }
+.csheet-rate-btn.is-on.is-solid { border-color: var(--success); background: var(--success-glow); }
+.csheet-rate-btn.is-on.is-shaky { border-color: var(--warning); background: var(--warning-glow); }
+.csheet-rate-btn.is-on.is-none { border-color: var(--text-muted); background: var(--surface-3); }
+
+.csheet-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.csheet-actions .btn { justify-content: center; min-height: 44px; }
+.csheet-loop { flex: 1; }
+
+.csheet-remove {
+  align-self: center;
+  padding: 0.3rem;
+  border: none;
+  background: none;
+  font: 500 0.78rem var(--font-ui);
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ----- The loop: a docked bar, and a sheet on a phone ----- */
+.cb-dock {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 15;
+}
+
+.cb-dock:empty { display: none; }
+
+.cdock {
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.55);
+}
+
+.cdock-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem 0.5rem 0.4rem;
+}
+
+.cdock-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.2rem 0.35rem;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.cdock-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.cdock-seq {
+  display: flex;
+  gap: 0.2rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.cdock-seq span {
+  flex-shrink: 0;
+  padding: 0.05rem 0.35rem;
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.cdock-seq span.is-now {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.cdock-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.cdock-play,
+.cdock-stop {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.cdock-play {
+  width: 42px;
+  height: 42px;
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.cdock-play:disabled { opacity: 0.4; cursor: default; }
+
+.cdock-stop {
+  width: 34px;
+  height: 34px;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.cdock-live {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.9rem;
+  padding: 0.6rem 0.8rem 0;
+}
+
+.cdock-now,
+.cdock-next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.cdock-now-name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cdock-next {
+  opacity: 0.6;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.cdock-count {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--primary);
+  padding: 0.4rem 0.4rem 0;
+}
+
+.cdock-beats {
+  margin-left: auto;
+  align-self: center;
+  display: flex;
+  gap: 5px;
+}
+
+.cdock-beats i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--surface-3);
+}
+
+.cdock-beats i.is-on { background: var(--primary); }
+
+.loopsheet { display: none; }
+
+.loopsheet.is-open {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.5);
+  animation: overlayIn 0.16s ease both;
+}
+
+.loopsheet-panel {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-radius: 20px 20px 0 0;
+  background: var(--elevated-bg);
+  animation: msheetUp 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.loopsheet-panel .quickplay {
+  border-radius: 20px 20px 0 0;
+  box-shadow: none;
+}
+
+@media (min-width: 1001px) {
+  .cb-dock { display: none; }
+
+  .loopsheet,
+  .loopsheet.is-open {
+    position: static;
+    display: block;
+    background: none;
+    animation: none;
+  }
+
+  .loopsheet-panel {
+    max-height: none;
+    overflow: visible;
+    border-radius: 14px;
+    animation: none;
+  }
+
+  .loopsheet-panel .quickplay { border-radius: 14px; }
+  .loopsheet .quickplay-close { display: none; }
+}
+
+@media (max-width: 1000px) {
+  .cb-dock {
+    bottom: calc(var(--mtabs-h, 64px) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rstack-card,
+  .loopsheet.is-open,
+  .loopsheet-panel {
+    animation: none;
+  }
 }
 
 /* The other half of the same idea: the quick pass asks what you can play,
@@ -6474,30 +7319,6 @@ button.progression-chord:hover {
 .chordcard-drill:hover {
   background: var(--success);
   color: var(--surface-1);
-}
-
-.chordbook-next {
-  width: fit-content;
-  max-width: 100%;
-  box-shadow: inset 2px 0 0 var(--success);
-}
-
-/* Four cards at most, so they keep their own width instead of being stretched
-   across a row built for fifty. */
-.chordbook-next .chordcards {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.chordbook-filters {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  flex-wrap: wrap;
-}
-
-.chordbook-filters .text-field {
-  width: 10rem;
 }
 
 .chordcards-book .chordcard {
@@ -6539,22 +7360,6 @@ button.progression-chord:hover {
   .chordcards .chordcard.is-open {
     grid-column: 1 / -1;
   }
-}
-
-
-/* ---------------------------------------------------------------------------
-   The catalogue: every chord there is
-   ---------------------------------------------------------------------------
-   Two things share this page and they are not the same kind of list. What your
-   songs ask for is a working set of ten or so; this is a reference of a hundred
-   and thirty-two. So the reference gets group headings, a coverage bar on each,
-   and the ability to stay shut. */
-
-.chordbook-views {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  flex-wrap: wrap;
 }
 
 .catalogue {
@@ -7840,27 +8645,6 @@ button.qslot-shape:focus-visible {
   box-shadow: inset 0 0 0 1px var(--primary), inset 2px 0 0 var(--warning);
 }
 
-/* ===== The bucket =====
-   Pinned to the foot of the window while there is chord book left below it,
-   then coming to rest at the end of the page. Last child of the lab for that
-   reason: a sticky element only sticks inside its own parent's box. */
-.bucket {
-  position: sticky;
-  bottom: 0;
-  z-index: 25;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: auto;
-  padding: 0.55rem 0.8rem;
-  border-radius: 12px;
-  background: var(--toolbar-bg);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: var(--elevation);
-  animation: bucketIn 0.18s ease both;
-}
-
 @keyframes bucketIn {
   from {
     opacity: 0;
@@ -7868,104 +8652,9 @@ button.qslot-shape:focus-visible {
   }
 }
 
-.bucket-count {
-  flex-shrink: 0;
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
-/* The chords take whatever width is left and scroll sideways inside it. A
-   bucket that wrapped would grow up the screen and eat the page it is meant
-   to be a footnote to. */
-.bucket-chords {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  min-width: 0;
-  margin: 0;
-  padding: 0.15rem 0;
-  list-style: none;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-}
-
-.bucket-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.22rem;
-  border: none;
-  font-family: var(--font-display);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.bucket-x {
-  font-size: 0.9em;
-  line-height: 1;
-  color: var(--text-muted);
-  transition: color 0.15s ease;
-}
-
-.bucket-chip:hover {
-  background: var(--surface-3);
-}
-
-.bucket-chip:hover .bucket-x {
-  color: var(--danger);
-}
-
-.bucket-clear,
-.bucket-play {
-  flex-shrink: 0;
-  padding: 0.4rem 0.8rem;
-  font-size: 0.78rem;
-}
-
-/* Play and stop have to be the same size or the bar twitches every time the
-   loop starts. The word is shorter, so the button keeps a floor. */
-.bucket-play {
-  justify-content: center;
-  min-width: 7.2rem;
-}
-
-.bucket-clear:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* The panel's own wrapper. Empty it must take no room at all, or the page
-   carries a gap where quick play would have been. */
-.chordbook-panel:empty {
-  display: none;
-}
-
-@media (max-width: 640px) {
-  .bucket {
-    gap: 0.4rem;
-    padding: 0.45rem 0.5rem;
-  }
-
-  .bucket-count {
-    display: none;
-  }
-
-  .bucket-clear {
-    padding: 0.4rem 0.55rem;
-  }
-}
-
 /* While quick play is collecting, every shape on the page says so. */
 .chordcard.is-pickable .chordcard-play:hover {
   background: var(--primary-glow);
-}
-
-.chordbook-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
 }
 
 /* ===== Strumming patterns =====
@@ -11109,11 +11798,6 @@ button.strumcell:hover { background: var(--surface-3); }
   .mtab.is-active .mtab-icon::before {
     opacity: 1;
     transform: none;
-  }
-
-  /* Things that stick to the bottom of the page sit on the tab bar, not under it. */
-  .bucket {
-    bottom: calc(var(--mtabs-h) + env(safe-area-inset-bottom, 0px) + 0.5rem);
   }
 }
 

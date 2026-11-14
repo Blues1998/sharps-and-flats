@@ -1,59 +1,47 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChordBucket } from '../components/ChordBucket';
 import { LabIcon } from '../components/LabIcon';
-import { IconComfort } from '../components/Icons';
-import { ChordCard } from '../components/ChordCard';
+import { ChordDiagram } from '../components/ChordDiagram';
+import { ChordTile } from '../components/ChordTile';
+import { ChordSheet } from '../components/ChordSheet';
 import { ChordCatalogue } from '../components/ChordCatalogue';
+import { RateStack } from '../components/RateStack';
 import { QuickPlay, type TransportOrder } from '../components/QuickPlay';
 import { onHandoff, takeLoop, type Handoff } from '../utils/handoff';
 import { makeSlot, type Slot } from '../utils/loop';
-import { Segmented } from '../components/Segmented';
 import { useLibrary } from '../hooks/useLibrary';
 import { getSongs, songChords } from '../utils/library';
 import { timeChart } from '../utils/chart';
 import {
-  COMFORT_LABEL,
   chordKey,
   comfortOf,
   forgetChord,
   getChordSkills,
+  preferredVoicing,
   setComfort,
   setPreferredVoicing,
   skillFor,
   voicingsFor,
   type ChordComfort
 } from '../utils/chordbook';
-import { drillSlots, nextChords, reasonFor, type NextChord } from '../utils/next';
-import type { ChartPhase } from '../hooks/useChartTransport';
+import { drillSlots, nextChords, reasonInFull, type NextChord } from '../utils/next';
 import { normalizeChordSymbol } from '../utils/songText';
 import { chartsWithChord, hideChord, removeFromSongs, songsWithChord, unhideAll, unhideChord, useHiddenChords } from '../utils/chordRemoval';
 import { useBackToClose } from '../utils/nativeShell';
 
-type View = 'songs' | 'all';
+type Tab = 'learn' | 'mine' | 'all';
+type Section = ChordComfort | 'unrated';
 
-const VIEWS: { value: View; label: string }[] = [
-  { value: 'songs', label: 'In your songs' },
-  { value: 'all', label: 'All chords' }
+/** The order My chords is read in: what needs work first, what's done last. */
+const SECTIONS: { id: Section; label: string }[] = [
+  { id: 'none', label: 'Not yet' },
+  { id: 'shaky', label: 'Shaky' },
+  { id: 'unrated', label: 'Not rated' },
+  { id: 'solid', label: 'Solid' }
 ];
 
-type Filter = 'all' | ChordComfort | 'unrated';
-
-
-// A filter names one of the states the cards are marked with, so it shows the
-// same ring the cards show. Without it the row of words and the rings under
-// them are two vocabularies for one idea.
-const comfortOption = (value: ChordComfort, label: string) => (
-  <span className="filter-mark"><IconComfort state={value} />{label}</span>
-);
-
-const FILTERS: { value: Filter; label: React.ReactNode }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'solid', label: comfortOption('solid', 'Solid') },
-  { value: 'shaky', label: comfortOption('shaky', 'Shaky') },
-  { value: 'none', label: comfortOption('none', 'Not yet') },
-  { value: 'unrated', label: 'Unrated' }
-];
+/** With no songs yet, the chords most songs are made of. */
+const COMMON = ['C', 'G', 'D', 'Em', 'Am', 'E', 'A', 'F'];
 
 interface Entry {
   /** The canonical key the book files it under. */
@@ -78,15 +66,19 @@ interface Entry {
  */
 export const ChordBookLab: React.FC = () => {
   const ready = useLibrary();
-  const [view, setView] = useState<View>('songs');
-  // The bucket: what has been ticked, in the order it was ticked. It outlives
-  // the panel, so shutting quick play to go and find two more chords does not
-  // throw away the four you had.
+  const [tab, setTab] = useState<Tab | null>(null);
+  // The bucket: the loop being built, in the order chords were added. It
+  // outlives the sheet, so shutting the loop to go and find two more chords
+  // does not throw away the four you had.
   const [picked, setPicked] = useState<Slot[]>([]);
-  const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
-  const [adding, setAdding] = useState('');
+  const [sheetFor, setSheetFor] = useState<string | null>(null);
+  const [shut, setShut] = useState<Set<Section>>(() => new Set<Section>(['solid']));
+  // This visit's ratings from the stack, so it can say how the pass went.
+  const [ratedNow, setRatedNow] = useState<{ symbol: string; comfort: ChordComfort }[]>([]);
+  const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
+  const [dock, setDock] = useState<HTMLDivElement | null>(null);
   const skills = getChordSkills();
   const songs = getSongs();
   const hidden = useHiddenChords();
@@ -143,34 +135,28 @@ export const ChordBookLab: React.FC = () => {
     unrated: entries.filter(e => !e.rated).length
   }), [entries]);
 
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return entries.filter(e => {
-      if (q && !e.symbol.toLowerCase().includes(q)) return false;
-      if (filter === 'all') return true;
-      if (filter === 'unrated') return !e.rated;
-      return e.comfort === filter;
-    });
-  }, [entries, filter, query]);
-
-  // The unrated ones, easiest first: a pass you can make in a couple of
-  // minutes that turns the rest of the app on.
-  const queue = useMemo(
-    () => entries.filter(e => !e.rated).sort((a, b) => a.difficulty - b.difficulty).slice(0, 8),
+  // Unrated chords, easiest first: the stack in Learn. With no songs yet it
+  // offers the common open chords, so the app learns your hands on day one.
+  const unrated = useMemo(
+    () => entries.filter(e => !e.rated).sort((a, b) => a.difficulty - b.difficulty),
     [entries]
   );
+  const stack = useMemo(() => {
+    const pool = entries.length > 0
+      ? unrated.map(e => ({ symbol: e.symbol, song: e.songs[0] ?? null }))
+      : COMMON.filter(sym => !skillFor(sym)).map(symbol => ({ symbol, song: null }));
+    return pool.filter(c => !skipped.has(c.symbol));
+  }, [entries.length, unrated, skipped]);
 
-  // And once you have said what you cannot play, what to do about it. The two
-  // lists hand off to each other: the quick pass shrinks as chords are rated,
-  // and this one fills with what the rating turned up.
-  // The list under the quick pass leaves out the chords the quick pass is
-  // already showing: the same eight diagrams twice, one screen apart, read as
-  // a bug. Searching or filtering looks at everything again.
-  const listed = useMemo(() => {
-    if (filter !== 'all' || query.trim() || view !== 'songs') return shown;
-    const inQueue = new Set(queue.map(e => e.symbol));
-    return shown.filter(e => !inQueue.has(e.symbol));
-  }, [shown, queue, filter, query, view]);
+  // My chords, in sections, through the search field.
+  const sections = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q ? entries.filter(e => e.symbol.toLowerCase().includes(q)) : entries;
+    return SECTIONS.map(sec => ({
+      ...sec,
+      items: list.filter(e => (sec.id === 'unrated' ? !e.rated : e.rated && e.comfort === sec.id))
+    })).filter(sec => sec.items.length > 0);
+  }, [entries, query]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const next = useMemo(() => nextChords(6).filter(c => !hidden.has(c.key)).slice(0, 4), [songs, skills, hidden]);
@@ -237,18 +223,16 @@ export const ChordBookLab: React.FC = () => {
     setToast({ text: `Hid ${entry.symbol}`, undo: () => unhideChord(entry.key) });
   };
 
-  const addChord = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const symbol = normalizeChordSymbol(adding);
+  // A chord found by name in All chords. Added as "not yet" rather than as
+  // solid: putting it in the book is saying you have met it, not that you
+  // have it. Then it opens, so the next thing (its shapes) is right there.
+  const addChord = async (raw: string) => {
+    const symbol = normalizeChordSymbol(raw);
     if (!symbol) return;
-    // Added as "not yet" rather than as solid: putting it in the book is
-    // saying you have met it, not that you have it.
     if (!skills.some(s => s.id === chordKey(symbol))) await setComfort(symbol, 'none');
-    setAdding('');
-    setView('songs');
-    setQuery(symbol);
-    setFilter('all');
+    setSheetFor(symbol);
   };
+  const isMine = (symbol: string) => entries.some(e => e.key === chordKey(symbol));
 
   // Ticked by canonical key, so B flat and A sharp are the one chord here as
   // they are everywhere else in the book.
@@ -266,51 +250,21 @@ export const ChordBookLab: React.FC = () => {
       : [...prev, makeSlot(symbol)];
   });
 
-  // The bucket's button is the page's transport: down among the chords it is
-  // the only one in reach, so it starts and stops the loop rather than going
-  // to find the panel that can. The panel reports back where it has got to,
-  // which is what tells the button whether to offer play or stop.
+  // The docked bar and the sheet both drive the one player inside QuickPlay.
+  // Orders from here (Drill plays at once) go in as numbered requests.
   const [order, setOrder] = useState<TransportOrder | null>(null);
-  const [phase, setPhase] = useState<ChartPhase>('idle');
   const tell = (action: 'start' | 'stop') =>
     setOrder(prev => ({ id: (prev?.id ?? 0) + 1, action }));
 
-  // Quick play sits at the top of a page that is several screens long, so
-  // showing it has to bring it into view as well. Counted rather than
-  // watched, so it fires again on a second showing.
-  const panel = useRef<HTMLDivElement>(null);
-  const [calls, setCalls] = useState(0);
-  useEffect(() => {
-    if (calls > 0) panel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [calls]);
-  const show = () => {
-    setOpen(true);
-    setCalls(n => n + 1);
-  };
+  const openLoop = useCallback(() => setExpanded(true), []);
+  const closeLoop = useCallback(() => setExpanded(false), []);
 
-  // Shutting the panel takes the standing order with it. The panel is where
-  // the transport lives, so closing it stops the loop, and an order left
-  // lying about would be obeyed by the next panel the moment it opened.
-  const close = () => {
-    setOpen(false);
-    setOrder(null);
-  };
-
-  // Pressing play from the bucket opens the panel if it was shut, what is
-  // playing is worth seeing, but leaves you where you are if it was already
-  // open, because being yanked to the top of the page is not what pressing
-  // play asked for.
-  const play = () => {
-    if (!open) show();
-    tell('start');
-  };
-
-  // A suggestion you can act on in one press. Quick play opens on the drill
-  // whether or not it was already open, because pressing Drill is a decision
-  // about what to practise next and nothing else in the panel is.
+  // Drill: the chord and the changes into it, playing straight away. The
+  // loop bar shows what is sounding; the sheet stays shut.
   const drill = (chord: NextChord) => {
     setPicked(drillSlots(chord));
-    show();
+    setSheetFor(null);
+    tell('start');
   };
 
   /**
@@ -328,188 +282,219 @@ export const ChordBookLab: React.FC = () => {
     if (!loop) return;
     setPicked(loop.slots);
     setPreset(loop);
-    setOpen(true);
-    setCalls(n => n + 1);
+    setExpanded(true);
   }, []);
   useEffect(() => {
     accept();
     return onHandoff(accept);
   }, [accept]);
 
+  const rate = (symbol: string, comfort: ChordComfort) => {
+    setRatedNow(prev => [...prev, { symbol, comfort }]);
+    void setComfort(symbol, comfort);
+  };
+
   if (!ready) return <div className="songs-loading readout">Opening your chord book…</div>;
+
+  const total = entries.length;
+  const focus = next[0] ?? null;
+  const later = next.slice(1);
+  const songsOf = (symbol: string) => entries.find(e => e.key === chordKey(symbol))?.songs ?? [];
+  // Learn opens first while it has something to say, otherwise your chords.
+  const shownTab: Tab = tab ?? (stack.length > 0 || focus ? 'learn' : total > 0 ? 'mine' : 'learn');
+  const sheetEntry = sheetFor ? entries.find(e => e.key === chordKey(sheetFor)) ?? null : null;
+  const sheetNext = sheetFor ? next.find(n => n.key === chordKey(sheetFor)) ?? null : null;
+  const metaFor = (e: Entry) => (e.songs.length > 0 ? `${e.songs.length} song${e.songs.length === 1 ? '' : 's'}` : 'added by you');
+
+  // The drill as it will sound: the chord, then each partner, alternating.
+  const pair = focus ? drillSlots(focus).map(slot => slot.symbol) : [];
+  const focusShape = focus ? preferredVoicing(focus.symbol) : null;
 
   return (
     <div className="chordbook">
-      <header className="songs-head">
-        <div>
-          <h2 className="lab-title"><LabIcon tab="chordbook" />Chords</h2>
-          <p className="songs-count readout">
-            {entries.length === 0 ? (
-              <><strong>0</strong> chords</>
-            ) : (<>
-            <strong>{counts.solid}</strong> / {entries.length}
-            {entries.length > 0 && (
-              <span className="tallybar is-wide" aria-hidden="true">
-                <span className="tallybar-seg is-solid" style={{ flexGrow: counts.solid }} />
-                <span className="tallybar-seg is-shaky" style={{ flexGrow: counts.shaky }} />
-                <span className="tallybar-seg is-none" style={{ flexGrow: counts.none + counts.unrated }} />
-              </span>
-            )}
-            <span className="songs-count-sub">
-              {[
-                counts.shaky > 0 && `${counts.shaky} shaky`,
-                counts.none > 0 && `${counts.none} not yet`,
-                counts.unrated > 0 && `${counts.unrated} unrated`
-              ].filter(Boolean).join(' · ') || 'all marked'}
+      <header className="cb-head">
+        <h2 className="lab-title"><LabIcon tab="chordbook" />Chords</h2>
+        {total > 0 && (
+          <p className="cb-summary">
+            <span className="readout"><strong>{counts.solid}</strong> of {total} solid</span>
+            <span className="tallybar is-wide" aria-hidden="true">
+              <span className="tallybar-seg is-solid" style={{ flexGrow: counts.solid }} />
+              <span className="tallybar-seg is-shaky" style={{ flexGrow: counts.shaky }} />
+              <span className="tallybar-seg is-none" style={{ flexGrow: counts.none + counts.unrated }} />
             </span>
-            </>)}
           </p>
-        </div>
-        <div className="chordbook-actions">
-          <button
-            type="button"
-            className={`btn${open ? '' : ' btn-secondary'}`}
-            onClick={() => (open ? close() : show())}
-            aria-pressed={open}
-            title={open ? 'Close quick play' : undefined}
-          >
-            Quick play
-          </button>
-        </div>
-        <form className="chordbook-add" onSubmit={addChord}>
-          <input
-            className="text-field"
-            value={adding}
-            onChange={e => setAdding(e.target.value)}
-            placeholder="Add a chord"
-            aria-label="Add a chord by name"
-          />
-          <button type="submit" className="btn" disabled={!adding.trim()}>Add</button>
-        </form>
+        )}
       </header>
 
-      <div ref={panel} className="chordbook-panel">
-        {open && (
+      <div className="cb-tabs" role="tablist" aria-label="Chords">
+        {([
+          ['learn', 'Learn', stack.length > 0 ? stack.length : null],
+          ['mine', 'My chords', total > 0 ? total : null],
+          ['all', 'All chords', null]
+        ] as [Tab, string, number | null][]).map(([id, label, n]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={shownTab === id}
+            className={`cb-tab${shownTab === id ? ' is-active' : ''}`}
+            onClick={() => setTab(id)}
+          >
+            {label}{n !== null && <span className="cb-tab-n readout">{n}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="cb-layout">
+        <div className="cb-main">
+          {shownTab === 'learn' && (
+            <>
+              <RateStack
+                cards={stack}
+                ratedNow={ratedNow}
+                common={entries.length === 0}
+                onRate={rate}
+                onSkip={(symbol: string) => setSkipped(prev => new Set(prev).add(symbol))}
+                onAgain={() => { setRatedNow([]); setSkipped(new Set()); }}
+              />
+
+              {focus && (
+                <section className="cb-focus">
+                  <span className="surface-label">Learn next</span>
+                  <div className="cb-focus-body">
+                    <button type="button" className="cb-focus-shape" onClick={() => setSheetFor(focus.symbol)} aria-label={`Open ${focus.symbol}`}>
+                      {focusShape && <ChordDiagram frets={focusShape.frets} fingers={focusShape.fingers} scale={0.8} />}
+                    </button>
+                    <div className="cb-focus-text">
+                      <h3 className="cb-focus-name">{focus.symbol}</h3>
+                      <span className="cb-focus-why">{reasonInFull(focus)}</span>
+                      {pair.length > 1 && (
+                        <span className="cb-focus-pair readout" aria-label={`The change you'll drill: ${pair.join(', ')}`}>
+                          {pair.map((sym, k) => (
+                            <React.Fragment key={k}>{k > 0 && <i aria-hidden="true">↔</i>}{sym}</React.Fragment>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button type="button" className="btn btn-primary cb-focus-go" onClick={() => drill(focus)}>
+                    Drill {focus.symbol}
+                  </button>
+                  {later.length > 0 && (
+                    <div className="cb-later">
+                      <span>Then</span>
+                      {later.map(n => (
+                        <button key={n.key} type="button" className="chip-btn cb-later-chip" onClick={() => setSheetFor(n.symbol)}>
+                          {n.symbol}<small>{n.unlocks.length > 0 ? 'finishes a song' : `${n.songs} song${n.songs === 1 ? '' : 's'}`}</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {stack.length === 0 && ratedNow.length === 0 && !focus && (
+                <div className="songs-blank">
+                  <p className="songs-blank-title">{total > 0 ? 'Nothing to learn next' : 'The chords your songs need'}</p>
+                  <p className="songs-blank-said">
+                    {total > 0
+                      ? 'Every chord your songs use is rated, and none is marked Not yet. Mark one Not yet and it shows up here with a drill.'
+                      : 'Add a song with its chords and they all land here to rate and drill. You can also look any chord up in All chords.'}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {shownTab === 'mine' && (
+            total === 0 ? (
+              <div className="songs-blank">
+                <p className="songs-blank-title">No chords yet</p>
+                <p className="songs-blank-said">Add a song with its chords, or find a chord in All chords and add it.</p>
+              </div>
+            ) : (
+              <>
+                <input
+                  className="text-field cb-find"
+                  type="search"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Find a chord"
+                  aria-label="Find one of your chords"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
+                {sections.length === 0 && <p className="song-empty">None of your chords match "{query.trim()}".</p>}
+                {sections.map(sec => {
+                  const closed = shut.has(sec.id) && !query.trim();
+                  return (
+                    <section key={sec.id} className={`cb-sec is-${sec.id}${closed ? ' is-shut' : ''}`}>
+                      <button
+                        type="button"
+                        className="cb-sec-head"
+                        aria-expanded={!closed}
+                        onClick={() => setShut(prev => {
+                          const nextSet = new Set(prev);
+                          if (nextSet.has(sec.id)) nextSet.delete(sec.id); else nextSet.add(sec.id);
+                          return nextSet;
+                        })}
+                      >
+                        <i className="cb-sec-dot" aria-hidden="true" />
+                        <span className="cb-sec-label">{sec.label}</span>
+                        <span className="cb-sec-n readout">{sec.items.length}</span>
+                        <svg className="cb-sec-caret" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
+                      </button>
+                      {!closed && (
+                        <div className="ctiles">
+                          {sec.items.map(e => (
+                            <ChordTile key={e.key} symbol={e.symbol} meta={metaFor(e)} inLoop={isPicked(e.symbol)} onOpen={setSheetFor} />
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
+                {hidden.size > 0 && (
+                  <p className="chordbook-hidden">
+                    {hidden.size} hidden chord{hidden.size === 1 ? '' : 's'} ·{' '}
+                    <button type="button" className="linklike" onClick={unhideAll}>show {hidden.size === 1 ? 'it' : 'them'}</button>
+                  </p>
+                )}
+              </>
+            )
+          )}
+
+          {shownTab === 'all' && (
+            <ChordCatalogue onOpen={setSheetFor} onAdd={symbol => void addChord(symbol)} isMine={isMine} isLooped={isPicked} />
+          )}
+        </div>
+
+        <aside className="cb-side">
           <QuickPlay
             slots={picked}
             preset={preset}
             onChange={setPicked}
-            onClose={close}
+            onClose={closeLoop}
+            onExpand={openLoop}
             order={order}
-            onPhase={setPhase}
+            dock={dock}
+            expanded={expanded}
           />
-        )}
+        </aside>
       </div>
 
-      <div className="chordbook-views">
-        <Segmented<View> value={view} onChange={setView} options={VIEWS} ariaLabel="Which chords" />
-      </div>
+      <div className="cb-dock" ref={setDock} />
 
-      {view === 'all' && <ChordCatalogue isPicked={isPicked} onToggle={toggle} />}
-
-      {view === 'songs' && queue.length > 0 && (
-        <section className="song-panel chordbook-queue">
-          <div className="surface-label">
-            <span>Quick pass</span>
-            <span className="readout">{counts.unrated} left · easiest first</span>
-          </div>
-          <div className="chordcards">
-            {queue.map(e => (
-              <ChordCard key={e.symbol} symbol={e.symbol} markable picked={isPicked(e.symbol)} onToggle={toggle} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {view === 'songs' && next.length > 0 && (
-        <section className="song-panel chordbook-next">
-          <div className="surface-label">
-            <span>Learn next</span>
-            <span className="readout">closest to a song first</span>
-          </div>
-          <div className="chordcards">
-            {next.map(chord => (
-              <ChordCard
-                key={chord.key}
-                symbol={chord.symbol}
-                markable
-                picked={isPicked(chord.symbol)}
-                onToggle={toggle}
-                meta={reasonFor(chord)}
-                footer={
-                  <button
-                    type="button"
-                    className="btn chordcard-drill"
-                    onClick={() => drill(chord)}
-                    title={
-                      chord.partners.length > 0
-                        ? `Loop ${chord.symbol} against ${chord.partners.join(' and ')}`
-                        : `Loop ${chord.symbol}`
-                    }
-                  >
-                    Drill
-                  </button>
-                }
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {view === 'songs' && entries.length === 0 && (
-        <div className="songs-blank">
-          <p className="songs-blank-title">The chords your songs need</p>
-          <p className="songs-blank-said">
-            Add a song with its chords and they all land here, with diagrams, to rate and drill. You can also add one by name above, or browse every shape under All chords.
-          </p>
-        </div>
-      )}
-
-      {view === 'songs' && entries.length > 0 && (
-        <>
-      <div className="chordbook-filters">
-        <Segmented<Filter> value={filter} onChange={setFilter} options={FILTERS} ariaLabel="Filter chords" size="sm" />
-        <input
-          className="text-field"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Find a chord"
-          aria-label="Find a chord"
+      {sheetFor && (
+        <ChordSheet
+          symbol={sheetFor}
+          songs={songsOf(sheetFor)}
+          inLoop={isPicked(sheetFor)}
+          onToggleLoop={() => toggle(sheetFor)}
+          onDrill={sheetNext ? () => drill(sheetNext) : undefined}
+          onRemove={sheetEntry ? () => { setSheetFor(null); void startRemove(sheetEntry); } : undefined}
+          onClose={() => setSheetFor(null)}
         />
-      </div>
-
-      {listed.length === 0 ? (
-        <p className="song-empty">
-          {shown.length > 0
-            ? 'Every chord is in the quick pass above. Rate them there and they move down here.'
-            : `Nothing ${filter === 'unrated' ? 'unrated' : COMFORT_LABEL[filter as ChordComfort]?.toLowerCase() ?? ''} here.`}
-        </p>
-      ) : (
-        <div className="chordcards chordcards-book">
-          {listed.map(e => (
-            <ChordCard
-              key={e.symbol}
-              symbol={e.symbol}
-              markable
-              shapes
-              scale={0.66}
-              picked={isPicked(e.symbol)}
-              onToggle={toggle}
-              meta={e.songs.length > 0 ? `${e.songs.length} song${e.songs.length === 1 ? '' : 's'}` : 'added by you'}
-              metaTitle={e.songs.length > 0 ? e.songs.join(' · ') : undefined}
-              onRemove={() => void startRemove(e)}
-            />
-          ))}
-        </div>
-      )}
-        </>
-      )}
-
-      {view === 'songs' && hidden.size > 0 && (
-        <p className="chordbook-hidden">
-          {hidden.size} hidden chord{hidden.size === 1 ? '' : 's'} ·{' '}
-          <button type="button" className="linklike" onClick={unhideAll}>show {hidden.size === 1 ? 'it' : 'them'}</button>
-        </p>
       )}
 
       {/* Portaled: inside the page they sat under the phone's tab bar, since
@@ -554,18 +539,6 @@ export const ChordBookLab: React.FC = () => {
         document.body
       )}
 
-      {/* Last in the page, so it pins to the bottom of the window for as long
-          as there is chord book above it and then comes to rest at the end. */}
-      {picked.length > 0 && (
-        <ChordBucket
-          slots={picked}
-          running={open && phase !== 'idle' && phase !== 'done'}
-          onRemove={id => setPicked(prev => prev.filter(slot => slot.id !== id))}
-          onClear={() => setPicked([])}
-          onPlay={play}
-          onStop={() => tell('stop')}
-        />
-      )}
     </div>
   );
 };
