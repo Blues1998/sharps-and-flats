@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useSyncExternalStore } from 'react';
 import { IconBest, IconCheck, IconX } from './Icons';
-import { go } from '../hooks/useRoute';
+import { go, useRoute } from '../hooks/useRoute';
 import { handLoop } from '../utils/handoff';
 import { COMFORT_LABEL } from '../utils/chordbook';
 import {
@@ -30,7 +30,8 @@ subscribeRun(bump);
 /** Whether a bar is on screen, for the shell that has to make room for it. */
 export function useRunning(): boolean {
   useSyncExternalStore(subscribeRun, () => version, () => 0);
-  return getRun() !== null || getReport() !== null;
+  const onToday = useRoute().tab === 'dashboard';
+  return !onToday && (getRun() !== null || getReport() !== null);
 }
 
 export const RunBar: React.FC = () => {
@@ -41,17 +42,26 @@ export const RunBar: React.FC = () => {
   // Where the run has sent us, so that wandering off mid-step is allowed.
   // Navigating on every render would pin you to the tuner until you pressed a
   // button; navigating when the step changes is the run doing its one job.
-  const sent = useRef(-1);
+  // Keyed by run and step, and seeded with the run found on opening the app:
+  // reopening mid-session lands on Today, which shows the run and a Resume,
+  // instead of being pulled onto whichever screen the step was on.
+  const keyOf = (r: typeof run) => (r ? `${r.startedAt}:${r.at}` : '');
+  const sent = useRef(keyOf(run));
   useEffect(() => {
-    if (!run) { sent.current = -1; return; }
-    if (sent.current === run.at) return;
-    sent.current = run.at;
+    if (!run) { sent.current = ''; return; }
+    if (sent.current === keyOf(run)) return;
+    sent.current = keyOf(run);
     const now = run.steps[run.at];
     if (!now) return;
     const loop = stepLoop(now);
     if (loop) handLoop(loop);
     go({ tab: now.tab, songId: now.songId ?? null });
   }, [run]);
+
+  // Today shows the run, and its report, at full size in its Tonight card.
+  // The bar would say the same thing twice, one card above it.
+  const onToday = useRoute().tab === 'dashboard';
+  if (onToday) return null;
 
   if (report) {
     const nothing = report.promoted.length === 0 && report.records.length === 0;

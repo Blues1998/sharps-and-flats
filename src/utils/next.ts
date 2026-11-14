@@ -102,6 +102,16 @@ export function reasonFor(chord: NextChord): string {
 }
 
 /**
+ * The same reason with room to say it: Today's plan has a full line per step,
+ * so the song is named whatever its length.
+ */
+export function reasonInFull(chord: NextChord): string {
+  if (chord.unlocks.length === 1) return `Finishes ${chord.unlocks[0]}`;
+  if (chord.unlocks.length > 1) return `Finishes ${chord.unlocks.length} of your songs`;
+  return chord.songs === 1 ? 'In one of your songs' : `In ${chord.songs} of your songs`;
+}
+
+/**
  * A loop for learning one chord: the new shape, and the changes into it.
  *
  * Two bars each, alternating, because what is hard about a chord is never the

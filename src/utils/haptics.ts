@@ -74,7 +74,7 @@ export function feel(kind: Feel): void {
 
 // ---- The listener ------------------------------------------------------------
 
-const TAP = '.dash-run, .btn-primary, .transport-btn, .chordcard-play, .mtab, .practice-card, button.dash-card, .daynode, .songrow, .onb-choice';
+const TAP = '.tday-row, .tday-song, .tday-step button, .btn-primary, .transport-btn, .chordcard-play, .mtab, .practice-card, .daynode, .songrow, .onb-choice';
 const SELECT = '.segmented button, [role="tab"], [aria-pressed], .btn, .chip, .mtop-icon, summary, a.btn';
 
 const ranges = new WeakMap<HTMLInputElement, number>();

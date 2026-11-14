@@ -2077,395 +2077,648 @@ input[type='range'] {
   }
 }
 
-/* ===== Dashboard =====
-   A launcher. The name, the drawing, one line of progress, and the labs,
-   nothing that needs reading before you can press something. */
-.dash {
+/* ===== Today =====
+   One question: what do I do now. The Tonight card answers it and changes
+   with the evening (first open, plan, halfway, finished). Under it, only what
+   helps decide what comes after. On a phone the two columns dissolve into one
+   list, ordered by `order`; on a wide screen tonight stays left. */
+.tday {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.85rem;
 }
 
-/* Flat, and flush with the grid below it, the hero is a masthead, not a
-   slab. Anything boxed here would be a card, which is the thing we removed. */
-/* The one photograph in the app. It is a stage surface like the waveform
-   canvases: it stays dark in the light theme rather than being washed out,
-   which is why the title colours here are literals and not theme tokens. */
-.hero {
+.tday-main,
+.tday-side {
+  display: contents;
+}
+
+.tday-hero { order: 1; }
+.tday-lesson, .tday-week { order: 2; }
+.tday-songs { order: 3; }
+.tday-tip { order: 4; }
+.tday-journey { order: 5; }
+
+@media (min-width: 1001px) {
+  .tday {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .tday-main,
+  .tday-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+}
+
+/* The status colours, orange to green the way a song goes. */
+.tday-status i.is-learning, .tday-edge.is-learning { background: var(--primary); }
+.tday-status i.is-playable, .tday-edge.is-playable { background: color-mix(in srgb, var(--primary) 55%, var(--warning)); }
+.tday-status i.is-solid, .tday-edge.is-solid { background: color-mix(in srgb, var(--success) 55%, var(--warning)); }
+.tday-status i.is-complete, .tday-edge.is-complete { background: var(--success); }
+
+/* ----- Tonight -----
+   The one photograph in the app sits faded behind tonight's song. It is a
+   stage surface: dark in the dark theme, inverted to paper in the light one,
+   which is why its colours come from the --hero-* tokens. */
+.tday-hero {
   position: relative;
-  display: flex;
-  align-items: center;
-  /* A masthead, not a poster: it names the app and the week, and the cards
-     under it are what the screen is for. */
-  min-height: 176px;
-  padding: 0 2.5rem;
-  border-radius: 14px;
+  isolation: isolate;
   overflow: hidden;
-  background-color: rgb(var(--hero-ground-rgb));
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  padding: 1.15rem 1.15rem 1.2rem;
+  border-radius: 18px;
+  background: rgb(var(--hero-ground-rgb));
+  color: var(--hero-ink);
   box-shadow: var(--elevation);
 }
 
-/* The photograph sits on its own layer so the light theme can invert it
-   without inverting the name laid over it. */
-.hero::after {
+.tday-hero::before {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 0;
-  background-image: var(--hero-image);
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: right center;
+  z-index: -2;
+  background: var(--tday-photo) right -90px top -10px / auto 150px no-repeat;
   filter: var(--hero-photo-filter);
+  opacity: 0.6;
   pointer-events: none;
 }
 
-/* The scrim never reaches transparent. Left of the name it is solid, so the
-   title always holds; across the instrument it stays a veil, so the guitar
-   reads as something the panel is lit by rather than a photograph pasted
-   into it. */
-.hero::before {
+.tday-hero::after {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 1;
-  background: linear-gradient(
-    90deg,
-    rgb(var(--hero-ground-rgb)) 0%,
-    rgba(var(--hero-ground-rgb), 0.94) 28%,
-    rgba(var(--hero-ground-rgb), 0.5) 100%
-  );
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(var(--hero-ground-rgb), 0) 0, rgba(var(--hero-ground-rgb), 0.8) 105px, rgb(var(--hero-ground-rgb)) 165px),
+    linear-gradient(90deg, rgb(var(--hero-ground-rgb)) 28%, rgba(var(--hero-ground-rgb), 0) 85%);
   pointer-events: none;
 }
 
-.hero-title {
-  position: relative;
-  z-index: 2;
-  font-size: 3.1rem;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.02;
+.tday-when {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--hero-accent) 50%, var(--hero-ink));
+}
+
+.tday-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.tday-title h2 {
   margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
   color: var(--hero-ink);
 }
 
-/* One word carries the accent, not the whole name */
-.hero-title span {
+.tday-title > span {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--hero-ink) 68%, transparent);
+}
+
+.tday-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tday-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* The plan, as a timeline. Every step is a button: start from it. */
+.tday-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tday-step button {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  width: calc(100% + 0.7rem);
+  margin: 0 -0.35rem;
+  padding: 0.42rem 0.35rem;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tday-step button:hover {
+  background: color-mix(in srgb, var(--hero-ink) 5%, transparent);
+}
+
+.tday-dot {
+  position: relative;
+  flex: 0 0 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.tday-dot i {
+  position: relative;
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  margin-top: 4px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--hero-ink) 38%, transparent);
+  background: rgb(var(--hero-ground-rgb));
+}
+
+.tday-step:not(:last-child) .tday-dot::after {
+  content: '';
+  position: absolute;
+  top: 17px;
+  bottom: -12px;
+  width: 1.5px;
+  background: color-mix(in srgb, var(--hero-ink) 18%, transparent);
+}
+
+.tday-step.is-song .tday-dot i { border-color: var(--hero-accent); }
+
+.tday-step.is-done .tday-dot i {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.tday-step.is-done .tday-dot i::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 3px;
+  height: 5px;
+  border: solid rgb(var(--hero-ground-rgb));
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.tday-step.is-done .tday-dot::after { background: color-mix(in srgb, var(--success) 55%, transparent); }
+.tday-step.is-skipped .tday-dot i { border-style: dashed; }
+
+.tday-step.is-now .tday-dot i {
+  border-color: var(--hero-accent);
+  background: var(--hero-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--hero-accent) 20%, transparent);
+}
+
+.tday-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.tday-step-text b {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.tday-step-text small {
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--hero-ink) 55%, transparent);
+}
+
+.tday-step.is-done .tday-step-text b,
+.tday-step.is-skipped .tday-step-text b {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--hero-ink) 50%, transparent);
+}
+
+.tday-now {
+  margin-left: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--hero-accent);
 }
 
-/* The curriculum, said in a bar and two numbers. The levels are a click away
-   and there is no sentence here explaining that. */
-.dash-progress {
+.tday-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  width: 100%;
-  padding: 0.85rem 1.25rem;
-  border: none;
-  border-radius: 10px;
-  background: var(--surface-2);
-  box-shadow: var(--elevation-low);
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  gap: 0.9rem;
 }
 
-.dash-progress:hover {
-  background: var(--surface-3);
-  color: var(--text-primary);
-}
-
-.dash-progress-label {
-  flex-shrink: 0;
-  font-weight: 500;
-}
-
-.dash-progress-bar {
+.tday-go {
   flex: 1;
-  min-width: 60px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--surface-3);
-  overflow: hidden;
-}
-
-.dash-progress:hover .dash-progress-bar {
-  background: var(--surface-1);
-}
-
-.dash-progress-bar span {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--primary);
-  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.dash-progress-count {
-  flex-shrink: 0;
-  font-size: 0.78rem;
-  color: var(--text-primary);
-}
-
-/* A question, not a tagline. Small enough that the name still carries the
-   frame, the guitar behind it is doing most of the talking. */
-.hero-copy {
-  position: relative;
-  z-index: 2;
-}
-
-.hero-eyebrow {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--hero-ink);
-  opacity: 0.5;
-}
-
-/* ===== Today =====
-   The one card allowed to be big, because it is the answer to the only
-   question the page asks. Everything below it is context for this. */
-.today {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 1.5rem 1.6rem 1.6rem;
-  border-radius: 14px;
-  background: var(--elevated-bg);
-  box-shadow: var(--elevation), inset 3px 0 0 var(--primary);
-}
-
-/* Nothing has been chosen for today: the card keeps its size and loses its
-   accent, so an empty day reads as an empty day rather than as an error. */
-.today.is-empty {
-  box-shadow: var(--elevation), inset 3px 0 0 var(--surface-3);
-}
-
-.today-mark {
-  display: flex;
-  align-items: baseline;
-  gap: 0.7rem;
-  width: 100%;
-}
-
-.today-mark .surface-label {
-  margin-bottom: 0;
-}
-
-.today-day {
-  margin-left: auto;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-.today-title {
-  margin: 0.9rem 0 0.2rem;
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  color: var(--text-primary);
-}
-
-.today.is-empty .today-title {
-  font-size: 1.45rem;
-  color: var(--text-secondary);
-}
-
-.today-artist {
-  margin: 0;
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-}
-
-.today-meta {
-  margin: 0.55rem 0 0;
-  font-size: 0.82rem;
-  color: var(--primary);
-}
-
-.today-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.1rem;
-  margin-top: 1.1rem;
-}
-
-.today-stat {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 44px;
   white-space: nowrap;
 }
 
-.today-stat .readout {
-  margin-right: 0.35rem;
-  font-size: 0.95rem;
-  color: var(--text-primary);
-}
-
-.today-go {
-  margin-top: 1.35rem;
-}
-
-/* ===== The cards under it =====
-   Two to a row, equal weight. None of them is the point of the page on its
-   own; together they are the state of the month. */
-.dash-row {
-  display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 0.85rem;
-  align-items: stretch;
-}
-
-.dash-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  padding: 1.1rem 1.2rem 1.15rem;
+.tday-quiet {
+  flex-shrink: 0;
+  padding: 0.4rem 0.1rem;
   border: none;
-  border-radius: 12px;
-  background: var(--elevated-bg);
-  box-shadow: var(--elevation);
-  font-family: var(--font-ui);
-  text-align: left;
-  color: var(--text-secondary);
-  transition: box-shadow 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-/* Only the ones that go somewhere lift. A panel that rises under the pointer
-   and then does nothing when pressed is a lie told in CSS. */
-button.dash-card {
+  background: none;
+  font: 500 0.86rem var(--font-ui);
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--hero-ink) 75%, transparent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--hero-ink) 25%, transparent);
+  text-underline-offset: 4px;
   cursor: pointer;
 }
 
-button.dash-card:hover {
-  background: var(--elevated-bg-hover);
-  box-shadow: var(--elevation-hover);
+.tday-quiet:hover { color: var(--hero-ink); }
+
+.tday-wins {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
 }
 
-button.dash-card:active {
-  transform: translateY(0);
-  box-shadow: var(--elevation-low);
+.tday-wins li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
 }
 
-.card-head {
+.tday-wins li i {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+}
+
+.tday-wins li small {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--hero-ink) 55%, transparent);
+}
+
+/* ----- Cards and rows under it ----- */
+.tday-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem;
+  border-radius: 14px;
+  background: var(--elevated-bg);
+  box-shadow: var(--elevation);
+}
+
+.tday-card .surface-label { margin-bottom: 0; }
+
+.tday-card-head {
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
 }
 
-.card-head .surface-label {
-  margin-bottom: 0;
-}
-
-.card-count {
+.tday-link {
   margin-left: auto;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  padding: 0;
+  border: none;
+  background: none;
+  font: 500 0.8rem var(--font-ui);
+  color: var(--primary);
+  cursor: pointer;
 }
 
-.card-count strong {
+.tday-week-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.tday-big {
+  margin-top: 0.15rem;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
   font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
-.card-foot {
-  margin-top: auto;
-  font-size: 0.74rem;
+.tday-big small {
+  margin-left: 0.3rem;
+  font: 400 0.8rem var(--font-ui);
+  letter-spacing: 0;
   color: var(--text-muted);
 }
 
-/* ===== Repertoire overview ===== */
-.repertoire-card {
-  min-height: 140px;
-}
-
-.repertoire-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin: 0.35rem 0;
-}
-
-.repertoire-stat-row {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.rep-stat-item {
+.tday-running {
   display: inline-flex;
   align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.tday-running i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.tday-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.45rem;
 }
 
-.rep-stat-item .readout {
-  font-size: 0.95rem;
+.tday-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.tday-track {
+  position: relative;
+  width: 100%;
+  max-width: 34px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--surface-3);
+}
+
+.tday-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: color-mix(in srgb, var(--primary) 58%, var(--surface-3));
+  transform-origin: bottom;
+  animation: tday-grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms + 120ms);
+}
+
+/* Today is open, not missed: an outline until something is logged. */
+.tday-day.is-today .tday-track {
+  background: transparent;
+  outline: 1.5px dashed color-mix(in srgb, var(--text-muted) 55%, transparent);
+  outline-offset: -1.5px;
+}
+
+.tday-day.is-today.is-on .tday-track {
+  outline: none;
+  background: var(--surface-3);
+}
+
+.tday-day.is-today .tday-fill { background: var(--primary); }
+
+/* Days played back to back are joined under their bars. */
+.tday-day.is-linked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 15px;
+  width: calc(100% + 0.45rem);
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--primary) 50%, transparent);
+}
+
+.tday-letter {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.tday-day.is-today .tday-letter { color: var(--text-primary); }
+
+.tday-fact {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.tday-fact b {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.tday-songlist {
+  display: flex;
+  flex-direction: column;
+}
+
+.tday-song {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.6rem 0;
+  border: none;
+  border-top: 1px solid var(--panel-border);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tday-song:first-child {
+  border-top: none;
+  padding-top: 0.1rem;
+}
+
+.tday-edge {
+  flex-shrink: 0;
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+}
+
+.tday-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: none;
+  border-radius: 14px;
+  background: var(--elevated-bg);
+  box-shadow: var(--elevation);
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.tday-row:hover { background: var(--elevated-bg-hover); }
+
+.tday-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.tday-row-text b {
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.rep-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
+.tday-row-text small {
+  font-size: 0.76rem;
+  color: var(--text-muted);
 }
 
-.rep-dot.is-learning {
-  background: var(--primary);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--primary) 50%, transparent);
+.tday-tip .tday-row-text,
+.tday-lesson .tday-row-text {
+  gap: 0.25rem;
 }
 
-.rep-dot.is-complete {
-  background: var(--success);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--success) 40%, transparent);
+.tday-tip small,
+.tday-lesson small {
+  order: -1;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
 }
 
-/* The four statuses run orange to green, the way a song does. */
-.rep-dot.is-playable,
-.meter-seg.is-playable {
-  background: color-mix(in srgb, var(--primary) 55%, var(--warning));
+.tday-tip b {
+  font-weight: 500;
+  line-height: 1.4;
 }
 
-.rep-dot.is-solid,
-.meter-seg.is-solid {
-  background: color-mix(in srgb, var(--success) 55%, var(--warning));
+.tday-lesson {
+  background: color-mix(in srgb, var(--primary) 7%, var(--elevated-bg));
 }
 
-.repertoire-meter {
-  display: flex;
-  height: 6px;
-  width: 100%;
-  background: var(--surface-2);
-  border-radius: 999px;
-  overflow: hidden;
-  gap: 2px;
+/* The warm-up offer inside Tonight's card, on the photograph's ground. */
+.tday-row-inset {
+  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--hero-ink) 12%, transparent);
+  background: color-mix(in srgb, var(--hero-ink) 4%, transparent);
+  color: var(--hero-ink);
 }
 
-.meter-seg {
-  height: 100%;
-  transition: width 0.3s ease;
+.tday-row-inset:hover { background: color-mix(in srgb, var(--hero-ink) 8%, transparent); }
+.tday-row-inset .tday-row-text b { color: var(--hero-ink); }
+.tday-row-inset .tday-row-text small { color: color-mix(in srgb, var(--hero-ink) 58%, transparent); }
+
+.tday-chev {
+  flex-shrink: 0;
+  color: var(--text-muted);
 }
 
-.meter-seg.is-complete {
-  background: var(--success);
+.tday-ring {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
 }
 
-.meter-seg.is-learning {
-  background: var(--primary);
+.tday-ring-track {
+  fill: none;
+  stroke: var(--surface-3);
+  stroke-width: 3.5;
 }
 
-.today-chords {
-  color: var(--text-secondary);
+.tday-ring-fill {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.tday-ring text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text-primary);
+}
+
+/* Once, on open: cards rise in reading order. */
+.tday-hero,
+.tday-card,
+.tday-row:not(.tday-row-inset) {
+  animation: tday-rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+@keyframes tday-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes tday-grow {
+  from { transform: scaleY(0); }
+  to { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tday-hero,
+  .tday-card,
+  .tday-row,
+  .tday-fill {
+    animation: none;
+  }
+}
+
+@media (min-width: 1001px) {
+  .tday-hero {
+    padding: 1.4rem 1.45rem 1.45rem;
+  }
+
+  .tday-hero::before {
+    background-size: auto 210px;
+    background-position: right -50px top -12px;
+  }
+
+  .tday-title h2 {
+    font-size: 2.15rem;
+  }
 }
 
 /* ===== The month, as thirty marks ===== */
@@ -2572,182 +2825,6 @@ button.daynode:active {
 
 .daynode.is-fresh {
   animation: dayComplete 520ms cubic-bezier(0.34, 1.4, 0.64, 1);
-}
-
-/* ===== Practice snapshot =====
-   Four numbers, every one of them derived from something that is actually
-   stored. A metric with no data behind it shows "-" rather than nought:
-   nought is a claim, and a claim we cannot support. */
-/* ===== This week ===== */
-/* Four unrelated metrics became one span. The strip carries the shape of the
-   week, the list says what it contained, and the footer is the only thing on
-   the card talking about any other stretch of time, which is why it says so
-   in its first two words. */
-.weekpanel {
-  gap: 0.85rem;
-}
-
-.weekstrip {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.3rem;
-  align-items: end;
-}
-
-.weekbar {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.3rem;
-}
-
-.weekbar-track {
-  display: flex;
-  align-items: flex-end;
-  width: 100%;
-  max-width: 26px;
-  height: 44px;
-  margin: 0 auto;
-  border-radius: 4px;
-  background: rgba(var(--surface-tint-rgb), 0.07);
-}
-
-/* Today is not a day you failed to practise, it has not finished. An outline
-   where an empty past day has a flat fill keeps the difference visible even
-   before anything is logged. */
-.weekbar.is-today .weekbar-track {
-  box-shadow: inset 0 0 0 1px rgba(var(--surface-tint-rgb), 0.22);
-  background: transparent;
-}
-
-/* No floor on the height. A minimum kept a sliver of accent sitting at the
-   bottom of every blank day, which read as a day with something in it, the
-   share is already held above a visible fraction for days that do. */
-.weekbar-fill {
-  width: 100%;
-  border-radius: 4px;
-  background: var(--primary);
-  opacity: 0.55;
-  transition: height 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.weekbar.is-today .weekbar-fill {
-  opacity: 1;
-}
-
-.weekbar-day {
-  font-family: var(--font-mono);
-  font-size: 0.63rem;
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.weekbar.is-today .weekbar-day {
-  color: var(--text-secondary);
-}
-
-.weekfacts {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.weekfact {
-  display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  color: var(--text-secondary);
-}
-
-/* Three characters wide whatever the number is, so 1, 2 and 112 start their
-   sentences at the same place rather than stepping to the right. */
-.weekfact-value {
-  min-width: 3ch;
-  font-size: 1.15rem;
-  font-weight: 500;
-  line-height: 1;
-  text-align: right;
-  color: var(--text-primary);
-}
-
-.week-quiet {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: var(--text-muted);
-}
-
-.week-foot {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding-top: 0.15rem;
-  border-top: 1px solid rgba(var(--surface-tint-rgb), 0.07);
-}
-
-.week-most strong {
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.week-alltime {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .weekbar-fill {
-    transition: none;
-  }
-}
-
-/* ===== Pick up / Try this ===== */
-.pickup-title {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-}
-
-.pickup-meta {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-}
-
-.pickup-when {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-}
-
-.pickup-go {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: auto;
-  padding-top: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--primary);
-}
-
-.pickup-go svg {
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-button.dash-card:hover .pickup-go svg {
-  transform: translateX(3px);
-}
-
-.tryit-text {
-  font-size: 1rem;
-  line-height: 1.45;
-  color: var(--text-primary);
 }
 
 /* ===== Songs =====
@@ -4782,7 +4859,6 @@ button.dash-card:hover .pickup-go svg {
 }
 
 @media (max-width: 1000px) {
-  .dash-row,
   .song-body {
     grid-template-columns: 1fr;
   }
@@ -4808,10 +4884,6 @@ button.dash-card:hover .pickup-go svg {
     grid-template-columns: repeat(10, minmax(0, 34px));
   }
 
-  .today-title {
-    font-size: 1.6rem;
-  }
-
   .timer-clock {
     font-size: 2.1rem;
   }
@@ -4827,26 +4899,6 @@ button.dash-card:hover .pickup-go svg {
 }
 
 @media (max-width: 900px) {
-  /* A short band on a phone: the name on the left, the guitar's body
-     showing on the right, the scrim running across as on a wide screen. */
-  .hero {
-    min-height: 116px;
-    padding: 0 1.25rem;
-  }
-
-  .hero::after {
-    background-position: 70% 40%;
-  }
-
-  .hero-title {
-    font-size: 1.9rem;
-  }
-
-  .hero-eyebrow {
-    margin-bottom: 0.35rem;
-    font-size: 0.64rem;
-  }
-
   .songs-actions {
     margin-left: 0;
   }
@@ -8711,69 +8763,6 @@ button.strumcell:hover { background: var(--surface-3); }
   color: var(--success);
 }
 
-/* ---- the card that starts one ---- */
-.dash-run {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.8rem 1.4rem;
-  width: 100%;
-  margin-bottom: 1.1rem;
-  padding: 1rem 1.2rem;
-  border: none;
-  border-radius: 14px;
-  background: var(--elevated-bg);
-  /* No accent edge: the song card above already has the one on this screen. */
-  box-shadow: var(--elevation);
-  font-family: var(--font-ui);
-  text-align: left;
-  cursor: pointer;
-  transition: box-shadow 0.18s ease, transform 0.18s ease;
-}
-
-.dash-run:hover {
-  box-shadow: var(--elevation-hover);
-}
-
-.dash-run-said {
-  display: flex;
-  flex: 1 1 16rem;
-  flex-direction: column;
-  min-width: 0;
-  gap: 0.18rem;
-}
-
-.dash-run-title {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: var(--text-primary);
-}
-
-.dash-run-note {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.dash-run-go {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
-  padding: 0.5rem 0.95rem;
-  border-radius: 8px;
-  /* Tonal: the song card above already holds the screen's one orange button. */
-  background: var(--surface-3);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.dash-run-go svg {
-  color: var(--primary);
-}
-
 @media (max-width: 640px) {
   .runbar {
     gap: 0.45rem 0.8rem;
@@ -12313,10 +12302,10 @@ a.btn {
 }
 
 /* Rows and cards sink a touch under the finger and spring back. */
-.dash-run,
+.tday-row,
+.tday-song,
 .songrow,
 .practice-card,
-button.dash-card,
 .onb-choice,
 .daynode,
 .chip,
@@ -12326,10 +12315,10 @@ button.dash-card,
   transition-timing-function: ease, ease, ease, ease, ease, cubic-bezier(0.3, 1.5, 0.6, 1);
 }
 
-.dash-run:active,
+.tday-row:active,
+.tday-song:active,
 .songrow:active,
 .practice-card:active,
-button.dash-card:active,
 .onb-choice:active,
 .daynode:active {
   transform: scale(0.985);

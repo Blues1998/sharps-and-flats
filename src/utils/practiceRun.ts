@@ -15,8 +15,8 @@
 // abandoned on Tuesday should not still be waiting on Friday.
 
 import { comfortOf, getChordSkills, type ChordComfort } from './chordbook';
-import { challengeProgress, lastPractised } from './library';
-import { drillSlots, nextChords, reasonFor } from './next';
+import { challengeProgress, getSongs, lastPractised } from './library';
+import { drillSlots, nextChords, reasonFor, reasonInFull } from './next';
 import { loopSignature } from './loopbook';
 import { getRecords } from './records';
 import { LOOP_LEVELS, LOOP_TEMPLATES, templateChords, templateSlots } from './loopTemplates';
@@ -40,6 +40,8 @@ export interface RunStep {
   title: string;
   /** Why it is in the run. */
   note: string;
+  /** The reason at full length, for a screen with room for it. */
+  detail?: string;
   songId?: string;
   /** A drill's loop, handed over on arrival. */
   slots?: Slot[];
@@ -63,8 +65,12 @@ export interface RunReport {
   minutes: number;
   done: number;
   skipped: number;
+  /** How many steps the run had. */
+  steps: number;
+  /** The song it ended on, if it had one. */
+  songId: string | null;
   /** Chords that moved up while the run was on. */
-  promoted: { symbol: string; to: ChordComfort }[];
+  promoted: { symbol: string; from: ChordComfort; to: ChordComfort }[];
   /** Tempo records set while the run was on. */
   records: { chords: string; from: number | null; to: number }[];
 }
@@ -134,6 +140,7 @@ export function planRun(): RunStep[] {
       tab: 'chordbook',
       title: `${chord.symbol}, and the changes into it`,
       note: reasonFor(chord),
+      detail: reasonInFull(chord),
       slots: drillSlots(chord),
       tempo: 70,
       beatsPerBar: 4,
@@ -164,7 +171,10 @@ export function planRun(): RunStep[] {
 
   // Today's song, or the last one you touched, a run with nothing to play at
   // the end of it is a warm-up, and warm-ups are for something.
-  const song = challengeProgress().todaySong ?? lastPractised(null)?.song ?? null;
+  // A library nobody has practised from yet still has a song to end on.
+  const songs = getSongs();
+  const song = challengeProgress().todaySong ?? lastPractised(null)?.song
+    ?? songs.find(s => s.status === 'learning') ?? songs[0] ?? null;
   if (song) {
     steps.push({
       kind: 'song',
@@ -207,7 +217,11 @@ export function advance(skip = false): void {
 
 export function step(to: number): void {
   if (!run || to < 0 || to >= run.steps.length) return;
-  run = { ...run, at: to };
+  // Jumping ahead walks past steps without doing them: they count as skipped,
+  // so the report never claims them. Steps already behind keep what they were.
+  const skipped = [...run.skipped];
+  for (let i = run.at; i < to; i++) skipped[i] = skipped[i] ?? true;
+  run = { ...run, at: to, skipped };
   write();
   announce();
 }
@@ -223,7 +237,7 @@ export function finish(): void {
   const promoted: RunReport['promoted'] = [];
   for (const skill of getChordSkills()) {
     const was = held.before.comfort[skill.id] ?? 'none';
-    if (RANK[skill.comfort] > RANK[was]) promoted.push({ symbol: skill.label ?? skill.id, to: skill.comfort });
+    if (RANK[skill.comfort] > RANK[was]) promoted.push({ symbol: skill.label ?? skill.id, from: was, to: skill.comfort });
   }
   const records: RunReport['records'] = [];
   for (const record of getRecords()) {
@@ -236,6 +250,8 @@ export function finish(): void {
     minutes: Math.max(1, Math.round((Date.now() - held.startedAt) / 60000)),
     done: held.steps.filter((_, i) => i < held.at && !held.skipped[i]).length,
     skipped: held.skipped.filter(Boolean).length,
+    steps: held.steps.length,
+    songId: held.steps.find(s => s.kind === 'song')?.songId ?? null,
     promoted,
     records
   };
