@@ -10,6 +10,8 @@ interface PulseGrooveStageProps {
   onSwingChange: (swing: number) => void;
   at: () => number | null;
   isPlaying: boolean;
+  /** Show the swing control under the stage. Rhythm keeps it on its Feel tab. */
+  showFeel?: boolean;
 }
 
 /**
@@ -35,7 +37,8 @@ export const PulseGrooveStage: React.FC<PulseGrooveStageProps> = ({
   swing,
   onSwingChange,
   at,
-  isPlaying
+  isPlaying,
+  showFeel = true
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [currentBeatDisplay, setCurrentBeatDisplay] = useState<number>(1);
@@ -300,52 +303,56 @@ export const PulseGrooveStage: React.FC<PulseGrooveStageProps> = ({
         />
       </div>
 
-      {/* Rhythmic Feel: Straight vs Swing Controller */}
-      <div className="swing-shuffle-control">
-        <div className="swing-header-group">
-          <span className="swing-title">Feel</span>
-          <span className="swing-feel-tag">{swingName(swing)}</span>
-        </div>
-
-        <div className="swing-slider-wrap">
-          <input
-            type="range"
-            className="swing-range-input"
-            min={0}
-            max={SWING_MAX}
-            step={0.01}
-            value={swing}
-            onChange={e => onSwingChange(Number(e.target.value))}
-            aria-label="Swing feel ratio"
-          />
-          <span className="swing-percent readout">
-            {Math.round((swing / SWING_MAX) * 100)}%
-          </span>
-        </div>
-
-        <p className="swing-said">{FEEL_SAID[swingName(swing)]}</p>
-
-        <div style={{ display: 'flex', gap: '0.35rem' }}>
-          <button
-            type="button"
-            className={`btn ramp-btn${swing === 0 ? ' is-active' : ''}`}
-            onClick={() => onSwingChange(0)}
-            title="Even eighths"
-          >
-            Straight
-          </button>
-          <button
-            type="button"
-            className={`btn ramp-btn${Math.abs(swing - SHUFFLE) < 0.05 ? ' is-active' : ''}`}
-            onClick={() => onSwingChange(SHUFFLE)}
-            title="Long-short, the triplet feel"
-          >
-            Shuffle
-          </button>
-        </div>
-      </div>
+      {showFeel && <SwingFeel swing={swing} onSwingChange={onSwingChange} />}
     </div>
   );
 };
+
+/** Straight to shuffle: the off-beat eighth, slid later. */
+export const SwingFeel: React.FC<{ swing: number; onSwingChange: (swing: number) => void }> = ({ swing, onSwingChange }) => (
+  <div className="swing-shuffle-control">
+    <div className="swing-header-group">
+      <span className="swing-title">Feel</span>
+      <span className="swing-feel-tag">{swingName(swing)}</span>
+    </div>
+
+    <div className="swing-slider-wrap">
+      <input
+        type="range"
+        className="swing-range-input"
+        min={0}
+        max={SWING_MAX}
+        step={0.01}
+        value={swing}
+        onChange={e => onSwingChange(Number(e.target.value))}
+        aria-label="Swing feel ratio"
+      />
+      <span className="swing-percent readout">
+        {Math.round((swing / SWING_MAX) * 100)}%
+      </span>
+    </div>
+
+    <p className="swing-said">{FEEL_SAID[swingName(swing)]}</p>
+
+    <div style={{ display: 'flex', gap: '0.35rem' }}>
+      <button
+        type="button"
+        className={`btn ramp-btn${swing === 0 ? ' is-active' : ''}`}
+        onClick={() => onSwingChange(0)}
+        title="Even eighths"
+      >
+        Straight
+      </button>
+      <button
+        type="button"
+        className={`btn ramp-btn${Math.abs(swing - SHUFFLE) < 0.05 ? ' is-active' : ''}`}
+        onClick={() => onSwingChange(SHUFFLE)}
+        title="Long-short, the triplet feel"
+      >
+        Shuffle
+      </button>
+    </div>
+  </div>
+);
 
 export default PulseGrooveStage;

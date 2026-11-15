@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Segmented } from '../components/Segmented';
 import { LabIcon } from '../components/LabIcon';
 import { Pendulum } from '../components/Pendulum';
-import { PulseGrooveStage } from '../components/PulseGrooveStage';
+import { PulseGrooveStage, SwingFeel } from '../components/PulseGrooveStage';
 import { usePlayKey } from '../hooks/usePlayKey';
 import { audio } from '../utils/audio';
 import { clearTempoLog, getTempoLog, heldLabel, logTempo, whenHeld, type TempoRun } from '../utils/tempoLog';
@@ -205,13 +205,6 @@ const BPM_MAX = 220;
  */
 const RAMP_BARS = 8;
 
-const SUBDIVISIONS: { value: number; label: string; title: string }[] = [
-  { value: 1, label: '1', title: 'Quarter notes: one click per beat' },
-  { value: 2, label: '2', title: 'Eighth notes: down-up strumming' },
-  { value: 3, label: '3', title: 'Triplets: three per beat' },
-  { value: 4, label: '4', title: 'Sixteenths' }
-];
-
 const RAMPS: { value: number; label: string; title: string }[] = [
   { value: 0, label: 'Off', title: 'Hold the tempo where it is' },
   { value: 2, label: '+2', title: `Two beats a minute faster every ${RAMP_BARS} bars` },
@@ -289,7 +282,12 @@ export const RhythmLab: React.FC = () => {
   const [tempoLog, setTempoLog] = useState<TempoRun[]>(() => getTempoLog());
   
   // Rhythm game states
-  const [isGameMode, setIsGameMode] = useState<boolean>(false);
+  // Three jobs, three tabs: keep time with the click, test your timing, and
+  // hear what feel does. Tap test is the old Game mode.
+  const [tab, setTab] = useState<'play' | 'tap' | 'feel'>('play');
+  const isGameMode = tab === 'tap';
+  const [touch, setTouch] = useState<'open' | 'muted' | null>(null);
+  const taps = useRef<number[]>([]);
   const [tapHistory, setTapHistory] = useState<TapHit[]>([]);
   const [overallAccuracy, setOverallAccuracy] = useState<number>(0);
   const [feedback, setFeedback] = useState<{ text: string; color: string; offset: number } | null>(null);
@@ -352,6 +350,7 @@ export const RhythmLab: React.FC = () => {
       const beatsPerBar = timeSignatureRef.current;
       const beatNum = beatIndex.current % beatsPerBar;
       const isAccented = beatNum === 0;
+      if (isAccented) setBars(Math.floor(beatIndex.current / beatsPerBar));
 
       // The ladder takes its rung on the bar line, which is where a change of
       // tempo belongs, arriving mid-bar it reads as the click slipping.
@@ -608,352 +607,246 @@ export const RhythmLab: React.FC = () => {
     };
   }, []);
 
+  // Tap tempo: the average gap between the last few presses, forgotten after
+  // three seconds so a fresh run of taps starts clean.
+  const tapTempo = () => {
+    const now = performance.now();
+    const kept = [...taps.current, now].filter(t => now - t < 3000).slice(-5);
+    taps.current = kept;
+    if (kept.length < 2) return;
+    const gaps = kept.slice(1).map((t, i) => t - kept[i]);
+    const next = Math.round(60000 / (gaps.reduce((x, y) => x + y, 0) / gaps.length));
+    if (next >= BPM_MIN && next <= BPM_MAX) setBpm(next);
+  };
+
+  // The same strum, open and palm-muted.
+  const playTouch = (type: 'open' | 'muted') => {
+    audio.init();
+    setTouch(type);
+    const chord = [40, 45, 50, 55, 59, 64];
+    if (type === 'open') audio.playStrum(chord, 3.0, 0.04);
+    else audio.playStroke(chord, 'X', 0.2);
+    window.setTimeout(() => setTouch(null), type === 'open' ? 1400 : 350);
+  };
+
+  const last = tempoLog[0] ?? null;
+  const climbed = isPlaying && bpm > runFrom.current ? bpm - runFrom.current : 0;
+  // A verdict, once there are enough taps to mean something: the average
+  // signed offset of the hits (misses are not timing, they are absence).
+  const hits = tapHistory.filter(h => h.rating !== 'miss').slice(0, 12);
+  const lean = hits.length >= 8 ? Math.round(hits.reduce((n, h) => n + h.differenceMs, 0) / hits.length) : null;
+  const verdict = lean === null ? null : Math.abs(lean) < 8 ? 'Right on the beat' : lean < 0 ? `You rush by about ${-lean} ms` : `You drag by about ${lean} ms`;
+  const timeSig = timeSignature === 6 ? '6/8' : `${timeSignature}/4`;
+
   return (
-    <div className="lab-stack">
-      
-      {/* Header */}
+    <div className="lab-stack rhythm">
       <div className="lab-header">
         <h2 className="lab-title"><LabIcon tab="rhythm" />Rhythm</h2>
       </div>
 
-      <div className="grid-2">
-        
-        {/* Metronome */}
-        <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.15rem', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-            <span>Metronome</span>
-            <span className="readout" style={{ color: 'var(--primary)', fontWeight: 600 }}>{bpm} bpm</span>
-          </h3>
+      <div className="rh-tabs" role="tablist" aria-label="Rhythm">
+        {([['play', 'Play along'], ['tap', 'Tap test'], ['feel', 'Feel']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={`rh-tab${tab === id ? ' is-active' : ''}`}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-          {/* Tempo Controls */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <button 
-                onClick={() => setBpm(prev => Math.max(BPM_MIN, prev - 5))} 
-                className="btn" 
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                -5
-              </button>
-              <input
-                type="range"
-                min={BPM_MIN}
-                max={BPM_MAX}
-                value={bpm}
-                onChange={(e) => setBpm(Number(e.target.value))}
-                style={{ flex: 1, accentColor: 'var(--primary)', cursor: 'pointer' }}
-              />
-              <button 
-                onClick={() => setBpm(prev => Math.min(BPM_MAX, prev + 5))} 
-                className="btn" 
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                +5
-              </button>
+      {tab !== 'feel' && (
+        <section className="rh-tempo">
+          <div className="rh-tempo-row">
+            <button type="button" className="rh-round" onClick={() => setBpm(prev => Math.max(BPM_MIN, prev - 5))} aria-label="5 bpm slower">−</button>
+            <div className="rh-bpm">
+              <span className="rh-bpm-num readout">{bpm}</span>
+              <span className="rh-bpm-word">bpm · {getTempoMarking(bpm)}</span>
             </div>
+            <button type="button" className="rh-round" onClick={() => setBpm(prev => Math.min(BPM_MAX, prev + 5))} aria-label="5 bpm faster">+</button>
+          </div>
+          <input
+            type="range"
+            className="rh-slider"
+            min={BPM_MIN}
+            max={BPM_MAX}
+            value={bpm}
+            onChange={e => setBpm(Number(e.target.value))}
+            aria-label="Tempo in beats per minute"
+          />
+          <div className="rh-chips">
+            <button type="button" className="chip-btn" onClick={tapTempo}>Tap tempo</button>
+            <label className="chip-btn rh-pick">
+              {timeSig} ▾
+              <select value={timeSignature} onChange={e => setTimeSignature(Number(e.target.value))} aria-label="Time signature">
+                <option value={2}>2/4 · Duple</option>
+                <option value={3}>3/4 · Waltz</option>
+                <option value={4}>4/4 · Common</option>
+                <option value={6}>6/8 · Compound</option>
+              </select>
+            </label>
+            {tab === 'play' && (
+              <>
+                <label className="chip-btn rh-pick">
+                  {subdivision === 1 ? '1 click a beat' : `${subdivision} clicks a beat`} ▾
+                  <select
+                    value={subdivision}
+                    onChange={e => {
+                      const n = Number(e.target.value);
+                      setSubdivision(n);
+                      // Swing lives between pairs of eighths; with any other
+                      // count there is nothing for it to move.
+                      if (n !== 2) setSwing(0);
+                    }}
+                    aria-label="Clicks per beat"
+                  >
+                    {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n} click{n === 1 ? '' : 's'} a beat</option>)}
+                  </select>
+                </label>
+                <label className="chip-btn rh-pick">
+                  {metronomeVisual === 'groove' ? 'Pulse' : 'Pendulum'} ▾
+                  <select value={metronomeVisual} onChange={e => setMetronomeVisual(e.target.value as 'groove' | 'precision')} aria-label="View">
+                    <option value="groove">Pulse</option>
+                    <option value="precision">Pendulum</option>
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {tab === 'play' && (
+        <>
+          <div className="metronome-stage rh-stage">
+              {metronomeVisual === 'groove' ? (
+                <PulseGrooveStage
+                  beatsPerBar={timeSignature}
+                  subdivision={subdivision}
+                  bpm={bpm}
+                  swing={swing}
+                  onSwingChange={setSwing}
+                  at={beatAt}
+                  isPlaying={isPlaying}
+                  showFeel={false}
+                />
+              ) : (
+                <Pendulum beatsPerBar={timeSignature} subdivision={subdivision} at={beatAt} onBar={setBars} running={isPlaying} />
+              )}
           </div>
 
-          {/* Both views get the same height, so switching never moves Start. */}
-          <div className="metronome-stage">
-          {metronomeVisual === 'groove' ? (
-            <PulseGrooveStage
-              beatsPerBar={timeSignature}
-              subdivision={subdivision}
-              bpm={bpm}
+          <section className="rh-card">
+            {/* "Clean twice in a row? Add 5 BPM" used to be a tip, which made it
+                the player's job to count bars. It is a thing a metronome can do. */}
+            <div className="rh-card-head">
+              <span className="surface-label">Build speed</span>
+              <span className="rh-sub">every {RAMP_BARS} bars</span>
+            </div>
+            <Segmented<number> value={ramp} onChange={setRamp} options={RAMPS} size="sm" ariaLabel="Speed up" />
+          </section>
+
+          <section className="rh-card">
+            <div className="rh-card-head">
+              <span className="surface-label">Your last runs</span>
+              {tempoLog.length > 0 && (
+                <button type="button" className="rhythm-forget" onClick={() => setTempoLog(clearTempoLog())}>Forget</button>
+              )}
+            </div>
+            {tempoLog.length === 0 ? (
+              <p className="rh-sub">Runs longer than 15 seconds show up here, so you can pick up where you left off.</p>
+            ) : (
+              <>
+                <TempoHistory runs={tempoLog} onPick={run => { setBpm(run.to); setTimeSignature(run.beatsPerBar); }} />
+                {last && last.to !== bpm && (
+                  <button type="button" className="btn rh-last" onClick={() => { setBpm(last.to); setTimeSignature(last.beatsPerBar); }}>
+                    Last time {last.to} bpm · Start there
+                  </button>
+                )}
+              </>
+            )}
+          </section>
+        </>
+      )}
+
+      {tab === 'tap' && (
+        <section className="rh-card">
+          <div className="rh-card-head">
+            <span className="surface-label">Tap test</span>
+            {tapHistory.length > 0 && <span className="rh-sub readout">{overallAccuracy}% accurate</span>}
+          </div>
+          <button type="button" className="rh-pad" onPointerDown={handleTap}>
+            <span className="rh-pad-big" style={feedback ? { color: feedback.color } : undefined}>{feedback ? feedback.text : 'Tap'}</span>
+            <span className="rh-pad-small">{isPlaying ? 'on the beat, or press Space' : 'Tap to start the click, then tap on the beat'}</span>
+          </button>
+          {tapHistory.length > 0 && (
+            <>
+              <div className="rh-spread" aria-hidden="true">
+                {tapHistory.slice(0, 16).map(h => (
+                  <i key={h.id} className={`is-${h.rating}`} style={{ left: `${50 + Math.max(-48, Math.min(48, h.differenceMs / 3))}%` }} />
+                ))}
+              </div>
+              <div className="rh-spread-labels"><span>early</span><span>on the beat</span><span>late</span></div>
+            </>
+          )}
+          {verdict ? (
+            <p className="rh-verdict">{verdict}<small>Average of your last {hits.length} hits. Under 20 ms is tight.</small></p>
+          ) : tapHistory.length > 0 ? (
+            <p className="rh-sub">{8 - hits.length} more on-beat taps for a verdict.</p>
+          ) : null}
+          <TimingGraph beatsRef={timelineBeats} tapsRef={timelineTaps} active={isPlaying} />
+        </section>
+      )}
+
+      {tab === 'feel' && (
+        <>
+          <section className="rh-card">
+            <SwingFeel
               swing={swing}
               onSwingChange={amount => {
                 setSwing(amount);
                 // A swung feel is heard in the off-beat click. With one click a
-                // beat there is none, so Straight and Shuffle sounded identical:
-                // asking for swing brings in the eighths it needs.
+                // beat there is none, so asking for swing brings in the eighths.
                 if (amount > 0 && subdivision !== 2) setSubdivision(2);
               }}
-              at={beatAt}
-              isPlaying={isPlaying}
             />
+            <p className="rh-sub">Press Start to hear it on the click.</p>
+          </section>
+          <section className="rh-card">
+            <span className="surface-label">Open or muted</span>
+            <p className="rh-lead">The same strum, two ways. Muted is the side of your picking hand resting on the strings by the bridge.</p>
+            <div className="touch-buttons-row">
+              <button type="button" className={`touch-btn is-open-touch${touch === 'open' ? ' is-active' : ''}`} onClick={() => playTouch('open')}>
+                <span className="touch-title">Open</span>
+                <span className="touch-sub">Let it ring</span>
+              </button>
+              <button type="button" className={`touch-btn is-muted-touch${touch === 'muted' ? ' is-active' : ''}`} onClick={() => playTouch('muted')}>
+                <span className="touch-title">Palm mute</span>
+                <span className="touch-sub">Short and percussive</span>
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* Start, docked: pressed every time, so it is always in reach. */}
+      <div className="rh-dock">
+        <div className="rh-dock-text">
+          <span className="rh-dock-title">{isPlaying ? `Bar ${bars + 1}` : 'Metronome'}</span>
+          <span className="rh-dock-sub readout">
+            {bpm} bpm · {timeSig}{climbed > 0 ? ` · up ${climbed} from ${runFrom.current}` : ''}
+          </span>
+        </div>
+        <button type="button" className={`btn ${isPlaying ? 'btn-secondary' : 'btn-primary'} rh-go`} onClick={handleTogglePlay}>
+          {isPlaying ? (
+            <><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>Stop</>
           ) : (
-            <Pendulum beatsPerBar={timeSignature} subdivision={subdivision} at={beatAt} onBar={setBars} running={isPlaying} />
+            <><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20" /></svg>Start</>
           )}
-          </div>
-
-          <button
-            onClick={handleTogglePlay}
-            className={`btn ${isPlaying ? 'btn-secondary' : 'btn-primary'}`}
-            style={{ width: '100%', padding: '1rem 0', fontSize: '1.05rem', justifyContent: 'center' }}
-          >
-            {isPlaying ? (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-                Stop
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Start
-              </>
-            )}
-          </button>
-
-          {/* The settings come after Start. They are changed now and then; Start
-              is pressed every time, and on a phone it used to sit a whole
-              screen down, under all of them. */}
-          <div className="metronome-settings">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label className="field-label" htmlFor="time-signature">Time signature</label>
-                <select
-                  id="time-signature"
-                  value={timeSignature}
-                  onChange={(e) => setTimeSignature(Number(e.target.value))}
-                  className="select-field"
-                >
-                  <option value={2}>2/4 · Duple</option>
-                  <option value={3}>3/4 · Waltz</option>
-                  <option value={4}>4/4 · Common</option>
-                  <option value={6}>6/8 · Compound</option>
-                </select>
-              </div>
-
-              <Segmented<number>
-                label="Clicks per beat"
-                value={subdivision}
-                onChange={n => {
-                  setSubdivision(n);
-                  // Swing lives between pairs of eighths; with any other count
-                  // there is nothing for it to move, so it goes back to straight.
-                  if (n !== 2) setSwing(0);
-                }}
-                options={SUBDIVISIONS}
-                size="sm"
-                full
-              />
-            </div>
-
-            <Segmented
-              label="Mode"
-              value={isGameMode}
-              onChange={(v) => { setIsGameMode(v); stopMetronome(); }}
-              tone={isGameMode ? 'secondary' : 'primary'}
-              options={[
-                { value: false, label: 'Solo' },
-                { value: true, label: 'Game' }
-              ]}
-              full
-            />
-
-            {/* Visualizer Style Toggle */}
-            <Segmented<'groove' | 'precision'>
-              label="View"
-              value={metronomeVisual}
-              onChange={setMetronomeVisual}
-              options={[
-                { value: 'groove', label: 'Groove', title: 'Pulse view with swing' },
-                { value: 'precision', label: 'Pendulum', title: 'A pendulum, with your timing' }
-              ]}
-              size="sm"
-              full
-            />
-          </div>
-        </section>
-
-        {/* Tapping Game Console */}
-        <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: '340px' }}>
-          <h3 style={{ fontSize: '1.15rem', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-            {isGameMode ? 'Tap accuracy' : 'Practice'}
-          </h3>
-
-          {!isGameMode ? (
-            <div className="rhythm-practice">
-              <p className="rhythm-lead">
-                Play along until you lock in with the click.
-              </p>
-
-              {/* "Clean twice in a row? Add 5 BPM" was one of the four notes
-                  under this heading, which made it the player's job to watch
-                  the bar count and remember. It is a thing a metronome can do. */}
-              <Segmented<number>
-                label={`Speed up · every ${RAMP_BARS} bars`}
-                value={ramp}
-                onChange={setRamp}
-                options={RAMPS}
-                size="sm"
-                full
-              />
-
-              {/* Something that changes while it runs, on a page where nothing did. */}
-              {isPlaying ? (
-                <p className="rhythm-live readout">
-                  <span>bar {bars + 1}</span>
-                  <span className="rhythm-live-bpm">{bpm} bpm</span>
-                  {ramp > 0 && bpm > runFrom.current && (
-                    <span className="rhythm-live-climb">up {bpm - runFrom.current} from {runFrom.current}</span>
-                  )}
-                </p>
-              ) : (
-                <p className="rhythm-live is-off readout">not running</p>
-              )}
-
-              <div className="rhythm-tips">
-                {[
-                  'Start slower than feels necessary.',
-                  'Beat 1 is the higher click. Lost it? Start again.',
-                  'When it\u2019s easy, count two bars without the click.'
-                ].map(line => (
-                  <div key={line} className="rhythm-tip">
-                    <span className="rhythm-dot" aria-hidden="true" />
-                    <span>{line}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Not a record and not a claim, this page has no ear. It is
-                  the answer to "what was I at last night?", which is the
-                  question you actually have when you sit down. */}
-              <div className="rhythm-been">
-                <div className="surface-label">
-                  <span>Where the click has been</span>
-                  {tempoLog.length > 0 && (
-                    <button type="button" className="rhythm-forget" onClick={() => setTempoLog(clearTempoLog())}>
-                      Forget
-                    </button>
-                  )}
-                </div>
-                {tempoLog.length === 0 ? (
-                  <p className="rhythm-none">
-                    Runs longer than 15 seconds show up here.
-                  </p>
-                ) : (
-                  <TempoHistory
-                    runs={tempoLog}
-                    onPick={run => { setBpm(run.to); setTimeSignature(run.beatsPerBar); }}
-                  />
-                )}
-              </div>
-
-              <p className="rhythm-key keys-only">
-                <kbd className="key-hint">Space</kbd> starts and stops.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, gap: '1rem' }}>
-              
-              {/* Score / Accuracy Banner */}
-              <div style={{ display: 'flex', justifyItems: 'space-between', alignItems: 'center', background: 'var(--surface-2)', padding: '0.75rem 1rem', borderRadius: '8px', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Accuracy</span>
-                <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: overallAccuracy > 80 ? 'var(--success)' : 'var(--primary)' }}>
-                  {overallAccuracy}%
-                </span>
-              </div>
-
-              {/* Interactive Game Pace Control Row */}
-              <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-2)', padding: '0.75rem 1rem', borderRadius: '8px', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Tempo</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <button 
-                    onClick={() => setBpm(prev => Math.max(BPM_MIN, prev - 10))} 
-                    className="btn" 
-                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
-                    title="10 bpm slower"
-                  >
-                    Slower
-                  </button>
-                  <strong style={{ color: 'var(--primary)', fontSize: '0.9rem', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', minWidth: '10.5rem', textAlign: 'center' }}>
-                    {bpm} bpm · {getTempoMarking(bpm)}
-                  </strong>
-                  <button 
-                    onClick={() => setBpm(prev => Math.min(BPM_MAX, prev + 10))} 
-                    className="btn" 
-                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
-                    title="10 bpm faster"
-                  >
-                    Faster
-                  </button>
-                </div>
-              </div>
-
-              {/* Tap Target Zone */}
-              <div
-                onPointerDown={handleTap}
-                style={{
-                  height: '100px',
-                  background: 'var(--surface-2)',
-                  border: '2px dashed rgba(var(--surface-tint-rgb),0.1)',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'background 0.15s ease'
-                }}
-                className="pulse-hover"
-              >
-                {/* Floating score text feedback */}
-                {feedback ? (
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: feedback.color }}>
-                      {feedback.text}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      Tap here or press Space, on the beat
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Tap here or press Space, on the beat
-                  </div>
-                )}
-              </div>
-
-              {/* Live latency timeline graph */}
-              <TimingGraph beatsRef={timelineBeats} tapsRef={timelineTaps} active={isPlaying} />
-
-              {/* Hit History Scrolling track */}
-              <div>
-                <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Recent taps</h4>
-                
-                {tapHistory.length === 0 ? (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    No taps yet.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '110px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-                    {tapHistory.map((hit) => {
-                      const color = hit.rating === 'perfect' ? 'var(--success)' :
-                                    hit.rating === 'good' ? 'var(--primary)' :
-                                    hit.rating === 'imprecise' ? 'var(--warning)' : 'var(--danger)';
-
-                      return (
-                        <div 
-                          key={hit.id} 
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            background: 'var(--surface-2)',
-                            padding: '0.4rem 0.6rem',
-                            borderRadius: '6px',
-                            fontSize: '0.8rem',
-                            borderLeft: `3px solid ${color}`
-                          }}
-                        >
-                          <span style={{ textTransform: 'uppercase', fontWeight: 600, fontSize: '0.75rem', color }}>{hit.rating}</span>
-                          <span style={{ fontFamily: 'var(--font-mono)' }}>
-                            {hit.differenceMs > 0 ? `+${hit.differenceMs}` : hit.differenceMs}ms
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-            </div>
-          )}
-        </section>
-
+        </button>
       </div>
     </div>
   );

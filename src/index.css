@@ -15197,3 +15197,287 @@ a.btn {
   padding: 0.05rem 0.25rem;
   font-size: 0.66rem;
 }
+
+/* ===== Rhythm =====
+   Three tabs (Play along, Tap test, Feel), the tempo on top, and Start
+   docked above the tab bar, because it is pressed every time. */
+.rhythm { max-width: 44rem; margin: 0 auto; width: 100%; }
+
+.rh-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--toolbar-bg, var(--surface-1));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.rh-tab {
+  padding: 0.7rem 0.25rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font: 500 0.9rem var(--font-ui);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.rh-tab.is-active { color: var(--text-primary); border-bottom-color: var(--primary); }
+
+.rh-tempo,
+.rh-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.05rem;
+  border-radius: 16px;
+  background: var(--elevated-bg);
+  box-shadow: var(--elevation);
+}
+
+.rh-tempo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rh-round {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--panel-border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  font: 600 1.15rem var(--font-ui);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.rh-bpm {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rh-bpm-num {
+  font-family: var(--font-display);
+  font-size: 2.8rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.rh-bpm-word {
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.rh-slider {
+  width: 100%;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.rh-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+/* A real select under a chip, so a phone shows its own picker. */
+.rh-pick {
+  position: relative;
+  cursor: pointer;
+}
+
+.rh-pick select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rh-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.rh-card-head .surface-label { margin: 0; }
+.rh-card-head > :last-child:not(:first-child) { margin-left: auto; }
+
+.rh-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.rh-lead {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+
+.rh-last { align-self: flex-start; }
+
+.rh-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 140px;
+  border: 2px dashed color-mix(in srgb, var(--text-muted) 35%, transparent);
+  border-radius: 16px;
+  background: var(--surface-2);
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rh-pad:active { background: var(--surface-3); }
+
+.rh-pad-big {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.rh-pad-small {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.rh-spread {
+  position: relative;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.rh-spread::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--success);
+}
+
+.rh-spread i {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  opacity: 0.85;
+  background: var(--primary);
+}
+
+.rh-spread i.is-perfect { background: var(--success); }
+.rh-spread i.is-imprecise { background: var(--warning); }
+.rh-spread i.is-miss { background: var(--danger); }
+
+.rh-spread-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -0.45rem;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.rh-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rh-verdict small {
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.rhythm .metronome-stage { min-height: 0; }
+/* The tempo card already says the tempo; the stage's idle caption repeated it. */
+.rhythm .pulse-groove-idle { display: none; }
+.rhythm .pulse-groove-stage { background: var(--elevated-bg); box-shadow: var(--elevation); border-radius: 16px; }
+/* On the Feel tab the card is the frame; the control's own box would nest. */
+.rh-card .swing-shuffle-control { padding: 0; border: none; background: none; }
+
+.rh-dock {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.55rem 0.55rem 0.95rem;
+  border-radius: 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.55);
+}
+
+.rh-dock-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rh-dock-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rh-dock-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.rh-go {
+  min-width: 7.5rem;
+  min-height: 46px;
+  justify-content: center;
+}
+
+@media (min-width: 1001px) {
+  .rh-tabs {
+    position: static;
+    grid-template-columns: repeat(3, max-content);
+    gap: 1.6rem;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .rhythm .lab-header { display: none; }
+  .rh-dock { bottom: calc(var(--mtabs-h, 64px) + env(safe-area-inset-bottom, 0px) + 0.5rem); }
+}
