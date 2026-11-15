@@ -15829,4 +15829,5 @@ a.btn {
 .trophy-empty { margin: 0; font-size: 0.82rem; color: var(--text-muted); }
 
 .voice-holdrow .btn { white-space: nowrap; }
-.unlock-go, .hsum-acts .btn { justify-content: center; }
+.unlock-go, .unlock-shelf, .hsum-acts .btn { justify-content: center; }
+.unlock-shelf { width: 100%; margin-top: 0.5rem; }

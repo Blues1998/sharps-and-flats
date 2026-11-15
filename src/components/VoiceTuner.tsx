@@ -10,7 +10,7 @@ import {
   GRADE_LABEL, MILESTONES, bestChime, gradeFor, hitChime, milestoneChime, missChime, setChime, useChime, type Grade
 } from '../utils/chime';
 import { countHold, setRecord, unlockShowing, useFeats, useHoldUnlocks } from '../utils/feats';
-import { freshRun, resumeRun, saveRun, type HoldRun } from '../utils/holdRun';
+import { endedRun, freshRun, saveRun, type HoldRun } from '../utils/holdRun';
 import { confetti } from '../utils/confetti';
 import { feel } from '../utils/haptics';
 import {
@@ -129,16 +129,17 @@ export const VoiceTuner: React.FC = () => {
   const feats = useFeats();
   const best = feats.records['hold-streak']?.value ?? 0;
 
-  // The run outlives the page: leaving is a rest, and coming back within ten
-  // minutes carries on from the same note. See holdRun.
-  const [run, setRunState] = useState<HoldRun>(() => resumeRun() ?? freshRun(sa + 7));
+  // A run is only ever the notes landed in a row: stop singing (mic off, page
+  // or app left, another mode) and it is over. One that ended while you were
+  // away opens as its summary when you come back. See holdRun.
+  const [ended] = useState(endedRun);
+  const [run, setRunState] = useState<HoldRun>(() => freshRun(ended?.target ?? sa + 7));
   const runRef = useRef(run);
   const setRun = useCallback((next: HoldRun) => {
     runRef.current = next;
     setRunState(next);
-    saveRun(next.held > 0 ? next : null);
   }, []);
-  const [summary, setSummary] = useState<HoldRun | null>(null);
+  const [summary, setSummary] = useState<HoldRun | null>(ended);
 
   const [target, setTarget] = useState<number>(() => run.target ?? sa + 7);
   const targetRef = useRef(target);
@@ -158,10 +159,9 @@ export const VoiceTuner: React.FC = () => {
     bannerTimer.current = window.setTimeout(() => setBanner(null), 2200);
   };
 
-  // Keep the note with the run, and the run's clock fresh when the page is left.
-  useEffect(() => {
-    if (runRef.current.held > 0) saveRun({ ...runRef.current, target });
-  }, [target]);
+  // Shown once: the stored run is cleared as soon as it is on screen.
+  useEffect(() => { saveRun(null); }, []);
+  // Leaving the page ends the run; its summary waits for the next visit.
   useEffect(() => () => {
     window.clearTimeout(bannerTimer.current);
     if (runRef.current.held > 0) saveRun({ ...runRef.current, target: targetRef.current });
@@ -186,9 +186,20 @@ export const VoiceTuner: React.FC = () => {
   const endRun = useCallback(() => {
     const r = runRef.current;
     if (r.held === 0) return;
-    saveRun(null);
     setSummary(r);
-  }, []);
+    setRun(freshRun(targetRef.current));
+  }, [setRun]);
+
+  // Anything that stops the singing ends the run: the mic going off, another
+  // mode, or the app going to the background (a locked phone included).
+  useEffect(() => {
+    if (!(mode === 'hold' && isActive)) endRun();
+  }, [mode, isActive, endRun]);
+  useEffect(() => {
+    const away = () => { if (document.visibilityState === 'hidden') endRun(); };
+    document.addEventListener('visibilitychange', away);
+    return () => document.removeEventListener('visibilitychange', away);
+  }, [endRun]);
 
   const startOver = (pickNew: boolean) => {
     setSummary(null);

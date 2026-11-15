@@ -1,10 +1,11 @@
 // A run in Hold a note: the notes landed in a row, and everything a summary
 // card needs to say about them afterwards.
 //
-// It lives here rather than in the tuner's state so that leaving the page is a
-// rest, not the end: the run pauses, and coming back within ten minutes picks
-// it up on the same note. It is written to localStorage as it goes, so even a
-// closed app resumes inside that window.
+// A streak is notes landed one after another, so anything that stops the
+// singing ends it: stopping the mic, leaving the page or the app, switching
+// mode. Nothing is lost by that. The bests are saved the moment they happen,
+// and a run that ended while you were away is kept here (in localStorage, so
+// even a closed app keeps it) to be shown as its summary when you come back.
 
 import { getRecord, heldTier } from './feats';
 
@@ -29,7 +30,6 @@ export interface HoldRun {
 }
 
 const KEY = 'cadenza-hold-run';
-export const RESUME_MS = 10 * 60 * 1000;
 
 export function freshRun(target: number | null = null): HoldRun {
   return {
@@ -47,12 +47,8 @@ let current: HoldRun | null = (() => {
   } catch { return null; }
 })();
 
-/** The run to carry on with, if it was left recently enough. */
-export function resumeRun(): HoldRun | null {
-  if (!current) return null;
-  if (Date.now() - current.lastActive > RESUME_MS) { saveRun(null); return null; }
-  return current;
-}
+/** A run that ended while the tuner was closed, to show as its summary. */
+export const endedRun = (): HoldRun | null => (current && current.held > 0 ? current : null);
 
 export function saveRun(run: HoldRun | null): void {
   current = run ? { ...run, lastActive: Date.now() } : null;

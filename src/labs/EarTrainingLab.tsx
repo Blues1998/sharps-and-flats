@@ -596,6 +596,16 @@ export const EarTrainingLab: React.FC = () => {
             {isAnswered && (
               <>
                 <p className="ear-explain">{userAnswer && isCorrect(userAnswer) ? '✓ ' : ''}{explain}</p>
+                {/* Next sits right under the answer, above the picture of it: it is
+                    pressed ten times a set, and the picture is there to look at. */}
+                <div className="ear-next">
+                  <button type="button" className="btn" onClick={playSound}>Hear it again</button>
+                  {finished ? (
+                    <button type="button" className="btn btn-primary" onClick={() => setSetDone(true)}>See how it went</button>
+                  ) : (
+                    <button type="button" className="btn btn-primary" onClick={generateQuestion}>Next</button>
+                  )}
+                </div>
                 <div className="ear-see">
                   <Segmented<'guitar' | 'piano'>
                     value={see}
@@ -607,14 +617,6 @@ export const EarTrainingLab: React.FC = () => {
                   {see === 'guitar'
                     ? <Fretboard highlightCorrectMidis={correctMidis} interactive={false} />
                     : <Keyboard highlightCorrectMidis={correctMidis} interactive={false} />}
-                </div>
-                <div className="ear-next">
-                  <button type="button" className="btn" onClick={playSound}>Hear it again</button>
-                  {finished ? (
-                    <button type="button" className="btn btn-primary" onClick={() => setSetDone(true)}>See how it went</button>
-                  ) : (
-                    <button type="button" className="btn btn-primary" onClick={generateQuestion}>Next</button>
-                  )}
                 </div>
               </>
             )}

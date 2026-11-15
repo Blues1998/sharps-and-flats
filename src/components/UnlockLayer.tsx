@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Pick } from './Pick';
-import { MATERIALS, ROMAN, dismissUnlock, initFeats, useUnlocks } from '../utils/feats';
+import { MATERIALS, ROMAN, dismissAllUnlocks, dismissUnlock, initFeats, showOnShelf, useUnlocks } from '../utils/feats';
+import { go } from '../hooks/useRoute';
 import { cadenceChime } from '../utils/chime';
 import { confetti } from '../utils/confetti';
 import { feel } from '../utils/haptics';
@@ -29,12 +30,19 @@ export const UnlockLayer: React.FC = () => {
   useBackToClose(!!top, dismissUnlock);
   useEffect(() => {
     if (!top) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' || e.key === 'Enter') dismissUnlock(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') dismissUnlock(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [top]);
 
   if (!top) return null;
+  // The whole collection, opened on the pick just earned. Anything else that
+  // was queued is on the shelf already, so the queue is cleared.
+  const seeShelf = (id: string) => {
+    showOnShelf(id);
+    dismissAllUnlocks();
+    go({ tab: 'me', songId: null });
+  };
   const single = top.tier === 0;
 
   return createPortal(
@@ -47,6 +55,9 @@ export const UnlockLayer: React.FC = () => {
         {top.next && <span className="unlock-next readout">Next: {top.next}</span>}
         <button type="button" className="btn btn-primary unlock-go" onClick={dismissUnlock} autoFocus>
           {queue.length > 1 ? `Next badge (${queue.length - 1} more)` : 'Keep going'}
+        </button>
+        <button type="button" className="btn unlock-shelf" onClick={() => seeShelf(top.id)}>
+          See all my picks
         </button>
       </div>
     </div>,

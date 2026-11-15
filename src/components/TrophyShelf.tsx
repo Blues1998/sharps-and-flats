@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pick } from './Pick';
 import {
-  MATERIALS, ONE_OFFS, ROMAN, TIERED, fmtMark, heldTier, nextStep, recordRows, tierOf, useFeats
+  MATERIALS, ONE_OFFS, ROMAN, TIERED, fmtMark, heldTier, nextStep, recordRows, takeShelfPick, tierOf, useFeats
 } from '../utils/feats';
 
 /**
@@ -13,7 +13,13 @@ import {
  */
 export const TrophyShelf: React.FC = () => {
   useFeats();
-  const [open, setOpen] = useState<string>(TIERED[0].id);
+  // Sent here from a badge: open on that pick and bring the shelf into view.
+  const [sentFor] = useState(takeShelfPick);
+  const [open, setOpen] = useState<string>(() => TIERED.find(b => b.id === sentFor)?.id ?? TIERED[0].id);
+  const shelfRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (sentFor) shelfRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [sentFor]);
   const earned = TIERED.reduce((n, b) => n + Math.max(heldTier(b.id), tierOf(b)), 0) + ONE_OFFS.filter(o => heldTier(o.id) > 0).length;
   const total = TIERED.length * 5 + ONE_OFFS.length;
   const sel = TIERED.find(b => b.id === open) ?? TIERED[0];
@@ -22,7 +28,7 @@ export const TrophyShelf: React.FC = () => {
   const rows = recordRows();
 
   return (
-    <section className="glass-panel me-card trophies">
+    <section ref={shelfRef} id="trophies" className="glass-panel me-card trophies">
       <div className="trophies-head">
         <h3 className="me-heading">Trophies</h3>
         <span className="trophies-count"><b className="readout">{earned}</b> of {total} picks</span>

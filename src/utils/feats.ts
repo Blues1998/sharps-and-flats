@@ -318,6 +318,20 @@ export function useUnlocks(): Unlock[] {
 /** Whether an unlock is on screen. */
 export const unlockShowing = (): boolean => open && queue.length > 0;
 
+export function dismissAllUnlocks(): void {
+  queue = [];
+  announceQueue();
+}
+
+// Which pick the Trophies shelf should open on, when a badge sent you there.
+let shelfPick: string | null = null;
+export const showOnShelf = (id: string): void => { shelfPick = id; };
+export function takeShelfPick(): string | null {
+  const id = shelfPick;
+  shelfPick = null;
+  return id;
+}
+
 export function dismissUnlock(): void {
   queue = queue.slice(1);
   announceQueue();
