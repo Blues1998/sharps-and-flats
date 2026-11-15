@@ -15481,3 +15481,131 @@ a.btn {
   .rhythm .lab-header { display: none; }
   .rh-dock { bottom: calc(var(--mtabs-h, 64px) + env(safe-area-inset-bottom, 0px) + 0.5rem); }
 }
+
+/* ===== Sound Physics =====
+   Four lessons, one at a time, each with one thing to try. */
+.physics { max-width: 46rem; margin: 0 auto; width: 100%; }
+
+.ph-head { display: flex; align-items: center; gap: 1rem; }
+.ph-count { margin-left: auto; font-size: 0.8rem; color: var(--text-muted); }
+
+.ph-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.ph-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.5rem 0.2rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--elevated-bg);
+  font: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ph-step.is-on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--elevated-bg)); color: var(--text-primary); }
+.ph-step-n { font-size: 0.68rem; color: var(--text-muted); }
+.ph-step.is-done .ph-step-n { color: var(--success); font-weight: 600; }
+.ph-step-label { font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+
+.ph-lesson {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem;
+}
+
+.ph-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--text-primary);
+}
+
+.ph-lead {
+  margin: -0.35rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ph-more,
+.ph-why {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.ph-more summary,
+.ph-why summary {
+  width: max-content;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ph-more[open] summary { margin-bottom: 0.7rem; }
+.ph-why p { margin: 0.5rem 0 0; line-height: 1.6; }
+
+.ph-task {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 45%, transparent);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.ph-task-mark {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid color-mix(in srgb, var(--text-muted) 60%, transparent);
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ph-task.is-done { border-style: solid; border-color: color-mix(in srgb, var(--success) 50%, transparent); color: var(--text-primary); }
+.ph-task.is-done .ph-task-mark { border-color: var(--success); background: var(--success); color: var(--text-on-primary); }
+
+.ph-rows { display: flex; flex-direction: column; }
+
+.ph-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--panel-border);
+}
+
+.ph-row:first-child { border-top: none; }
+
+.ph-row-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ph-row-name strong { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.ph-row-name small { font-size: 0.72rem; color: var(--text-muted); }
+.ph-row-name .is-off { color: var(--warning); }
+.ph-row-name .is-close { color: var(--success); }
+
+.ph-all { align-self: flex-start; font-size: 0.82rem; }
+.ph-next { align-self: stretch; justify-content: center; min-height: 46px; }
+
+@media (max-width: 1000px) {
+  .physics .lab-title { display: none; }
+}

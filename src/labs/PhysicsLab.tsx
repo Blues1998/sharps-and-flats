@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { audio } from '../utils/audio';
-import { NOTE_NAMES } from '../utils/musicTheory';
-import { reportProgress } from '../utils/progress';
+import { getProgressCount, reportProgress, subscribeProgress } from '../utils/progress';
 import { IconSounding } from '../components/Icons';
 import { LabIcon } from '../components/LabIcon';
 
@@ -155,34 +154,11 @@ const HarmonicExplorer: React.FC = () => {
   };
 
   return (
-    <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <h3 style={{ fontSize: '1.15rem', paddingBottom: '0.5rem' }}>
-        1 · Why instruments sound different
-      </h3>
-      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-        A note is not one frequency but a stack: the fundamental <em>f</em> plus overtones at 2f, 3f, 4f…
-        A guitar and a flute playing the same note differ only in the
-        <strong style={{ color: 'var(--text-primary)' }}> mix of those overtones</strong>. That mix is timbre.
-        Build your own below.
-      </p>
+    <section className="glass-panel ph-lesson">
+      <h3 className="ph-title">Why a guitar and a flute differ</h3>
+      <p className="ph-lead">A note is a stack of frequencies. The mix of that stack is the instrument's sound.</p>
 
       <canvas ref={canvasRef} style={{ width: '100%', height: '130px', background: '#0E0F11', borderRadius: '8px' }} />
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>
-        {amps.map((a, n) => (
-          <label key={n} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-            <span>{n + 1}f · {Math.round(BASE_HZ * (n + 1))} Hz</span>
-            <input
-              type="range" min={0} max={1} step={0.01} value={a}
-              onChange={e => {
-                const next = [...amps];
-                next[n] = Number(e.target.value);
-                setAmps(next);
-              }}
-            />
-          </label>
-        ))}
-      </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={play} className="btn btn-primary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -194,6 +170,30 @@ const HarmonicExplorer: React.FC = () => {
           </button>
         ))}
       </div>
+      <details className="ph-more">
+        <summary>Build your own</summary>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>
+          {amps.map((a, n) => (
+            <label key={n} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              <span>{n + 1}f · {Math.round(BASE_HZ * (n + 1))} Hz</span>
+              <input
+                type="range" min={0} max={1} step={0.01} value={a}
+                onChange={e => {
+                  const next = [...amps];
+                  next[n] = Number(e.target.value);
+                  setAmps(next);
+                }}
+              />
+            </label>
+          ))}
+        </div>
+
+      </details>
+      <details className="ph-why">
+        <summary>Why?</summary>
+        <p>A note is the fundamental <em>f</em> plus overtones at 2f, 3f, 4f and up. A guitar and a flute playing the same note differ only in the mix of those overtones. That mix is called timbre.</p>
+      </details>
+      <Task event="physics-harmonic-played">Press Hear it on any sound</Task>
     </section>
   );
 };
@@ -335,16 +335,9 @@ const RatioExplorer: React.FC = () => {
   }, [locked, sounding]);
 
   return (
-    <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <h3 style={{ fontSize: '1.15rem', paddingBottom: '0.5rem' }}>
-        2 · Why some notes sound good together
-      </h3>
-      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-        Two tones are <strong style={{ color: 'var(--text-primary)' }}>consonant</strong> when their frequencies form a
-        simple ratio (2:1, 3:2, 5:4) and the combined wave repeats in a tidy pattern. In between, the
-        loudness wobbles at |f₂ − f₁| Hz. That wobble is
-        <strong style={{ color: 'var(--text-primary)' }}> beating</strong>: the sound of "out of tune".
-      </p>
+    <section className="glass-panel ph-lesson">
+      <h3 className="ph-title">Why some notes sound good together</h3>
+      <p className="ph-lead">Simple ratios like 3:2 make a wave that repeats neatly. Anything near them wobbles in loudness: that's beating.</p>
 
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={sounding ? stopDuo : startDuo} className={`btn ${sounding ? 'btn-secondary' : 'btn-primary'}`} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -376,10 +369,11 @@ const RatioExplorer: React.FC = () => {
         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>1 second: beating shows as slow loudness waves</span>
         <canvas ref={envCanvasRef} style={{ width: '100%', height: '80px', background: '#0E0F11', borderRadius: '8px', marginTop: '0.25rem' }} />
       </div>
-      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-        The tritone sits at √2 ≈ 1.414. No tidy pattern, so it sounds tense. It is also how
-        you tune by ear: adjust until the beating stops.
-      </p>
+      <details className="ph-why">
+        <summary>Why?</summary>
+        <p>Two tones are consonant when their frequencies form a simple ratio (2:1, 3:2, 5:4) and the combined wave repeats in a tidy pattern. In between, the loudness wobbles at |f₂ − f₁| times a second. The tritone sits at √2 ≈ 1.414: no tidy pattern, so it sounds tense. It is also how you tune by ear: adjust until the beating stops.</p>
+      </details>
+      <Task event="physics-ratio-locked">Turn the sound on and slide onto a pure ratio until it locks</Task>
     </section>
   );
 };
@@ -397,64 +391,56 @@ const TEMPER_ROWS: { name: string; semis: number; p: number; q: number }[] = [
   { name: 'Octave', semis: 12, p: 2, q: 1 }
 ];
 
-const TemperamentTable: React.FC = () => (
-  <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-    <h3 style={{ fontSize: '1.15rem', paddingBottom: '0.5rem' }}>
-      3 · Why 12 notes
-    </h3>
-    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-      Pure ratios can't all fit at once. Tune for C and E sounds sour. The fix, around 1600:
-      split the octave into 12 <em>equal</em> steps of 2<sup>1/12</sup> ≈ 1.0595. Now every interval is
-      slightly wrong in every key by the same tiny amount. It works on a coincidence:
-      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}> 2^(7/12) = 1.4983 ≈ 3/2</span>.
-      The error, measured in cents (1 semitone = 100¢):
-    </p>
+// The three that tell the story first: a fifth that is nearly pure, a third
+// that audibly is not, and the octave that is exact. The rest on request.
+const TEMPER_FIRST = ['Perfect 5th', 'Major 3rd', 'Octave'];
 
-    {/* On a phone the two raw cent columns go: the error is their difference
-        and says what they would, and without them the table fits. */}
-    <div style={{ overflowX: 'auto' }}>
-      <table className="temper-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-        <thead>
-          <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-            {['Interval', 'Ratio', 'Pure (¢)', '12-TET (¢)', 'Error', 'Listen'].map((hd, i) => (
-              <th key={hd} className={i === 2 || i === 3 ? 'hide-sm' : undefined} style={{ padding: '0.4rem 0.6rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{hd}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {TEMPER_ROWS.map(row => {
-            const justCents = 1200 * Math.log2(row.p / row.q);
-            const error = row.semis * 100 - justCents;
-            const bad = Math.abs(error) > 10;
-            return (
-              <tr key={row.name} style={{ borderBottom: '1px solid rgba(var(--surface-tint-rgb),0.04)' }}>
-                <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600 }}>{row.name}</td>
-                <td style={{ padding: '0.4rem 0.6rem', fontFamily: 'var(--font-mono)' }}>{row.p}:{row.q}</td>
-                <td className="hide-sm" style={{ padding: '0.4rem 0.6rem', fontFamily: 'var(--font-mono)' }}>{justCents.toFixed(1)}</td>
-                <td className="hide-sm" style={{ padding: '0.4rem 0.6rem', fontFamily: 'var(--font-mono)' }}>{row.semis * 100}</td>
-                <td style={{ padding: '0.4rem 0.6rem', fontFamily: 'var(--font-mono)', color: bad ? 'var(--warning)' : 'var(--success)' }}>
-                  {error >= 0 ? '+' : ''}{error.toFixed(1)}¢
-                </td>
-                <td style={{ padding: '0.4rem 0.6rem', display: 'flex', gap: '0.35rem' }}>
-                  <button onClick={() => playDyad(BASE_HZ, BASE_HZ * (row.p / row.q))} className="btn" style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem' }}>
-                    Pure
-                  </button>
-                  <button onClick={() => playDyad(BASE_HZ, BASE_HZ * Math.pow(2, row.semis / 12))} className="btn" style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem' }}>
-                    12-TET
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-      Fifths land within 2¢, which you can't hear. Thirds are ~14¢ off and you <em>can</em> hear it. Every piano,
-      every fret, and this app accept that error on purpose.
-    </p>
-  </section>
-);
+const TemperamentTable: React.FC = () => {
+  const [all, setAll] = useState(false);
+  const heard = useRef<Set<string>>(new Set());
+  const listen = (row: { name: string; semis: number; p: number; q: number }, pure: boolean) => {
+    playDyad(BASE_HZ, pure ? BASE_HZ * (row.p / row.q) : BASE_HZ * Math.pow(2, row.semis / 12));
+    if (row.name === 'Major 3rd') {
+      heard.current.add(pure ? 'pure' : 'piano');
+      if (heard.current.size === 2 && getProgressCount('physics-third-compared') === 0) reportProgress('physics-third-compared');
+    }
+  };
+  const rows = all ? TEMPER_ROWS : TEMPER_ROWS.filter(r => TEMPER_FIRST.includes(r.name))
+    .sort((a, b) => TEMPER_FIRST.indexOf(a.name) - TEMPER_FIRST.indexOf(b.name));
+  return (
+    <section className="glass-panel ph-lesson">
+      <h3 className="ph-title">Why 12 notes</h3>
+      <p className="ph-lead">Twelve equal steps make every key usable. The cost: most intervals land slightly off pure.</p>
+      <div className="ph-rows">
+        {rows.map(row => {
+          const justCents = 1200 * Math.log2(row.p / row.q);
+          const error = row.semis * 100 - justCents;
+          const exact = Math.abs(error) < 0.05;
+          return (
+            <div key={row.name} className="ph-row">
+              <span className="ph-row-name">
+                <strong>{row.name}</strong>
+                <small className="readout">
+                  {row.p}:{row.q} · {exact ? 'exact on a piano' : (
+                    <span className={Math.abs(error) > 10 ? 'is-off' : 'is-close'}>{error >= 0 ? '+' : ''}{error.toFixed(1)}¢ on a piano</span>
+                  )}
+                </small>
+              </span>
+              <button type="button" className="chip-btn" onClick={() => listen(row, true)}>Pure</button>
+              <button type="button" className="chip-btn" onClick={() => listen(row, false)}>Piano</button>
+            </div>
+          );
+        })}
+      </div>
+      <button type="button" className="linklike ph-all" onClick={() => setAll(v => !v)}>{all ? 'Fewer intervals' : 'All intervals'}</button>
+      <details className="ph-why">
+        <summary>Why?</summary>
+        <p>Pure ratios can't all fit at once: tune for C and E sounds sour. The fix, around 1600, was to split the octave into 12 equal steps of 2<sup>1/12</sup> ≈ 1.0595, so every interval is off by the same tiny amount in every key. It works on a coincidence: 2<sup>7/12</sup> = 1.4983, almost exactly 3/2. Fifths land within 2¢, which you can't hear. Thirds are about 14¢ off, and you can. One cent is a hundredth of a semitone.</p>
+      </details>
+      <Task event="physics-third-compared">Hear the major third both ways, Pure and Piano</Task>
+    </section>
+  );
+};
 
 // ============================================================
 // 4. The circle of fifths is (n + 7) mod 12
@@ -511,17 +497,9 @@ const ModularCircle: React.FC = () => {
   const uniqueVisited = new Set(visited).size;
 
   return (
-    <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <h3 style={{ fontSize: '1.15rem', paddingBottom: '0.5rem' }}>
-        4 · Why the circle of fifths closes
-      </h3>
-      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-        Put the 12 notes in a circle and keep jumping up a fifth (7 semitones). Because
-        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}> gcd(7, 12) = 1</span>,
-        the walk hits every note once before coming home. That is the whole reason the circle exists.
-        Try other step sizes.
-      </p>
-
+    <section className="glass-panel ph-lesson">
+      <h3 className="ph-title">Why the circle of fifths closes</h3>
+      <p className="ph-lead">Jump up a fifth twelve times and you visit every note once, then land home.</p>
       <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
         <svg width="300" height="300" viewBox="0 0 300 300">
           {/* chord lines of the walk */}
@@ -536,7 +514,7 @@ const ModularCircle: React.FC = () => {
             );
           })}
           {/* note nodes */}
-          {NOTE_NAMES.map((name, pc) => {
+          {FLAT_NAMES.map((name, pc) => {
             const p = pos(pc);
             const isVisited = visited.includes(pc);
             const isCurrent = visited[visited.length - 1] === pc;
@@ -581,28 +559,93 @@ const ModularCircle: React.FC = () => {
             </button>
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            Step size <strong style={{ color: 'var(--text-primary)' }}>+{stepSize}</strong>: gcd({stepSize}, 12) = {gcd(stepSize, 12)},
-            so the walk reaches <strong style={{ color: uniqueVisited === 12 || reachable === 12 ? 'var(--success)' : 'var(--warning)' }}>{reachable} of 12</strong> notes
-            before looping. {stepSize === 7 ? 'Full coverage. Spelled out: C G D A E B F♯ D♭ A♭ E♭ B♭ F, the circle of fifths.' :
-            stepSize === 5 ? 'Full coverage. Fourths walk the same circle backwards.' :
-            'A generator must be coprime with 12; this one isn\'t, so it cycles in a subgroup.'}
+            Steps of +{stepSize} reach <strong style={{ color: reachable === 12 ? 'var(--success)' : 'var(--warning)' }}>{reachable} of 12</strong> notes.
+            {stepSize === 7 ? ' In order: C G D A E B G♭ D♭ A♭ E♭ B♭ F.' :
+            stepSize === 5 ? ' Fourths walk the same circle backwards.' :
+            ' It comes home early and misses the rest.'}
           </p>
         </div>
       </div>
+      <details className="ph-why">
+        <summary>Why?</summary>
+        <p>Because 7 and 12 share no factor (gcd(7, 12) = 1), the walk can't close early: it has to touch all twelve notes before it comes home. Try +4: it closes after three notes. That is the whole reason the circle exists.</p>
+      </details>
+      <Task event="physics-circle-completed">Walk the whole circle of fifths with +7</Task>
     </section>
   );
 };
 
 // ============================================================
-export const PhysicsLab: React.FC = () => (
-  <div className="lab-stack">
-    <div className="lab-header">
-      <h2 className="lab-title"><LabIcon tab="physics" />Sound Physics</h2>
+// The names on the circle, in the spelling its sentence uses.
+const FLAT_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+
+const useProgressTick = () => {
+  const [, setTick] = useState(0);
+  useEffect(() => subscribeProgress(() => setTick(t => t + 1)), []);
+};
+
+/** One thing to try in a lesson, ticked once it has been done. */
+const Task: React.FC<{ event: string; children: React.ReactNode }> = ({ event, children }) => {
+  useProgressTick();
+  const done = getProgressCount(event) > 0;
+  return (
+    <p className={`ph-task${done ? ' is-done' : ''}`}>
+      <span className="ph-task-mark" aria-hidden="true">{done ? '✓' : ''}</span>
+      <span>{children}</span>
+      <span className="sr-only">{done ? ', done' : ', not done yet'}</span>
+    </p>
+  );
+};
+
+const LESSONS = [
+  { id: 'timbre', label: 'Timbre', event: 'physics-harmonic-played' },
+  { id: 'harmony', label: 'Harmony', event: 'physics-ratio-locked' },
+  { id: 'twelve', label: '12 notes', event: 'physics-third-compared' },
+  { id: 'circle', label: 'Circle', event: 'physics-circle-completed' }
+] as const;
+
+/**
+ * Four lessons, one at a time: a demo first, two sentences, the rest of the
+ * explanation behind Why?, and one thing to try that ticks when done. Three
+ * of the four are Journey goals, so the tick here and there is the same one.
+ */
+export const PhysicsLab: React.FC = () => {
+  useProgressTick();
+  const [at, setAt] = useState(0);
+  const done = LESSONS.map(l => getProgressCount(l.event) > 0);
+  const tried = done.filter(Boolean).length;
+  return (
+    <div className="lab-stack physics">
+      <div className="lab-header ph-head">
+        <h2 className="lab-title"><LabIcon tab="physics" />Sound Physics</h2>
+        <span className="ph-count readout">{tried} of 4 tried</span>
+      </div>
+      <div className="ph-steps" role="tablist" aria-label="Lessons">
+        {LESSONS.map((l, i) => (
+          <button
+            key={l.id}
+            type="button"
+            role="tab"
+            aria-selected={at === i}
+            className={`ph-step${at === i ? ' is-on' : ''}${done[i] ? ' is-done' : ''}`}
+            onClick={() => setAt(i)}
+          >
+            <span className="ph-step-n readout">{done[i] ? '✓' : i + 1}</span>
+            <span className="ph-step-label">{l.label}</span>
+          </button>
+        ))}
+      </div>
+      {at === 0 && <HarmonicExplorer />}
+      {at === 1 && <RatioExplorer />}
+      {at === 2 && <TemperamentTable />}
+      {at === 3 && <ModularCircle />}
+      {done[at] && at < LESSONS.length - 1 && (
+        <button type="button" className="btn btn-primary ph-next" onClick={() => setAt(at + 1)}>
+          Next: {LESSONS[at + 1].label}
+        </button>
+      )}
     </div>
-    <HarmonicExplorer />
-    <RatioExplorer />
-    <TemperamentTable />
-    <ModularCircle />
-  </div>
-);
+  );
+};
+
 export default PhysicsLab;
