@@ -45,3 +45,44 @@ export function walkStreak(played: Set<string>, today: string, shift: (iso: stri
   }
   return { current, rests, longest, restDays, playedToday: played.has(today) };
 }
+
+// ---- Repair ----------------------------------------------------------------
+//
+// A broken streak makes people quit more than any missed day does, and
+// messages that point at the break do not bring them back (Silverman &
+// Barasch, 2023). What softens it is a way to repair. So within two days of a
+// break you can earn the streak back: practise double your daily goal today
+// and the missed days count as played. Rests cover one off day for free; this
+// covers the bad week that rests ran out on.
+
+const REPAIR_KEY = 'cadenza-streak-repairs';
+export const REPAIR_WINDOW = 2;
+
+export function repairedDays(): string[] {
+  try { return JSON.parse(localStorage.getItem(REPAIR_KEY) ?? '[]') as string[]; } catch { return []; }
+}
+
+export function addRepaired(dates: string[]): void {
+  const all = [...new Set([...repairedDays(), ...dates])];
+  try { localStorage.setItem(REPAIR_KEY, JSON.stringify(all)); } catch { /* this session */ }
+}
+
+export interface RepairOffer {
+  /** The streak that broke. */
+  lost: number;
+  /** The days that would be filled in. */
+  missed: string[];
+}
+
+/** A streak that broke in the last two days and can still be earned back. */
+export function repairOffer(played: Set<string>, today: string, shift: (iso: string, n: number) => string): RepairOffer | null {
+  const past = new Set([...played].filter(d => d < today));
+  if (past.size === 0) return null;
+  if (walkStreak(past, today, shift).current > 0) return null; // not broken
+  const last = [...past].sort().pop() as string;
+  const missed: string[] = [];
+  for (let d = shift(last, 1); d < today; d = shift(d, 1)) missed.push(d);
+  if (missed.length === 0 || missed.length > REPAIR_WINDOW) return null;
+  const lost = walkStreak(past, last, shift).current;
+  return lost >= 2 ? { lost, missed } : null;
+}

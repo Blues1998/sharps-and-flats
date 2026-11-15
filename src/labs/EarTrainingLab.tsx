@@ -31,6 +31,7 @@ import { IconSounding } from '../components/Icons';
 import { feel } from '../utils/haptics';
 import { setRecord } from '../utils/feats';
 import { usePracticeTime } from '../hooks/usePracticeTime';
+import { useSessionEnd } from '../utils/session';
 import { useBackToClose } from '../utils/nativeShell';
 
 /** Questions in a set. A set ends, so a session has a shape and a result. */
@@ -481,6 +482,16 @@ export const EarTrainingLab: React.FC = () => {
   const improved = setDone
     ? strip.items.filter(item => getMastery(item.id) - (setStart.current[item.id] ?? 0) > 0.05).map(item => item.name)
     : [];
+
+  useSessionEnd('ear', hasStarted && !setDone, () => ({
+    title: 'Ear Training',
+    headline: `${score} of ${totalQuestions}`,
+    better: score === SET && totalQuestions === SET
+      ? usedClue ? 'All right, with a clue. Try one without.' : 'Perfect set.'
+      : improved.length ? `Getting better at ${improved.slice(0, 2).join(' and ')}.` : null,
+    isBetter: (score === SET && !usedClue) || improved.length > 0,
+    stats: [{ label: 'Best streak', value: String(best) }]
+  }));
 
   const explain = (() => {
     const root = midiToNoteName(currentRoot);

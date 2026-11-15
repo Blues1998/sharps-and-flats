@@ -20,6 +20,7 @@ import { DEFAULT_PATTERN, parseStrum, strokeCount } from '../utils/strum';
 import { loopSignature, rememberLoop, saveLoop, savedNamed, slotChords, slotShapeNames } from '../utils/loopbook';
 import { bankRun, bestFor } from '../utils/records';
 import { usePracticeTime } from '../hooks/usePracticeTime';
+import { useSessionEnd } from '../utils/session';
 
 const BEATS_PER_BAR = [3, 4, 6];
 
@@ -125,6 +126,7 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
   const moving = phase === 'countin' || phase === 'playing';
   usePracticeTime('loop', moving);
   const running = moving || phase === 'paused';
+  useSessionEnd('loop', running, () => ({ title: 'Chord loop', headline: `${tempo} bpm` }));
 
   // The page has a play button of its own, the one on the bucket, which is
   // in reach while the panel itself is several screens up.

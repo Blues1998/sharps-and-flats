@@ -6,8 +6,7 @@ import { useLibrary } from '../hooks/useLibrary';
 import { ALL_LEVELS, isLevelComplete } from '../utils/journey';
 import { getChordSkills } from '../utils/chordbook';
 import { MATERIALS, ROMAN, TIERED, getRecord, heldTier } from '../utils/feats';
-import { lastUsed } from '../utils/practiceClock';
-import { isoDate, shiftIso } from '../utils/library';
+import { suggestDrill } from '../utils/suggest';
 import { Pick } from '../components/Pick';
 
 /** Each drill's pick, and the clock key its time is counted under. */
@@ -17,23 +16,6 @@ const TOOL: Partial<Record<ActiveTab, { badge: string; clock: string }>> = {
   'ear-training': { badge: 'ears', clock: 'ear' },
   play: { badge: 'explorer', clock: 'challenge' }
 };
-
-/** "today", "yesterday", "Thursday", or "12 Nov" for older. */
-function since(date: string): string {
-  const today = isoDate();
-  if (date === today) return 'today';
-  if (date === shiftIso(today, -1)) return 'yesterday';
-  const d = new Date(`${date}T12:00:00`);
-  return date >= shiftIso(today, -6)
-    ? d.toLocaleDateString(undefined, { weekday: 'long' })
-    : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-}
-
-// Practice: everything that trains your hands and ears, and everything that
-// explains why, one page with a card each, rather than seven rail entries.
-//
-// Each card says what it is for in a line, because "Challenges" and "Ear
-// Training" are names that only mean something once you have opened them.
 
 interface PracticeLabProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -69,13 +51,10 @@ export const PracticeLab: React.FC<PracticeLabProps> = ({ setActiveTab }) => {
   };
 
   // One suggestion: the drill you have left longest, never-tried first.
-  const drills = (Object.keys(TOOL) as ActiveTab[]);
-  const pick = drills
-    .map(id => ({ id, last: lastUsed(TOOL[id]!.clock) ?? '' }))
-    .sort((a, b) => (a.last < b.last ? -1 : a.last > b.last ? 1 : 0))[0];
-  const suggestItem = PRACTICE_GROUPS.flatMap(g => g.items).find(i => i.id === pick?.id);
-  const suggestSaid = pick && (pick.last ? `Not since ${since(pick.last)}` : 'Not tried yet');
-  const fresh = pick?.last === isoDate();
+  const next = suggestDrill();
+  const suggestItem = next ? PRACTICE_GROUPS.flatMap(g => g.items).find(i => i.id === next.drill.tab) : undefined;
+  const suggestSaid = next?.said;
+  const fresh = next?.fresh ?? true;
 
   return (
     <div className="lab-narrow practice">

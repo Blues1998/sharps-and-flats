@@ -32,6 +32,15 @@ export const JOURNEY: JourneyChapter[] = [
     title: 'Sound & Your Instrument',
     levels: [
       {
+        id: 'set-up',
+        title: 'Set up your instrument',
+        idea: 'The app tunes its chords, shapes and lessons to what you play.',
+        task: 'Pick guitar or ukulele in the welcome setup.',
+        tab: 'me',
+        buttonText: 'Me',
+        requirements: [{ event: 'setup-done', count: 1 }]
+      },
+      {
         id: 'hear-a-note',
         title: 'Hear what a note is made of',
         idea: 'A note is a stack of overtones. The mix is why a guitar and a flute differ.',

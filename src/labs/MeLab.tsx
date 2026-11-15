@@ -1,10 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
 import { TrophyShelf } from '../components/TrophyShelf';
 import { useLibrary } from '../hooks/useLibrary';
 import { exportLibrary, getSongs, importLibrary, isoDate, practiceStats } from '../utils/library';
 import { saveTextFile } from '../utils/saveFile';
+import { CAN_REMIND, SLOTS, getReminders, reminderStats, setReminders, subscribeReminders } from '../utils/reminders';
+import { totalXp } from '../utils/xp';
 import { GOAL_CHOICES, getGoal, setGoal } from '../utils/practiceClock';
 import { BrandMark, PRIVACY_URL } from '../components/Brand';
 import { audio } from '../utils/audio';
@@ -101,6 +103,61 @@ const YourData: React.FC = () => {
   );
 };
 
+/** Practice reminders: Android only, since they are scheduled on the phone. */
+const Reminders: React.FC = () => {
+  const s = useSyncExternalStore(subscribeReminders, () => JSON.stringify(getReminders()));
+  const r = JSON.parse(s) as ReturnType<typeof getReminders>;
+  const stats = reminderStats();
+  if (!CAN_REMIND) return null;
+  return (
+    <section className="glass-panel me-card me-settings">
+      <h3 className="me-heading">Reminders</h3>
+      <div className="me-row">
+        <span className="me-row-label">
+          Practice reminder
+          <span className="me-row-sub">{r.on ? (stats.sent ? `${stats.sent} sent · ${stats.opened} opened` : 'One a day, only if you have not played') : 'Off'}</span>
+        </span>
+        <Segmented<boolean>
+          value={r.on}
+          onChange={on => void setReminders({ on, asked: true })}
+          options={[{ value: true, label: 'On' }, { value: false, label: 'Off' }]}
+          size="sm"
+        />
+      </div>
+      {r.on && (
+        <>
+          <div className="me-row">
+            <span className="me-row-label">
+              When
+              <span className="me-row-sub">Auto learns when you usually play</span>
+            </span>
+            <select
+              className="select-field me-select"
+              value={r.time ?? 'auto'}
+              onChange={e => void setReminders({ time: e.target.value === 'auto' ? null : e.target.value })}
+            >
+              <option value="auto">Auto</option>
+              {SLOTS.map(x => <option key={x.value} value={x.value}>{x.label} ({x.value})</option>)}
+            </select>
+          </div>
+          <div className="me-row">
+            <span className="me-row-label">
+              Streak warning
+              <span className="me-row-sub">At night, if a 3+ day streak is about to end</span>
+            </span>
+            <Segmented<boolean>
+              value={r.warn}
+              onChange={warn => void setReminders({ warn })}
+              options={[{ value: true, label: 'On' }, { value: false, label: 'Off' }]}
+              size="sm"
+            />
+          </div>
+        </>
+      )}
+    </section>
+  );
+};
+
 const PlayableMark: React.FC = () => {
   const turn = useRef(0);
   const [shown, setShown] = useState<{ chord: string; key: number } | null>(null);
@@ -165,6 +222,9 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
       </section>}
 
       <TrophyShelf />
+      {totalXp() > 0 && <p className="me-xp readout">{totalXp()} XP earned in all</p>}
+
+      <Reminders />
 
       <section className="glass-panel me-card me-settings">
         <h3 className="me-heading">Preferences</h3>

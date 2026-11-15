@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChordDiagram } from './ChordDiagram';
+import { award } from '../utils/xp';
 import { StrumChip } from './StrumChip';
 import { StrumGrid } from './StrumGrid';
 import { IconPause, IconPlay, IconStop } from './Icons';
@@ -29,6 +30,7 @@ import {
 } from '../utils/chart';
 import type { ChartLine, ChartLineRecord, ChartWord, ParsedChart } from '../utils/chart';
 import { usePracticeTime } from '../hooks/usePracticeTime';
+import { useSessionEnd } from '../utils/session';
 
 export type ChartMode = 'play' | 'edit' | 'import';
 
@@ -119,6 +121,21 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
   usePracticeTime('song-chart', moving, { songId: song.id });
   const counting = phase === 'countin' || (phase === 'paused' && beat < 0);
   const lap = chart.totalBeats > 0 && beat >= 0 ? Math.floor(beat / chart.totalBeats) + 1 : 1;
+  // A lap played all the way through is a play-through, looping or not.
+  useEffect(() => { if (lap > 1) award('song-through', song.id); }, [lap, song.id]);
+  // Play-throughs this session: laps finished, plus the end if it got there.
+  const throughRef = useRef(0);
+  useEffect(() => { if (running) throughRef.current = Math.max(throughRef.current, lap - 1); }, [running, lap]);
+  useEffect(() => { if (phase === 'done') throughRef.current += 1; }, [phase]);
+  useSessionEnd('song-chart', running, () => {
+    const n = throughRef.current;
+    throughRef.current = 0;
+    return {
+      title: song.title,
+      headline: n > 0 ? `${n} ${n === 1 ? 'play-through' : 'play-throughs'}` : 'Played along',
+      stats: [{ label: 'Tempo', value: `${settings.tempo} bpm` }]
+    };
+  });
 
   // When a play-through ends, the big button takes Stop's place. For a moment
   // it says Done and ignores taps, so a tap meant for Stop cannot start it all
@@ -126,10 +143,11 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
   const [cooling, setCooling] = useState(false);
   useEffect(() => {
     if (phase !== 'done') return;
+    award('song-through', song.id);
     setCooling(true);
     const t = window.setTimeout(() => setCooling(false), 2500);
     return () => window.clearTimeout(t);
-  }, [phase]);
+  }, [phase, song.id]);
 
   const currentLine = holding ? lineAtBeat(chart, beat) : null;
   const { current, next } = holding

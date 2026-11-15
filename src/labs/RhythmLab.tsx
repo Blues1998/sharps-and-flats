@@ -11,6 +11,7 @@ import { reportProgress } from '../utils/progress';
 import { feel } from '../utils/haptics';
 import { setRecord } from '../utils/feats';
 import { usePracticeTime } from '../hooks/usePracticeTime';
+import { useSessionEnd } from '../utils/session';
 import { frameGate } from '../utils/frames';
 import { swingOffbeat } from '../utils/swing';
 
@@ -276,6 +277,7 @@ export const RhythmLab: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   // Counted while the click runs; badges wait for Stop.
   usePracticeTime('metronome', isPlaying);
+  useSessionEnd('metronome', isPlaying, () => ({ title: 'Rhythm', headline: `${bpm} bpm` }));
   // Clicks to a beat. The pulse is always the beat; this is the texture under
   // it, which is what a strumming hand is actually counting.
   const [subdivision, setSubdivision] = useState<number>(1);

@@ -21,6 +21,8 @@ import { getRecords } from './records';
 import { prettyNote, subscribeVoice } from './voice';
 import { JOURNEY, isLevelComplete } from './journey';
 import { STORE_CHANGE_EVENT } from './db';
+import { award } from './xp';
+import { sessionRunning } from './session';
 
 // ---------------------------------------------------------------------------
 // Records
@@ -120,6 +122,7 @@ export function setRecord(id: RecordId, value: number, note?: string): RecordRes
   if (better) {
     state = { ...state, records: { ...state.records, [id]: { value, at: Date.now(), note } } };
     save();
+    if (old) award('record', id);
     checkBadges();
   }
   return { isNew: better, previous: old?.value ?? null };
@@ -180,6 +183,7 @@ export const isProven = (symbol: string): boolean => !!state.proven?.[chordKey(s
 export function markProven(symbol: string): void {
   state = { ...state, proven: { ...state.proven, [chordKey(symbol)]: Date.now() } };
   save();
+  award('chord-proven', chordKey(symbol));
   checkBadges();
 }
 const solidChords = (): number => getChordSkills().filter(s => s.comfort === 'solid' && !!state.proven?.[s.id]).length;
@@ -195,6 +199,8 @@ export function markClimbed(key: string, seconds: number): { best: number; previ
   const best = previous === undefined ? seconds : Math.min(previous, seconds);
   state = { ...state, climbed: { ...state.climbed, [key]: best } };
   save();
+  award(previous === undefined ? 'climb-new-key' : 'climb', key);
+  if (previous !== undefined && seconds < previous) award('record', `climb:${key}`);
   checkBadges();
   return { best, previous };
 }
@@ -461,6 +467,7 @@ export function checkBadges(): void {
   };
   save();
   if (!quiet && fresh.length) {
+    for (const f of fresh) award('pick', `${f.id}:${f.tier}`);
     queue = [...queue, ...fresh];
     announceQueue();
   }
@@ -492,6 +499,8 @@ export function initFeats(): void {
   subscribeProgress(checkBadges);
   subscribeVoice(checkBadges);
   window.addEventListener(GOAL_MET_EVENT, e => {
+    // A session that ends on a summary says it there instead.
+    if (sessionRunning()) return;
     const minutes = (e as CustomEvent<{ minutes: number }>).detail?.minutes ?? 0;
     const days = streakState().current;
     queue = [...queue, {

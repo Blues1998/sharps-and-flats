@@ -4,6 +4,7 @@
 // instrument is also written to the tuner's own key, so choosing ukulele here
 // is the same as choosing it on the tuner.
 
+import { getProgressCount, reportProgress } from './progress';
 import { useSyncExternalStore } from 'react';
 
 export type Level = 'new' | 'some' | 'regular';
@@ -33,6 +34,11 @@ function load(): Profile {
 }
 
 let profile = load();
+
+// The first Journey step is done the moment setup is: starting with a step
+// already ticked makes the rest more likely to follow (Nunes & Drèze, 2006).
+const markSetUp = () => { if (profile.onboarded && getProgressCount('setup-done') === 0) reportProgress('setup-done'); };
+markSetUp();
 const listeners = new Set<() => void>();
 
 export function setProfile(patch: Partial<Profile>): void {
@@ -42,6 +48,7 @@ export function setProfile(patch: Partial<Profile>): void {
     if (patch.instrument) localStorage.setItem(INSTRUMENT_KEY, patch.instrument);
   } catch { /* this session only */ }
   listeners.forEach(l => l());
+  markSetUp();
 }
 
 export const getProfile = (): Profile => profile;

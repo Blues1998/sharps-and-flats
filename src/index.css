@@ -16208,3 +16208,47 @@ a.btn {
 .practice-next-label { grid-area: label; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
 .practice-next-name { grid-area: name; font-size: 1.05rem; font-weight: 600; }
 .practice-next-said { grid-area: said; font-size: 0.8rem; color: var(--text-secondary); }
+
+/* ===== Session summary ===== */
+.ssum-head { font-size: 2.4rem; }
+.ssum-goal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--success);
+  border-radius: 12px;
+  background: var(--success-glow);
+}
+.ssum-goal b { color: var(--success); font-size: 0.95rem; }
+.ssum-goal span { font-size: 0.82rem; color: var(--text-secondary); }
+.ssum-xp { color: var(--primary); }
+.ssum-close { margin: 0.8rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.ssum-close li { font-size: 0.84rem; color: var(--text-secondary); padding-left: 1rem; position: relative; }
+.ssum-close li::before { content: ''; position: absolute; left: 0.2rem; top: 0.5em; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+.ssum-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.9rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.ssum-ask b { font-size: 0.92rem; }
+.ssum-ask > span { font-size: 0.8rem; color: var(--text-secondary); }
+.ssum-ask-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
+.ssum-ask-chips .is-quiet { color: var(--text-muted); }
+
+/* ===== XP on Today and Me ===== */
+.streak-xp { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--panel-border); }
+.streak-xp-bars { display: flex; align-items: flex-end; gap: 3px; height: 26px; }
+.streak-xp-bars i { width: 6px; border-radius: 2px; background: var(--surface-3); }
+.streak-xp-bars i.is-on { background: var(--primary); }
+.streak-xp-t { display: flex; flex-direction: column; font-size: 0.82rem; color: var(--text-secondary); }
+.streak-xp-t b { color: var(--text-primary); }
+.streak-xp-t small { font-size: 0.74rem; color: var(--text-muted); }
+.me-xp { margin: -0.4rem 0 0.2rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); }
+.me-select { width: auto; padding: 0.4rem 1.8rem 0.4rem 0.6rem; font-size: 0.85rem; }

@@ -19,6 +19,7 @@
 // something.
 
 import { STORE_CHANGE_EVENT, clearStore, putRecords, readAll } from './db';
+import { award } from './xp';
 
 const todayIso = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -112,6 +113,7 @@ export interface Banked {
 export async function bankRun(input: BankInput): Promise<Banked> {
   const existing = records.get(input.signature);
   const beat = !existing || input.tempo > existing.best;
+  if (beat && existing) award('loop-best', input.signature);
   const record: LoopRecord = {
     id: input.signature,
     chords: input.chords,

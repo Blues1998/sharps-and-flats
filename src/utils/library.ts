@@ -35,7 +35,7 @@ import {
 } from './loopbook';
 import { exportRecords, importRecords, loadRecords, type LoopRecord } from './records';
 import { clockEntries, secondsOn } from './practiceClock';
-import { walkStreak, type StreakState } from './streak';
+import { repairOffer, repairedDays, walkStreak, type RepairOffer, type StreakState } from './streak';
 import { parseProgressions, uniqueChords } from './songText';
 import { linesFromText, type ChartLineRecord } from './chart';
 import { syncUpsertSong, syncDeleteSong } from './cloudSync';
@@ -361,7 +361,7 @@ export function practiceStats(): PracticeStats {
   // older version or brought in by a restored file still show in totals, but
   // a streak built from them would be a number anyone could write, which is
   // why Strava leaves manual entries out of challenges too.
-  const practisedDays = new Set(ledger.filter(e => e.minutes > 0 && e.source === 'auto').map(e => e.date));
+  const practisedDays = streakDaySet(ledger);
 
   // A streak survives today being blank until the day is out, and a missed
   // day can be covered by a rest. See streak.ts.
@@ -388,9 +388,18 @@ export const minutesPractisedToday = (): number =>
   practiceLedger().filter(e => e.date === today() && e.source === 'auto').reduce((n, e) => n + e.minutes, 0);
 
 /** The daily streak, with its rests. */
+/** Days that count for the streak: counted practice, plus any repaired. */
+function streakDaySet(ledger = practiceLedger()): Set<string> {
+  return new Set([...ledger.filter(e => e.minutes > 0 && e.source === 'auto').map(e => e.date), ...repairedDays()]);
+}
+
 export function streakState(): StreakState {
-  const days = new Set(practiceLedger().filter(e => e.minutes > 0 && e.source === 'auto').map(e => e.date));
-  return walkStreak(days, today(), shiftIso);
+  return walkStreak(streakDaySet(), today(), shiftIso);
+}
+
+/** A streak broken in the last two days that today's practice can repair. */
+export function streakRepair(): RepairOffer | null {
+  return repairOffer(streakDaySet(), today(), shiftIso);
 }
 
 export function shiftIso(iso: string, days: number): string {

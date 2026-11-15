@@ -17,6 +17,7 @@ import { reportProgress } from '../utils/progress';
 import { IconCheck } from '../components/Icons';
 import { feel } from '../utils/haptics';
 import { useHeard, usePracticeTime } from '../hooks/usePracticeTime';
+import { useSessionEnd } from '../utils/session';
 
 // ---- Challenge tuning constants ----
 const CONFIRM_MS = 350;  // how long the correct note must be held to count
@@ -253,12 +254,34 @@ export const PlayLab: React.FC = () => {
     return () => window.clearInterval(id);
   }, [mode, phase, isActive, round]);
 
+  // Rounds finished since the mic went on, for the summary.
+  const roundsRef = useRef(0);
+  const bestStreakRef = useRef(0);
+  const bestClimbRef = useRef<{ key: string; seconds: number; previous?: number } | null>(null);
+  useEffect(() => { if (isActive) { roundsRef.current = 0; bestStreakRef.current = 0; bestClimbRef.current = null; } }, [isActive]);
+  useEffect(() => { bestStreakRef.current = Math.max(bestStreakRef.current, streak); }, [streak]);
+  useSessionEnd('challenge', isActive, () => {
+    const rounds = roundsRef.current;
+    const climb = mode === 'scale' ? bestClimbRef.current : null;
+    return {
+      title: 'Challenges',
+      headline: climb ? fmtTime(climb.seconds) : `${rounds} ${rounds === 1 ? 'round' : 'rounds'}`,
+      better: climb
+        ? climb.previous === undefined ? `${climb.key}, your first climb.` : climb.seconds < climb.previous ? `${climb.key}. New best, was ${fmtTime(climb.previous)}.` : `${climb.key}, your fastest this time. Best is ${fmtTime(climb.previous)}.`
+        : null,
+      isBetter: !!climb && (climb.previous === undefined || climb.seconds < climb.previous),
+      stats: [{ label: 'Rounds', value: String(rounds) }, { label: 'Best streak', value: String(bestStreakRef.current) }]
+    };
+  });
+
   const completeRound = () => {
+    roundsRef.current++;
     if (mode === 'scale' && round?.climbKey && startedAtRef.current !== null) {
       const seconds = Math.round((performance.now() - startedAtRef.current) / 100) / 10;
       setElapsed(seconds);
       const { previous } = markClimbed(round.climbKey, seconds);
       setLastClimb({ key: round.climbKey, seconds, previous });
+      if (!bestClimbRef.current || seconds < bestClimbRef.current.seconds) bestClimbRef.current = { key: round.climbKey, seconds, previous };
     }
     setStreak(s => s + 1);
     setPhase('complete');
