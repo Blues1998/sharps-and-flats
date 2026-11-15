@@ -1,17 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
 import { SongPage } from './SongPage';
-import { IconTray } from '../components/Icons';
 import { useLibrary } from '../hooks/useLibrary';
 import { go } from '../hooks/useRoute';
 import {
   createSong,
-  exportLibrary,
   getSong,
   getSongs,
-  importLibrary,
-  isoDate,
   practiceStats,
   songChords,
   STATUS_LABEL,
@@ -20,10 +16,7 @@ import {
 } from '../utils/library';
 import type { SongStatus } from '../utils/library';
 import { capoLabel, parseCapo } from '../utils/songText';
-import { saveTextFile } from '../utils/saveFile';
 import { feel } from '../utils/haptics';
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 interface SongsLabProps {
   focusSongId: string | null;
@@ -36,6 +29,9 @@ interface SongsLabProps {
 }
 
 type Filter = 'all' | SongStatus | 'revisit';
+
+/** Filters show once the list is long enough to need them. */
+const FILTER_FROM = 6;
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -59,8 +55,6 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [draft, setDraft] = useState<ReturnType<typeof blankDraft> | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const stats = practiceStats();
   const songs = getSongs();
@@ -85,7 +79,8 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
     const q = query.trim().toLowerCase();
     return songs
       .filter(song => {
-        if (filter === 'revisit' ? !song.revisit : filter !== 'all' && song.status !== filter) return false;
+        const f = songs.length >= FILTER_FROM ? filter : 'all';
+        if (f === 'revisit' ? !song.revisit : f !== 'all' && song.status !== f) return false;
         if (!q) return true;
         // The parsed chords as well as the raw line: the row shows "Am · Em",
         // so searching "Am" has to find a song whose sheet says "A min".
@@ -130,27 +125,6 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
     onOpenSong(song.id);
   };
 
-  const doExport = async () => {
-    const result = await saveTextFile(
-      `sharps-and-flats-library-${isoDate()}.json`,
-      JSON.stringify(exportLibrary(), null, 2),
-      'application/json'
-    );
-    if (result === 'cancelled') return;
-    setNotice(result === 'failed'
-      ? 'Could not save the backup. Try again.'
-      : `Backed up ${plural(songs.length, 'song')} and ${plural(stats.sessionCount, 'practice session')}.`);
-  };
-
-  const doImport = async (file: File) => {
-    const text = await file.text();
-    const result = await importLibrary(text);
-    setNotice(result.ok
-      ? `Restored ${plural(result.songs ?? 0, 'song')} and ${plural(result.sessions ?? 0, 'practice session')}.`
-      : result.message);
-    onOpenSong(null);
-  };
-
   if (focused) return <SongPage song={focused} onBack={() => onOpenSong(null)} />;
 
   if (!ready) {
@@ -175,43 +149,8 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
           <button type="button" className="btn btn-primary" onClick={() => setDraft(blankDraft())}>
             Add song
           </button>
-          {/* Said in words: two tray arrows side by side read as the same
-              button twice, and nobody could tell which one saves. */}
-          {songs.length > 0 && (
-            <button type="button" className="btn btn-tray" onClick={doExport} title="Save your songs and progress to a file">
-              <IconTray dir="out" aria-hidden="true" />
-              Back up
-            </button>
-          )}
-          <button type="button" className="btn btn-tray" onClick={() => fileInput.current?.click()} title="Load songs and progress from a backup file">
-            <IconTray dir="in" aria-hidden="true" />
-            Restore
-          </button>
-          {/* The Tab Player left the main navigation; it opens a score file,
-              which is a thing you do from your songs. */}
-          <button type="button" className="btn" onClick={() => go({ tab: 'tabs', songId: null })} title="Open a Guitar Pro or MusicXML file">
-            Tab file
-          </button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={e => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              if (file) void doImport(file);
-            }}
-          />
         </div>
       </header>
-
-      {notice && (
-        <p className="songs-notice" role="status">
-          {notice}
-          <button type="button" className="songs-notice-close" onClick={() => setNotice(null)} aria-label="Dismiss">×</button>
-        </p>
-      )}
 
       {draft && (
         <form className="song-draft" onSubmit={e => void submitDraft(e)}>
@@ -252,6 +191,9 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
           <div className="draft-actions">
             <button type="submit" className="btn btn-primary" disabled={!draft.title.trim()}>Add song</button>
             <button type="button" className="btn" onClick={() => setDraft(null)}>Cancel</button>
+            <button type="button" className="draft-tabfile" onClick={() => go({ tab: 'tabs', songId: null })}>
+              Import a tab file
+            </button>
           </div>
         </form>
       )}
@@ -270,6 +212,8 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
             onChange={e => setQuery(e.target.value)}
           />
         </label>
+        {/* Sorting a short list is slower than reading it. */}
+        {songs.length >= FILTER_FROM && (
         <Segmented<Filter>
           value={filter}
           onChange={setFilter}
@@ -277,6 +221,7 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
           ariaLabel="Filter songs"
           size="sm"
         />
+        )}
       </div>
       )}
 
@@ -285,7 +230,7 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
           <div className="songs-blank">
             <p className="songs-blank-title">Your songs live here</p>
             <p className="songs-blank-said">
-              Add one with its chords and strumming, and it gets chord diagrams, a play-along and a practice log. Or restore a backup from another phone.
+              Add one with its chords and strumming, and it gets chord diagrams and a play-along. Have a backup? Restore it in Me.
             </p>
           </div>
         )
@@ -319,10 +264,11 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
                     {song.capo !== null && song.capo > 0 && <span className="songrow-capo"> · {capoLabel(song.capo)}</span>}
                   </span>
                   <span className="songrow-chords readout">{chords.join(' · ')}</span>
-                  <span className="songrow-conf" title={`Confidence ${song.confidence} of 10`}>
-                    <span className="conf-bar"><span style={{ width: `${song.confidence * 10}%` }} /></span>
-                    <span className="readout">{song.confidence}<span className="songrow-of">/10</span></span>
-                  </span>
+                  {/* Your own rating, said in words. Unrated songs say nothing:
+                      the status already says where they stand. */}
+                  {song.confidence > 0 && (
+                    <span className="songrow-conf readout"><small>Confidence</small>{song.confidence} of 10</span>
+                  )}
                   <span className="songrow-mins readout">{totalMinutes(song)} min</span>
                 </button>
               </li>

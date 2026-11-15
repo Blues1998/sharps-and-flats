@@ -3081,11 +3081,18 @@ button.daynode:active {
 }
 
 .songrow-conf {
+  grid-column: 4;
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.74rem;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.78rem;
   color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.songrow-conf small {
+  font-size: 0.62rem;
+  color: var(--text-muted);
 }
 
 .conf-bar {
@@ -3233,6 +3240,23 @@ button.daynode:active {
   flex-wrap: wrap;
   gap: 0.5rem 0.8rem;
   margin-top: 0.9rem;
+}
+
+.draft-tabfile {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  padding: 0.4rem 0;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.draft-tabfile:hover {
+  color: var(--text-primary);
 }
 
 .draft-clash {
@@ -4887,6 +4911,10 @@ button.daynode:active {
   .songrow-chords,
   .songrow-mins {
     display: none;
+  }
+
+  .songrow-conf {
+    grid-column: 2;
   }
 
   .daygrid {
@@ -7072,6 +7100,19 @@ button.progression-chord:hover {
 .csheet-rate-btn.is-on.is-shaky { border-color: var(--warning); background: var(--warning-glow); }
 .csheet-rate-btn.is-on.is-none { border-color: var(--text-muted); background: var(--surface-3); }
 
+/* On a chord card, three to a row on a phone. */
+.csheet-rate.is-compact {
+  width: 100%;
+  gap: 0.25rem;
+}
+
+.csheet-rate.is-compact .csheet-rate-btn {
+  padding: 0.45rem 0.1rem;
+  border-radius: 9px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
 .csheet-actions {
   display: flex;
   gap: 0.5rem;
@@ -7372,6 +7413,11 @@ button.progression-chord:hover {
   .chordcards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+  }
+
+  /* Cards with the labelled Solid / Shaky / Not yet row need two to a row. */
+  .chordcards:has(.csheet-rate.is-compact) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .chordcards-book {
@@ -13842,6 +13888,12 @@ a.btn {
   }
 }
 
+.me-notice {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
 /* ===== About: the mark you can play ===== */
 .me-about {
   justify-content: flex-start;
@@ -14691,6 +14743,48 @@ a.btn {
   flex: 1;
   text-align: center;
   font-weight: 600;
+  color: var(--primary);
+}
+
+.song-stage {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  align-items: end;
+  gap: 0.75rem;
+  padding: 0.4rem 0.4rem 0.8rem;
+  margin-bottom: 0.6rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.song-stage-now,
+.song-stage-next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.song-stage-next {
+  opacity: 0.55;
+}
+
+.song-stage-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.song-stage-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.05;
+  font-size: 1.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.song-stage-now .song-stage-name {
+  font-size: 2.2rem;
   color: var(--primary);
 }
 

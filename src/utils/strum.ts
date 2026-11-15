@@ -100,18 +100,29 @@ const STROKE_OF: Record<string, Stroke> = {
 /** Where one bar ends and the next begins. */
 const BAR_LINE = /\|/;
 
+/** Strokes written out as words: "Down down up". */
+const WORD_STROKE: Record<string, Stroke> = {
+  down: 'D', up: 'U', mute: 'X', muted: 'X', chuck: 'X', rest: '-'
+};
+
 /**
  * The strokes somebody wrote, in order.
  *
- * Everything that is not a stroke is a separator: spaces, slashes, and the
- * counting people write above a pattern ("1 & 2 &") all fall out, so a pattern
- * copied off a lesson sheet with its counting attached still reads.
+ * Spaces, slashes, commas and the counting people write above a pattern
+ * ("1 & 2 &") are separators, so a pattern copied off a lesson sheet with its
+ * counting attached still reads. A word is read only when every letter in it
+ * is a stroke (or it is a stroke spelled out), so a note like "mixed" or
+ * "fingerpicked" is not mistaken for a row of mutes.
  */
 export const tokenize = (text: string): Stroke[] => {
   const out: Stroke[] = [];
-  for (const ch of text.toLowerCase()) {
-    const stroke = STROKE_OF[ch];
-    if (stroke) out.push(stroke);
+  for (const raw of text.toLowerCase().split(/[\s/,|]+/)) {
+    const word = raw.replace(/[0-9&+]/g, '');
+    if (!word) continue;
+    const spelled = WORD_STROKE[word];
+    if (spelled) { out.push(spelled); continue; }
+    const strokes = [...word].map(ch => STROKE_OF[ch]);
+    if (strokes.every(Boolean)) out.push(...(strokes as Stroke[]));
   }
   return out;
 };
@@ -194,7 +205,8 @@ function place(tokens: Stroke[], slots: number, beatsPerBar: number): Stroke[] {
  */
 export function parseStrum(text: string, beatsPerBar = 4): StrumPattern | null {
   const written = text.split(BAR_LINE).map(tokenize).filter(bar => bar.length > 0);
-  if (written.length === 0) return null;
+  // Mutes and rests alone are not a strum: nothing in them rings.
+  if (!written.some(bar => bar.some(st => st === 'D' || st === 'U'))) return null;
 
   // Sixteenths only when eighths plainly cannot hold what was written, judged
   // one bar at a time. Most patterns are eighths, and reading an eighth

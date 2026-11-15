@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChordDiagram } from './ChordDiagram';
-import { IconComfort, IconTrash } from './Icons';
+import { IconTrash } from './Icons';
 import { audio } from '../utils/audio';
 import type { ChordVoicing } from '../utils/chords';
 import {
@@ -17,59 +17,29 @@ import {
 } from '../utils/chordbook';
 
 /**
- * Three states of one hand, as one control.
+ * How a chord feels: Solid, Shaky or Not yet, said in words.
  *
- * Deliberately not a slider or a five-point scale. The question is asked in
- * passing, while you are looking at a song, and it has to be answerable in the
- * time it takes to notice you got the change wrong again.
- *
- * Three fills of one ring, and no word unless you ask for it. A catalogue page
- * carries fourteen of these and a song page five, and the answer was printed
- * next to every one of them, the same three words over and over, saying what
- * the mark beside them already said. The ring reads at a glance because empty,
- * half and full are the same object at three settings; the word comes back on
- * hover, on keyboard focus, and in the tooltip, where a word is worth having.
+ * The same three labelled buttons as the chord sheet on the Chords page, so
+ * rating a chord looks and reads the same wherever you meet it. Nothing is
+ * lit until you answer, so an unrated chord does not pass for "Not yet".
  */
-export const ComfortMark: React.FC<{
-  symbol: string;
-  size?: 'sm' | 'md';
-}> = ({ symbol, size = 'md' }) => {
+export const ComfortMark: React.FC<{ symbol: string }> = ({ symbol }) => {
   const comfort = comfortOf(symbol);
   const rated = skillFor(symbol) !== undefined;
-  // Which ring to congratulate, if any. Held rather than derived because the
-  // flourish belongs to the act of answering, not to the answer: mounting a
-  // page of already-marked chords should not set fourteen rings off at once.
-  const [justSet, setJustSet] = useState<ChordComfort | null>(null);
-  // On a phone there is no hover to bring the words back, so the small marks
-  // carry a caption: the question until it is answered, then the answer.
-  const mark = (
-    <div className={`comfort comfort-${size}`} role="group" aria-label={`How ${symbol} feels`}>
+  return (
+    <div className="csheet-rate is-compact" role="group" aria-label={`How ${symbol} feels`}>
       {COMFORT_ORDER.map(value => (
         <button
           key={value}
           type="button"
-          className={`comfort-btn is-${value}${comfort === value ? ' is-on' : ''}${justSet === value ? ' is-set' : ''}`}
-          aria-pressed={comfort === value}
-          title={`${COMFORT_LABEL[value]}: ${COMFORT_HINT[value]}`}
-          onClick={() => {
-            setJustSet(value);
-            void setComfort(symbol, value);
-          }}
-          onAnimationEnd={() => setJustSet(null)}
+          className={`csheet-rate-btn is-${value}${rated && comfort === value ? ' is-on' : ''}`}
+          aria-pressed={rated && comfort === value}
+          title={COMFORT_HINT[value]}
+          onClick={() => void setComfort(symbol, value)}
         >
-          <span className="comfort-glyph" aria-hidden="true"><IconComfort state={value} /></span>
-          <span className="comfort-text">{COMFORT_LABEL[value]}</span>
+          {COMFORT_LABEL[value]}
         </button>
       ))}
-    </div>
-  );
-  if (size !== 'sm') return mark;
-  return (
-    <div className="comfort-wrap">
-      {mark}
-      <span className={`comfort-caption${rated ? ` is-${comfort}` : ''}`}>
-        {rated ? COMFORT_LABEL[comfort] : 'How does it feel?'}
-      </span>
     </div>
   );
 };
@@ -199,7 +169,7 @@ export const ChordCard: React.FC<ChordCardProps> = ({
         </span>
       )}
 
-      {markable && <ComfortMark symbol={symbol} size="sm" />}
+      {markable && <ComfortMark symbol={symbol} />}
 
       {footer}
 

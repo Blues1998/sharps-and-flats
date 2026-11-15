@@ -2,6 +2,9 @@ import React, { useRef, useState } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
 import { TrophyShelf } from '../components/TrophyShelf';
+import { useLibrary } from '../hooks/useLibrary';
+import { exportLibrary, getSongs, importLibrary, isoDate, practiceStats } from '../utils/library';
+import { saveTextFile } from '../utils/saveFile';
 import { GOAL_CHOICES, getGoal, setGoal } from '../utils/practiceClock';
 import { BrandMark, PRIVACY_URL } from '../components/Brand';
 import { audio } from '../utils/audio';
@@ -37,6 +40,67 @@ const CREDITS: { name: string; what: string; licence: string }[] = [
 const MARK_CHORDS = ['E', 'Am', 'Cadd9', 'D/F#', 'G', 'Em7', 'A7sus4', 'Dsus2', 'E7#9'];
 
 /** The ♯♭ mark as an instrument: every tap strums the next chord. */
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Back up to a file and restore from one: rare, so here rather than on Songs. */
+const YourData: React.FC = () => {
+  const ready = useLibrary();
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const count = ready ? getSongs().length : 0;
+
+  const backUp = async () => {
+    const result = await saveTextFile(
+      `sharps-and-flats-library-${isoDate()}.json`,
+      JSON.stringify(exportLibrary(), null, 2),
+      'application/json'
+    );
+    if (result === 'cancelled') return;
+    setNotice(result === 'failed'
+      ? 'Could not save the backup. Try again.'
+      : `Backed up ${plural(count, 'song')} and ${plural(practiceStats().sessionCount, 'practice session')}.`);
+  };
+
+  const restore = async (file: File) => {
+    const result = await importLibrary(await file.text());
+    setNotice(result.ok
+      ? `Restored ${plural(result.songs ?? 0, 'song')} and ${plural(result.sessions ?? 0, 'practice session')}.`
+      : result.message);
+  };
+
+  return (
+    <section className="glass-panel me-card me-settings">
+      <h3 className="me-heading">Your data</h3>
+      <div className="me-row">
+        <span className="me-row-label">
+          Back up
+          <span className="me-row-sub">Save your songs and progress to a file</span>
+        </span>
+        <button type="button" className="btn" onClick={() => void backUp()} disabled={count === 0}>Save file</button>
+      </div>
+      <div className="me-row">
+        <span className="me-row-label">
+          Restore
+          <span className="me-row-sub">Load a backup from another phone</span>
+        </span>
+        <button type="button" className="btn" onClick={() => fileInput.current?.click()} disabled={!ready}>Open file</button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={e => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void restore(file);
+          }}
+        />
+      </div>
+      {notice && <p className="me-notice" role="status">{notice}</p>}
+    </section>
+  );
+};
+
 const PlayableMark: React.FC = () => {
   const turn = useRef(0);
   const [shown, setShown] = useState<{ chord: string; key: number } | null>(null);
@@ -185,6 +249,8 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
           <button type="button" className="btn" onClick={toVoiceRange}>{voice.range ? 'Measure again' : 'Find my range'}</button>
         </div>
       </section>
+
+      <YourData />
 
       <section className="glass-panel me-card">
         <div className="me-account-text">

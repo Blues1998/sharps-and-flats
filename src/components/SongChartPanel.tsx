@@ -139,6 +139,9 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
 
   const currentVoicing = useVoicing(current?.symbol ?? (chart.chords[0] ?? null));
   const nextVoicing = useVoicing(next?.symbol ?? null);
+  // During the count-in the stage shows the first chord to get your hand on.
+  const stageNow = current?.symbol ?? chart.chords[0] ?? null;
+  const stageNext = next?.symbol ?? null;
 
   // Automatically ramp tempo upon completing each full loop lap
   useEffect(() => {
@@ -242,6 +245,23 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
           </button>
         )
       ) : (
+        <>
+        {/* On the Play tab the chords to hold get the room: the one now, big
+            with its fingering, and the next one smaller beside it. */}
+        {visible && (
+          <div className="song-stage">
+            <div className="song-stage-now">
+              <span className="song-stage-label">{counting ? 'Get ready' : 'Hold'}</span>
+              <span className="song-stage-name">{stageNow ?? '–'}</span>
+              {currentVoicing && <ChordDiagram frets={currentVoicing.frets} fingers={currentVoicing.fingers} scale={1.05} />}
+            </div>
+            <div className="song-stage-next">
+              <span className="song-stage-label">Next</span>
+              <span className="song-stage-name">{stageNext ?? '–'}</span>
+              {nextVoicing && <ChordDiagram frets={nextVoicing.frets} fingers={nextVoicing.fingers} scale={0.62} />}
+            </div>
+          </div>
+        )}
         <div className="song-player-live">
           <button
             type="button"
@@ -260,6 +280,8 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
           </button>
           {counting ? (
             <span className="song-player-count readout">Count in {countInBeats + beat + 1}</span>
+          ) : visible ? (
+            isLooping && <span className="song-player-lap readout">Lap {lap}</span>
           ) : (
             <div className="song-player-chords">
               <HeldChord label="Hold" symbol={current?.symbol ?? chart.chords[0] ?? null} voicing={currentVoicing} />
@@ -268,6 +290,7 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   );
@@ -300,7 +323,7 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
                 aria-expanded={drawer === 'strum'}
                 aria-label="Strumming pattern"
               >
-                {song.strumming ? <StrumChip text={song.strumming} beatsPerBar={settings.beatsPerBar} /> : <span>Add a strum</span>}
+                {pattern && song.strumming ? <StrumChip text={song.strumming} beatsPerBar={settings.beatsPerBar} /> : <span>Pick a strum</span>}
                 <Chevron />
               </button>
               <button
