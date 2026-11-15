@@ -34,6 +34,11 @@ export interface LoopRecord {
   setAt: number;
   /** How many clean runs have been banked here, records or not. */
   runs: number;
+  /**
+   * The tempo of the first clean run, so a badge can say how far it has come.
+   * Absent on records banked before it was kept; `previous` stands in.
+   */
+  first?: number;
 }
 
 let records = new Map<string, LoopRecord>();
@@ -105,7 +110,8 @@ export async function bankRun(input: BankInput): Promise<Banked> {
     best: beat ? input.tempo : (existing as LoopRecord).best,
     previous: beat ? existing?.best ?? null : existing?.previous ?? null,
     setAt: beat ? Date.now() : (existing as LoopRecord).setAt,
-    runs: (existing?.runs ?? 0) + 1
+    runs: (existing?.runs ?? 0) + 1,
+    first: existing ? existing.first : input.tempo
   };
   records.set(record.id, record);
   await putRecords('records', [record]);

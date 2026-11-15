@@ -9,6 +9,7 @@ import { audio } from '../utils/audio';
 import { clearTempoLog, getTempoLog, heldLabel, logTempo, whenHeld, type TempoRun } from '../utils/tempoLog';
 import { reportProgress } from '../utils/progress';
 import { feel } from '../utils/haptics';
+import { setRecord } from '../utils/feats';
 import { frameGate } from '../utils/frames';
 import { swingOffbeat } from '../utils/swing';
 
@@ -637,6 +638,12 @@ export const RhythmLab: React.FC = () => {
   const lean = hits.length >= 8 ? Math.round(hits.reduce((n, h) => n + h.differenceMs, 0) / hits.length) : null;
   const verdict = lean === null ? null : Math.abs(lean) < 8 ? 'Right on the beat' : lean < 0 ? `You rush by about ${-lean} ms` : `You drag by about ${lean} ms`;
   const timeSig = timeSignature === 6 ? '6/8' : `${timeSignature}/4`;
+  // How close the verdict's taps sat to the beat, unsigned: the Clockwork
+  // number. Rushing 10 and dragging 10 are both 10 ms away.
+  const tightness = hits.length >= 8 ? Math.round(hits.reduce((n, h) => n + Math.abs(h.differenceMs), 0) / hits.length) : null;
+  useEffect(() => {
+    if (tightness !== null && tightness > 0) setRecord('tap-tightest', tightness);
+  }, [tightness]);
 
   return (
     <div className="lab-stack rhythm">

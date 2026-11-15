@@ -15609,3 +15609,224 @@ a.btn {
 @media (max-width: 1000px) {
   .physics .lab-title { display: none; }
 }
+
+/* ===== Encore: rewards ===== */
+
+/* The tuner's stage warms as a run grows: one step per milestone. */
+.voice-stage {
+  --heat: 0;
+  box-shadow: inset 0 0 calc(12px + 60px * var(--heat)) calc(-6px + 10px * var(--heat)) rgba(255, 106, 42, calc(0.5 * var(--heat)));
+  transition: box-shadow 0.6s ease;
+}
+
+.hold-score {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.7rem;
+  margin-top: 0.75rem;
+}
+.hold-streak {
+  font-size: 3.4rem;
+  font-weight: 700;
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+}
+.hold-streak.is-up { animation: holdPop 0.32s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes holdPop { 40% { transform: scale(1.14); } }
+.hold-streak-l {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0.2rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+.hold-streak-l b { font-size: 0.85rem; color: var(--text-primary); }
+.hold-streak-l .is-warn { color: var(--warning); font-weight: 600; }
+.hold-best { display: flex; flex-direction: column; align-items: flex-end; padding-bottom: 0.2rem; }
+.hold-best > span { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.hold-best b { font-size: 1.3rem; line-height: 1.1; }
+.hold-best.is-new b { color: var(--primary); }
+.voice-stats .hold-tools { display: flex; gap: 0.9rem; margin-left: auto; }
+.voice-stats .hold-tools .linklike { font-size: 0.75rem; }
+
+/* The grade, over the end of the trace, for a moment. */
+.hold-flash {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+  pointer-events: none;
+  opacity: 0;
+  animation: holdFlash 1.2s ease-out both;
+}
+.hold-flash small { font-size: 0.72rem; font-weight: 500; color: var(--text-secondary); }
+.hold-flash.is-perfect { color: var(--primary); }
+.hold-flash.is-great { color: var(--success); }
+.hold-flash.is-good { color: var(--note-scale); }
+.hold-flash.is-miss { color: var(--text-muted); font-size: 1.05rem; }
+@keyframes holdFlash {
+  0% { opacity: 0; transform: translateY(-40%) scale(0.92); }
+  12% { opacity: 1; transform: translateY(-50%) scale(1.06); }
+  22% { transform: translateY(-50%) scale(1); }
+  75% { opacity: 1; transform: translateY(-50%); }
+  100% { opacity: 0; transform: translateY(-50%); }
+}
+
+.hold-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 0.9rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: var(--text-primary);
+  color: var(--panel-bg);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: holdBanner 2.2s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.hold-banner.is-best { background: var(--primary); color: var(--text-on-primary); }
+.hold-mark { font-family: 'Encore Music', 'Noto Music', serif; font-size: 1.4rem; line-height: 0.6; font-weight: 400; }
+@keyframes holdBanner {
+  0% { opacity: 0; transform: translate(-50%, 120%); }
+  14% { opacity: 1; transform: translate(-50%, 0); }
+  85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 40%); }
+}
+
+/* The run summary. */
+.hsum { display: flex; flex-direction: column; padding-top: 1.25rem; }
+.hsum-kicker { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+.hsum-run { margin-top: 0.6rem; font-size: 3.8rem; font-weight: 700; line-height: 0.85; letter-spacing: -0.05em; }
+.hsum-run small { margin-left: 0.4rem; font-family: var(--font-display); font-size: 1.05rem; letter-spacing: -0.01em; color: var(--text-secondary); }
+.hsum-verdict { margin: 0.6rem 0 0; font-weight: 500; color: var(--text-secondary); }
+.hsum-verdict.is-best { font-weight: 600; color: var(--primary); }
+.hsum-strip { display: flex; align-items: flex-end; gap: 1px; height: 54px; margin-top: 1.1rem; border-bottom: 1px solid var(--panel-border); }
+.hsum-strip i { flex: 1; min-width: 1px; max-width: 14px; border-radius: 1px 1px 0 0; }
+.hsum-strip i.is-perfect { background: var(--primary); }
+.hsum-strip i.is-great { background: var(--success); }
+.hsum-strip i.is-good { background: var(--note-scale); }
+.hsum-strip-l { display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.62rem; color: var(--text-muted); }
+.hsum-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin-top: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--panel-border);
+}
+.hsum-stats div { padding: 0.6rem 0.75rem; background: var(--surface-1); }
+.hsum-stats span { display: block; font-size: 0.7rem; color: var(--text-muted); }
+.hsum-stats b { font-size: 1.1rem; }
+.hsum-earned { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; padding: 0.6rem 0.75rem; border: 1px solid var(--panel-border); border-radius: 12px; background: var(--surface-1); }
+.hsum-earned .hsum-pick { width: 36px; flex: none; }
+.hsum-earned b { display: block; font-size: 0.9rem; }
+.hsum-earned span { font-size: 0.75rem; color: var(--text-secondary); }
+.hsum-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1.1rem; }
+
+/* A badge, earned. Above every sheet, under the confetti. */
+.unlock-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.62);
+  animation: overlayIn 0.2s ease both;
+}
+.unlock-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 340px);
+  padding: 1.75rem 1.5rem 1.25rem;
+  border-radius: 22px;
+  background: var(--elevated-bg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+.unlock-pick { width: 128px; height: auto; animation: pickArrive 0.9s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+@keyframes pickArrive {
+  0% { opacity: 0; transform: scale(0.3) rotate(-25deg); }
+  60% { opacity: 1; transform: scale(1.08) rotate(4deg); }
+  100% { transform: none; }
+}
+.unlock-kicker { margin-top: 1.1rem; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary); }
+.unlock-name { margin: 0.5rem 0 0; font-family: var(--font-display); font-size: 1.6rem; letter-spacing: -0.02em; text-wrap: balance; }
+.unlock-why { margin: 0.4rem 0 0; font-size: 0.88rem; color: var(--text-secondary); }
+.unlock-next { margin-top: 0.9rem; font-size: 0.75rem; color: var(--text-muted); }
+.unlock-go { width: 100%; margin-top: 1.4rem; }
+.confetti-layer { position: fixed; inset: 0; z-index: 130; width: 100%; height: 100%; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hold-streak.is-up, .unlock-pick { animation: none; }
+  .hold-flash, .hold-banner { animation-duration: 2.2s; animation-timing-function: steps(1, end); }
+}
+
+/* Trophies, on Me. */
+.trophies { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+.trophies-head { display: flex; align-items: baseline; justify-content: space-between; }
+.trophies-count { font-size: 0.8rem; color: var(--text-secondary); }
+.trophies-count b { font-size: 1.05rem; color: var(--text-primary); }
+.trophies-shelf { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.trophy {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0.65rem 0.35rem 0.55rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  text-align: center;
+  cursor: pointer;
+}
+.trophy:hover { border-color: var(--panel-border-hover); }
+.trophy.is-open { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-glow); }
+.trophy-pick { width: 46px; height: auto; }
+.trophy b { font-size: 0.74rem; font-weight: 600; line-height: 1.2; }
+.trophy-pips { display: flex; gap: 2px; }
+.trophy-pips i { width: 7px; height: 3px; border-radius: 2px; background: var(--surface-3); }
+.trophy-pips i.is-on { background: var(--primary); }
+.trophy-detail { padding: 0.8rem; border: 1px solid var(--panel-border); border-radius: 14px; background: var(--surface-1); }
+.trophy-detail h4 { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin: 0; font-family: var(--font-display); font-size: 1rem; }
+.trophy-detail h4 span { font-family: var(--font-ui); font-size: 0.72rem; font-weight: 500; color: var(--text-muted); }
+.trophy-detail p { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--text-secondary); }
+.trophy-tiers { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.3rem; margin-top: 0.65rem; }
+.trophy-tiers div { display: grid; gap: 0.1rem; padding: 0.35rem 0; border-radius: 8px; background: var(--surface-2); text-align: center; font-size: 0.7rem; color: var(--text-muted); }
+.trophy-tiers div b { font-size: 0.72rem; color: var(--text-secondary); }
+.trophy-tiers div.is-got { background: var(--primary-glow); color: var(--text-primary); }
+.trophy-tiers div.is-got b { color: var(--primary); }
+.trophy-detail .trophy-next { margin-top: 0.55rem; color: var(--text-primary); }
+.trophy-ones { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.trophy-one { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.65rem 0.3rem 0.35rem; border: 1px solid var(--panel-border); border-radius: 999px; font-size: 0.74rem; color: var(--text-muted); }
+.trophy-one.is-got { color: var(--text-primary); }
+.trophy-one-pick { width: 20px; height: auto; flex: none; }
+.trophies-recs-h { margin-top: 0.4rem; }
+.trophy-recs { border: 1px solid var(--panel-border); border-radius: 14px; background: var(--surface-1); }
+.trophy-recs div { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0.8rem; border-top: 1px solid var(--panel-border); }
+.trophy-recs div:first-child { border-top: 0; }
+.trophy-recs span { display: flex; flex-direction: column; font-size: 0.82rem; min-width: 0; }
+.trophy-recs small { font-size: 0.7rem; color: var(--text-muted); }
+.trophy-recs b { font-size: 0.92rem; white-space: nowrap; }
+.trophy-empty { margin: 0; font-size: 0.82rem; color: var(--text-muted); }
+
+.voice-holdrow .btn { white-space: nowrap; }
+.unlock-go, .hsum-acts .btn { justify-content: center; }

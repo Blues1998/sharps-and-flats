@@ -125,7 +125,11 @@ export function setSongRange(songId: string, range: Range | null, capo = 0): voi
   setVoice({ songs });
 }
 
-const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
+export const subscribeVoice = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
+const subscribe = subscribeVoice;
+
+/** The voice settings now, outside React. */
+export const getVoice = (): VoiceState => state;
 const snapshot = () => state;
 
 export function useVoice(): VoiceState {

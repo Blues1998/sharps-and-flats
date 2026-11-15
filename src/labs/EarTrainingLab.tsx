@@ -29,6 +29,7 @@ import type { TabIntervalCandidate } from '../utils/tabIntervalSource';
 import { CHORD_FEELINGS } from '../utils/glossary';
 import { IconSounding } from '../components/Icons';
 import { feel } from '../utils/haptics';
+import { setRecord } from '../utils/feats';
 import { useBackToClose } from '../utils/nativeShell';
 
 /** Questions in a set. A set ends, so a session has a shape and a result. */
@@ -452,6 +453,17 @@ export const EarTrainingLab: React.FC = () => {
   const isCorrect = (opt: string) => (quizMode === 'intervals' ? correctInterval?.name === opt : correctChord?.name === opt);
   const clueFor = (opt: string) => (quizMode === 'intervals' ? INTERVALS.find(iv => iv.name === opt)?.songClue ?? '' : CHORD_FEELINGS[opt] ?? '');
   const finished = totalQuestions >= SET;
+
+  // A finished set leaves its mark: a perfect ten counts toward Sharp Ears,
+  // and the best streak in it is offered to the record. Once per set.
+  const markedSet = useRef(false);
+  useEffect(() => {
+    if (!finished) { markedSet.current = false; return; }
+    if (markedSet.current) return;
+    markedSet.current = true;
+    if (score === SET) reportProgress('ear-perfect-set');
+    if (best > 0) setRecord('ear-streak', best, quizMode === 'intervals' ? 'Intervals' : 'Chords');
+  }, [finished, score, best, quizMode]);
 
   // What Auto is drilling: the unlocked items you know least, said in words,
   // so the choice of question is not a black box.

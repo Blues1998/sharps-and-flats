@@ -5,6 +5,14 @@ import { IconPlay, IconStop } from './Icons';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { audio } from '../utils/audio';
 import { reportProgress } from '../utils/progress';
+import { HoldSummary } from './HoldSummary';
+import {
+  GRADE_LABEL, MILESTONES, bestChime, gradeFor, hitChime, milestoneChime, missChime, setChime, useChime, type Grade
+} from '../utils/chime';
+import { countHold, setRecord, unlockShowing, useFeats } from '../utils/feats';
+import { freshRun, resumeRun, saveRun, type HoldRun } from '../utils/holdRun';
+import { confetti } from '../utils/confetti';
+import { feel } from '../utils/haptics';
 import {
   SA_CHOICES, closestVoiceType, labelFor, prettyNote, setVoice, useVoice,
   type NoteLabel, type Notation, type Range
@@ -23,6 +31,8 @@ const BAND_CENTS = 30;        // in tune, for a held sung note
 const HOLD_TARGET_MS = 1500;  // long enough that you have stopped arriving and are holding
 const REFERENCE_MS = 1700;    // the reference note's length, plus its tail in the room
 const RANGE_HOLD_MS = 500;    // a note counts toward your range once held this long
+const MISS_MS = 8000;         // to land each note once a streak is going, or it breaks
+const SILENCE_MS = 30000;     // of hearing nothing, and the run is over
 
 const toMidi = (hz: number) => 12 * Math.log2(hz / 440) + 69;
 
@@ -115,18 +125,54 @@ export const VoiceTuner: React.FC = () => {
     return Array.from({ length: Math.max(1, high - low + 1) }, (_, i) => low + i);
   }, [voice.range, sa]);
 
-  const [target, setTarget] = useState<number>(() => sa + 7);
+  const chimeOn = useChime();
+  const feats = useFeats();
+  const best = feats.records['hold-streak']?.value ?? 0;
+
+  // The run outlives the page: leaving is a rest, and coming back within ten
+  // minutes carries on from the same note. See holdRun.
+  const [run, setRunState] = useState<HoldRun>(() => resumeRun() ?? freshRun(sa + 7));
+  const runRef = useRef(run);
+  const setRun = useCallback((next: HoldRun) => {
+    runRef.current = next;
+    setRunState(next);
+    saveRun(next.held > 0 ? next : null);
+  }, []);
+  const [summary, setSummary] = useState<HoldRun | null>(null);
+
+  const [target, setTarget] = useState<number>(() => run.target ?? sa + 7);
+  const targetRef = useRef(target);
+  targetRef.current = target;
   const [holdMs, setHoldMs] = useState(0);
-  const [matched, setMatched] = useState(0);
-  const [streak, setStreak] = useState(0);
   const [lastResult, setLastResult] = useState<{ note: number; spread: number } | null>(null);
   const holdRef = useRef({ ms: 0, last: 0, samples: [] as number[], quietUntil: 0 });
+  const missMs = useRef(0);
+  const lastPitch = useRef(performance.now());
+  const [missLeft, setMissLeft] = useState<number | null>(null);
+  const [flash, setFlash] = useState<{ key: number; grade: Grade | 'miss'; text: string; sub: string } | null>(null);
+  const [banner, setBanner] = useState<{ key: number; text: string; mark?: string; best?: boolean } | null>(null);
+  const bannerTimer = useRef<number | undefined>(undefined);
+  const showBanner = (b: { text: string; mark?: string; best?: boolean }) => {
+    setBanner({ ...b, key: performance.now() });
+    window.clearTimeout(bannerTimer.current);
+    bannerTimer.current = window.setTimeout(() => setBanner(null), 2200);
+  };
+
+  // Keep the note with the run, and the run's clock fresh when the page is left.
+  useEffect(() => {
+    if (runRef.current.held > 0) saveRun({ ...runRef.current, target });
+  }, [target]);
+  useEffect(() => () => {
+    window.clearTimeout(bannerTimer.current);
+    if (runRef.current.held > 0) saveRun({ ...runRef.current, target: targetRef.current });
+  }, []);
 
   const newTarget = useCallback((from?: number) => {
     const options = pool().filter(n => n !== (from ?? target));
     const next = options[Math.floor(Math.random() * options.length)] ?? sa;
     setTarget(next);
-    holdRef.current = { ms: 0, last: 0, samples: [], quietUntil: 0 };
+    holdRef.current = { ms: 0, last: 0, samples: [], quietUntil: holdRef.current.quietUntil };
+    missMs.current = 0;
     setHoldMs(0);
   }, [pool, target, sa]);
 
@@ -137,13 +183,29 @@ export const VoiceTuner: React.FC = () => {
     holdRef.current.quietUntil = performance.now() + REFERENCE_MS;
   };
 
+  const endRun = useCallback(() => {
+    const r = runRef.current;
+    if (r.held === 0) return;
+    saveRun(null);
+    setSummary(r);
+  }, []);
+
+  const startOver = (pickNew: boolean) => {
+    setSummary(null);
+    setRun(freshRun(target));
+    lastPitch.current = performance.now();
+    if (pickNew) newTarget();
+  };
+
+  // Landing a note.
   useEffect(() => {
-    if (mode !== 'hold' || !isActive) return;
+    if (mode !== 'hold' || !isActive || summary) return;
     const h = holdRef.current;
     const now = performance.now();
+    if (live !== null) lastPitch.current = now;
     const dt = h.last === 0 ? 16 : Math.min(100, now - h.last);
     h.last = now;
-    if (now < h.quietUntil) return;
+    if (now < h.quietUntil || unlockShowing()) return;
 
     const inBand = live !== null && Math.abs(live - target) * 100 <= BAND_CENTS;
     if (inBand) {
@@ -154,24 +216,101 @@ export const VoiceTuner: React.FC = () => {
       if (h.ms === 0) h.samples = [];
     }
     setHoldMs(h.ms);
+    if (h.ms < HOLD_TARGET_MS) return;
 
-    if (h.ms >= HOLD_TARGET_MS) {
-      // How steady it was: the spread of the held pitch, in cents.
-      const s = h.samples;
-      const mean = s.reduce((a, b) => a + b, 0) / s.length;
-      const spread = Math.round(Math.sqrt(s.reduce((a, b) => a + (b - mean) ** 2, 0) / s.length));
-      setLastResult({ note: target, spread });
-      setMatched(m => m + 1);
-      setStreak(n => n + 1);
-      reportProgress('tuner-note-matched');
-      h.ms = 0;
-      h.samples = [];
-      // A beat to see it land before the next one, and quiet so the chime
-      // is not heard as singing.
-      h.quietUntil = now + 900;
-      setTimeout(() => newTarget(target), 700);
+    // How steady it was: the spread of the held pitch, in cents.
+    const s = h.samples;
+    const mean = s.reduce((a, b) => a + b, 0) / s.length;
+    const spread = Math.round(Math.sqrt(s.reduce((a, b) => a + (b - mean) ** 2, 0) / s.length));
+    const grade = gradeFor(spread);
+    const r = runRef.current;
+    const streak = r.streak + 1;
+    const next: HoldRun = {
+      ...r, streak, max: Math.max(r.max, streak), held: r.held + 1,
+      perfect: r.perfect + (grade === 'perfect' ? 1 : 0), spreads: [...r.spreads, spread], target
+    };
+
+    hitChime(grade, target);
+    feel('success');
+    setFlash({ key: now, grade, text: GRADE_LABEL[grade], sub: `${prettyNote(target)} · ±${spread}¢` });
+    setLastResult({ note: target, spread });
+    missMs.current = 0;
+    setMissLeft(null);
+    reportProgress('tuner-note-matched');
+    countHold();
+
+    // Records first: a badge they earn takes the stage, and the run's own
+    // fanfare stands aside for it rather than playing over the cadence.
+    const before = unlockShowing();
+    setRecord('hold-steadiest', spread, prettyNote(target));
+    if (grade === 'perfect') setRecord('hold-perfect-run', next.perfect);
+    setRecord('hold-streak', streak);
+    const badge = !before && unlockShowing();
+
+    let quiet = 1200;
+    if (!next.passedBest && next.startBest > 0 && streak === next.startBest + 1) {
+      next.passedBest = true;
+      showBanner({ text: `New best · ${streak}`, best: true });
+      if (!badge) {
+        window.setTimeout(() => { bestChime(60); confetti(); feel('celebrate'); }, 380);
+        quiet = 2800;
+      }
+    } else {
+      const m = MILESTONES.find(x => x.n === streak);
+      if (m) {
+        showBanner({ text: `${m.n} in a row`, mark: m.mark });
+        if (!badge) {
+          window.setTimeout(() => { milestoneChime(m, 60); feel('celebrate'); }, 380);
+          quiet = 2400;
+        }
+      }
     }
-  }, [live, mode, isActive, target, newTarget]);
+    setRun(next);
+
+    h.ms = 0;
+    h.samples = [];
+    // A beat to see it land before the next one, and quiet so the chime is
+    // not heard as singing.
+    h.quietUntil = now + quiet;
+    setTimeout(() => newTarget(target), 700);
+  }, [live, mode, isActive, target, newTarget, summary, setRun]);
+
+  // The clocks: 8 seconds to land each note once a streak is going, and 30
+  // seconds of silence to end the run. Both stand still behind a badge.
+  useEffect(() => {
+    if (mode !== 'hold' || !isActive || summary) return;
+    let last = performance.now();
+    lastPitch.current = last;
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      const dt = now - last;
+      last = now;
+      if (unlockShowing()) { lastPitch.current += dt; return; }
+      const r = runRef.current;
+      if (r.held > 0) runRef.current = { ...r, activeMs: r.activeMs + dt };
+      const h = holdRef.current;
+      if (r.streak > 0 && now >= h.quietUntil && h.ms === 0) {
+        missMs.current += dt;
+        const left = Math.ceil((MISS_MS - missMs.current) / 1000);
+        setMissLeft(left <= 4 ? Math.max(0, left) : null);
+        if (missMs.current >= MISS_MS) {
+          const note = targetRef.current;
+          missMs.current = 0;
+          setMissLeft(null);
+          missChime(note - 12);
+          feel('error');
+          setFlash({ key: now, grade: 'miss', text: `Missed ${prettyNote(note)}`, sub: `Streak was ${r.streak}` });
+          setRun({ ...runRef.current, streak: 0 });
+        }
+      } else if (r.streak === 0) {
+        setMissLeft(null);
+      }
+      if (r.held > 0 && now - lastPitch.current > SILENCE_MS) endRun();
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [mode, isActive, summary, endRun, setRun]);
+
+  const heat = MILESTONES.filter(m => run.streak >= m.n).length / MILESTONES.length;
 
   // ---- Range ---------------------------------------------------------------
   const [found, setFound] = useState<Range | null>(null);
@@ -197,7 +336,7 @@ export const VoiceTuner: React.FC = () => {
     <div className="voice">
       {/* The stage: the trace fills it, and everything you read while singing
           floats over it, so the line gets every pixel the screen can spare. */}
-      <section className="glass-panel voice-stage">
+      <section className="glass-panel voice-stage" style={mode === 'hold' ? { '--heat': heat } as React.CSSProperties : undefined}>
         <PitchTrace pitch={live} notation={notation} sa={sa} target={mode === 'hold' ? target : null} bandCents={BAND_CENTS} height="fill" />
 
         <div className="voice-hud">
@@ -235,6 +374,17 @@ export const VoiceTuner: React.FC = () => {
           </div>
         )}
         {error && <p className="micbar-error voice-error">{error}</p>}
+        {mode === 'hold' && flash && (
+          <div key={flash.key} className={`hold-flash is-${flash.grade}`} aria-live="polite">
+            {flash.text}<small className="readout">{flash.sub}</small>
+          </div>
+        )}
+        {mode === 'hold' && banner && (
+          <div key={banner.key} className={`hold-banner${banner.best ? ' is-best' : ''}`}>
+            {banner.mark && <span className="hold-mark" aria-hidden="true">{banner.mark}</span>}
+            {banner.text}
+          </div>
+        )}
       </section>
 
       <section className="glass-panel voice-dock">
@@ -265,23 +415,41 @@ export const VoiceTuner: React.FC = () => {
 
         {mode === 'hold' && (
           <div className="voice-pane">
+            <div className="hold-score">
+              <span key={run.streak} className={`hold-streak readout${run.streak > 0 ? ' is-up' : ''}`}>{run.streak}</span>
+              <span className="hold-streak-l">
+                <b>in a row</b>
+                {missLeft !== null
+                  ? <span className="is-warn">Land it in {missLeft}s</span>
+                  : run.streak > 0 ? '8 seconds for each note' : 'Miss one and it starts over'}
+              </span>
+              <span className={`hold-best${run.passedBest ? ' is-new' : ''}`}>
+                <span>Best</span><b className="readout">{Math.max(best, run.max)}</b>
+              </span>
+            </div>
+            <div className="voice-hold-bar" aria-label={`Held ${Math.round(holdPct)}%`}><span style={{ width: `${holdPct}%` }} /></div>
             <div className="voice-row voice-holdrow">
-              <button type="button" className="btn voice-step" onClick={() => { setTarget(t => t - 1); holdRef.current.ms = 0; }} aria-label="One semitone lower">−</button>
+              <button type="button" className="btn voice-step" onClick={() => { setTarget(t => t - 1); holdRef.current.ms = 0; missMs.current = 0; }} aria-label="One semitone lower">−</button>
               <div className="voice-target-note">
                 <NoteName label={label(target)} className="voice-target-name" />
                 {notation === 'sargam' && <span className="voice-hint">{prettyNote(target)}</span>}
               </div>
-              <button type="button" className="btn voice-step" onClick={() => { setTarget(t => t + 1); holdRef.current.ms = 0; }} aria-label="One semitone higher">+</button>
+              <button type="button" className="btn voice-step" onClick={() => { setTarget(t => t + 1); holdRef.current.ms = 0; missMs.current = 0; }} aria-label="One semitone higher">+</button>
               <button type="button" className="btn btn-primary" onClick={() => playReference()}>
                 <IconPlay size={12} /> Hear it
               </button>
-              <button type="button" className="btn" onClick={() => { setStreak(0); newTarget(); }}>New</button>
+              <button type="button" className="btn" onClick={() => newTarget()}>New</button>
             </div>
-            <div className="voice-hold-bar" aria-label={`Held ${Math.round(holdPct)}%`}><span style={{ width: `${holdPct}%` }} /></div>
             <div className="voice-stats readout">
-              <span>Held <strong>{matched}</strong></span>
-              <span>Streak <strong>{streak}</strong></span>
-              <span>{lastResult ? `Last: steady to ±${lastResult.spread}¢` : `Hold in the green band`}</span>
+              <span>Held <strong>{run.held}</strong></span>
+              <span>Perfect <strong>{run.perfect}</strong></span>
+              <span>{lastResult ? `Last ±${lastResult.spread}¢` : 'Hold in the green band'}</span>
+              <span className="hold-tools">
+                <button type="button" className="linklike" aria-pressed={chimeOn} onClick={() => setChime(!chimeOn)}>
+                  {chimeOn ? 'Chime on' : 'Chime off'}
+                </button>
+                {run.held > 0 && <button type="button" className="linklike" onClick={endRun}>End run</button>}
+              </span>
             </div>
           </div>
         )}
@@ -317,6 +485,7 @@ export const VoiceTuner: React.FC = () => {
           </div>
         )}
       </section>
+      {summary && <HoldSummary run={summary} onAgain={() => startOver(true)} onDone={() => startOver(false)} />}
     </div>
   );
 };

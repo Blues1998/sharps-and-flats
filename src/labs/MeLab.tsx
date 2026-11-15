@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
+import { TrophyShelf } from '../components/TrophyShelf';
 import { BrandMark, PRIVACY_URL } from '../components/Brand';
 import { audio } from '../utils/audio';
 import { voicingsFor } from '../utils/chordbook';
@@ -96,6 +97,8 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
           {user ? 'Account & sync' : 'Sign in to back up'}
         </button>
       </section>}
+
+      <TrophyShelf />
 
       <section className="glass-panel me-card me-settings">
         <h3 className="me-heading">Preferences</h3>

@@ -5,6 +5,7 @@ import { RunBar, useRunning } from './components/RunBar';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
 import { Onboarding } from './components/Onboarding';
+import { UnlockLayer } from './components/UnlockLayer';
 import { SunburstReveal } from './components/Sunburst';
 import { useBackToClose } from './utils/nativeShell';
 import { AuthProvider } from './context/AuthContext';
@@ -240,6 +241,9 @@ function App() {
         </QuietBoundary>
         <TroubleToast />
         <SunburstReveal />
+        <QuietBoundary where="the badge">
+          <UnlockLayer />
+        </QuietBoundary>
       </div>
     </AuthProvider>
   );
