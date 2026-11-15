@@ -28,6 +28,7 @@ import { drillSlots, nextChords, reasonInFull, type NextChord } from '../utils/n
 import { normalizeChordSymbol } from '../utils/songText';
 import { chartsWithChord, hideChord, removeFromSongs, songsWithChord, unhideAll, unhideChord, useHiddenChords } from '../utils/chordRemoval';
 import { useBackToClose } from '../utils/nativeShell';
+import { useHoldUnlocks } from '../utils/feats';
 
 type Tab = 'learn' | 'mine' | 'all';
 type Section = ChordComfort | 'unrated';
@@ -147,6 +148,8 @@ export const ChordBookLab: React.FC = () => {
       : COMMON.filter(sym => !skillFor(sym)).map(symbol => ({ symbol, song: null }));
     return pool.filter(c => !skipped.has(c.symbol));
   }, [entries.length, unrated, skipped]);
+  // Rating a stack of chords is one job: badges wait for the last card.
+  useHoldUnlocks('chord-stack', (tab === null || tab === 'learn') && stack.length > 0 && ratedNow.length > 0);
 
   // My chords, in sections, through the search field.
   const sections = useMemo(() => {

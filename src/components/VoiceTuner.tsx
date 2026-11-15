@@ -9,7 +9,7 @@ import { HoldSummary } from './HoldSummary';
 import {
   GRADE_LABEL, MILESTONES, bestChime, gradeFor, hitChime, milestoneChime, missChime, setChime, useChime, type Grade
 } from '../utils/chime';
-import { countHold, setRecord, unlockShowing, useFeats } from '../utils/feats';
+import { countHold, setRecord, unlockShowing, useFeats, useHoldUnlocks } from '../utils/feats';
 import { freshRun, resumeRun, saveRun, type HoldRun } from '../utils/holdRun';
 import { confetti } from '../utils/confetti';
 import { feel } from '../utils/haptics';
@@ -311,6 +311,8 @@ export const VoiceTuner: React.FC = () => {
   }, [mode, isActive, summary, endRun, setRun]);
 
   const heat = MILESTONES.filter(m => run.streak >= m.n).length / MILESTONES.length;
+  // Badges earned during a run wait until it is over (the summary lists them too).
+  useHoldUnlocks('voice-run', mode === 'hold' && ((isActive && run.held > 0) || !!summary));
 
   // ---- Range ---------------------------------------------------------------
   const [found, setFound] = useState<Range | null>(null);

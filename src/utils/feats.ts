@@ -12,7 +12,7 @@
 //
 // Kept on this device, like the voice settings: localStorage, read once.
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { getProgressCount, subscribeProgress } from './progress';
 import { getChordSkills } from './chordbook';
 import { getSongs, isReady, practiceLedger, shiftIso } from './library';
@@ -279,15 +279,44 @@ let queue: Unlock[] = [];
 const QUEUE_CHANGE = 'cadenza-unlock-change';
 const announceQueue = () => window.dispatchEvent(new Event(QUEUE_CHANGE));
 
+// Badges wait for you to finish. While anything is in progress (a tap test,
+// a run of held notes, a set of ten, a stack of chords to rate) they queue up
+// quietly, and appear a moment after the last activity stops. Each activity
+// says it is busy through useHoldUnlocks.
+const busy = new Set<string>();
+let open = true;
+let openTimer: number | undefined;
+const NONE: Unlock[] = [];
+
+function setBusy(key: string, on: boolean): void {
+  if (on) busy.add(key); else busy.delete(key);
+  window.clearTimeout(openTimer);
+  if (busy.size > 0) {
+    if (open) { open = false; announceQueue(); }
+  } else if (!open) {
+    // A breath after stopping, so the badge follows the finish rather than
+    // landing on the last tap.
+    openTimer = window.setTimeout(() => { open = true; announceQueue(); }, 900);
+  }
+}
+
+/** Holds badges back while `active` is true, and lets them through after. */
+export function useHoldUnlocks(key: string, active: boolean): void {
+  useEffect(() => {
+    setBusy(key, active);
+    return () => setBusy(key, false);
+  }, [key, active]);
+}
+
 export function useUnlocks(): Unlock[] {
   return useSyncExternalStore(
     cb => { window.addEventListener(QUEUE_CHANGE, cb); return () => window.removeEventListener(QUEUE_CHANGE, cb); },
-    () => queue
+    () => (open ? queue : NONE)
   );
 }
 
-/** Whether an unlock is on screen, so a run can wait behind it. */
-export const unlockShowing = (): boolean => queue.length > 0;
+/** Whether an unlock is on screen. */
+export const unlockShowing = (): boolean => open && queue.length > 0;
 
 export function dismissUnlock(): void {
   queue = queue.slice(1);

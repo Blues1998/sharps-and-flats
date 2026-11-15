@@ -9,7 +9,7 @@ import { audio } from '../utils/audio';
 import { clearTempoLog, getTempoLog, heldLabel, logTempo, whenHeld, type TempoRun } from '../utils/tempoLog';
 import { reportProgress } from '../utils/progress';
 import { feel } from '../utils/haptics';
-import { setRecord } from '../utils/feats';
+import { setRecord, useHoldUnlocks } from '../utils/feats';
 import { frameGate } from '../utils/frames';
 import { swingOffbeat } from '../utils/swing';
 
@@ -269,6 +269,8 @@ export const RhythmLab: React.FC = () => {
   const [bpm, setBpm] = useState<number>(100);
   const [timeSignature, setTimeSignature] = useState<number>(4); // beats per bar
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  // Nothing pops up over a running click: badges wait for Stop.
+  useHoldUnlocks('rhythm', isPlaying);
   // Clicks to a beat. The pulse is always the beat; this is the texture under
   // it, which is what a strumming hand is actually counting.
   const [subdivision, setSubdivision] = useState<number>(1);
