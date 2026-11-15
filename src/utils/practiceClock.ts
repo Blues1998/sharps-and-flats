@@ -103,6 +103,23 @@ export function secondsOn(date: string, songId?: string): number {
   return Object.values(d).reduce((a, b) => a + b, 0);
 }
 
+// ---- When each tool was last used ------------------------------------------
+
+const USED_KEY = 'cadenza-tool-last';
+let used: Record<string, string> = (() => {
+  try { return JSON.parse(localStorage.getItem(USED_KEY) ?? '{}') as Record<string, string>; } catch { return {}; }
+})();
+
+/** The last day a tool (metronome, ear, challenge, loop, voice…) counted time. */
+export const lastUsed = (key: string): string | undefined => used[key];
+
+function markUsed(keys: string[], date: string): void {
+  const stale = keys.filter(k => used[k] !== date);
+  if (stale.length === 0) return;
+  used = { ...used, ...Object.fromEntries(stale.map(k => [k, date])) };
+  try { localStorage.setItem(USED_KEY, JSON.stringify(used)); } catch { /* this session */ }
+}
+
 // ---- The daily goal --------------------------------------------------------
 
 export const GOAL_CHOICES = [5, 10, 20] as const;
@@ -179,6 +196,7 @@ function tick(): void {
   // One clock: a song beats general practice when both are going.
   const songId = all.find(l => l.songId)?.songId ?? GENERAL;
   const date = creditDate();
+  markUsed([...live.keys()], date);
   if (presence === 'asking') pending.push({ date, songId, seconds: dt / 1000 });
   else credit(date, songId, dt / 1000);
 }

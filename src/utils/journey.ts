@@ -67,7 +67,7 @@ export const JOURNEY: JourneyChapter[] = [
         id: 'happy-vs-sad',
         title: 'Hear happy vs sad',
         idea: 'A scale is a family of notes. Minor is major with three notes lowered.',
-        task: 'Play Major, then Natural Minor. Hear the mood flip.',
+        task: 'Play Major, then Natural minor. Hear the mood flip.',
         tab: 'theory',
         buttonText: 'Theory',
         requirements: [
@@ -79,18 +79,18 @@ export const JOURNEY: JourneyChapter[] = [
         id: 'first-climb',
         title: 'Climb a scale on your instrument',
         idea: 'Play the scale. The app checks each note.',
-        task: 'Finish one Scale Climb round.',
+        task: 'In Challenges → Scales, climb one scale.',
         tab: 'play',
-        buttonText: 'Scale Climb',
+        buttonText: 'Challenges',
         requirements: [{ event: 'play-scale-completed', count: 1 }]
       },
       {
         id: 'pentatonic',
         title: 'The five-note shortcut',
         idea: 'Drop two notes and you get the pentatonic, the scale behind most rock and blues solos.',
-        task: 'Climb a pentatonic scale.',
+        task: 'Climb a pentatonic scale in Challenges → Scales.',
         tab: 'play',
-        buttonText: 'Scale Climb',
+        buttonText: 'Challenges',
         requirements: [{ event: 'play-scale-completed:pentatonic', count: 1 }]
       }
     ]
@@ -111,9 +111,9 @@ export const JOURNEY: JourneyChapter[] = [
         id: 'interval-hunt',
         title: 'Find intervals by hand',
         idea: 'One fret is one semitone. A fifth is seven frets.',
-        task: 'Play 2 intervals correctly.',
+        task: 'In Challenges → Intervals, play 2 correctly.',
         tab: 'play',
-        buttonText: 'Interval Hunt',
+        buttonText: 'Challenges',
         requirements: [{ event: 'play-interval-completed', count: 2 }]
       }
     ]
@@ -134,9 +134,9 @@ export const JOURNEY: JourneyChapter[] = [
         id: 'build-chords',
         title: 'Build chords note by note',
         idea: 'Every triad is a root, a third and a fifth.',
-        task: 'Build 2 chords on your instrument.',
+        task: 'In Challenges → Chords, build 2 chords.',
         tab: 'play',
-        buttonText: 'Chord Builder',
+        buttonText: 'Challenges',
         requirements: [{ event: 'play-chord-completed', count: 2 }]
       },
       {

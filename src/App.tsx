@@ -7,6 +7,7 @@ import { MobileNav } from './components/MobileNav';
 import { Onboarding } from './components/Onboarding';
 import { UnlockLayer } from './components/UnlockLayer';
 import { StillPlaying } from './components/StillPlaying';
+import { JourneyBar } from './components/JourneyBar';
 import { SunburstReveal } from './components/Sunburst';
 import { useBackToClose } from './utils/nativeShell';
 import { AuthProvider } from './context/AuthContext';
@@ -196,6 +197,7 @@ function App() {
               screens that already exist, so it takes a strip of the page and
               leaves everything under it exactly where it was. */}
           <RunBar />
+          <JourneyBar />
           <div key={activeTab} className="lab-enter">
             {/* Shown only the first time a lab is opened, and usually not even
                 then: the rail has normally started the download already. */}

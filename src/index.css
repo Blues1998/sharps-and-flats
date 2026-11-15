@@ -16150,3 +16150,61 @@ a.btn {
 @media (max-width: 900px) {
   .play-dock { bottom: calc(var(--mtabs-h) + env(safe-area-inset-bottom, 0px) + 0.5rem); }
 }
+
+/* ===== Journey step bar ===== */
+.journeybar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  box-shadow: var(--elevation-low);
+}
+.journeybar.is-done { border-color: var(--success); }
+.journeybar-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--primary);
+}
+.journeybar.is-done .journeybar-mark { background: var(--success); color: var(--page-bg, #111); }
+.journeybar-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.journeybar-text b { font-size: 0.85rem; font-weight: 600; line-height: 1.3; color: var(--text-primary); }
+.journeybar-text small { font-size: 0.74rem; color: var(--text-muted); }
+.journeybar.is-done .journeybar-text b { color: var(--success); }
+.journeybar-x { padding: 0.35rem; border: 0; background: none; color: var(--text-muted); cursor: pointer; }
+.journeybar-back { white-space: nowrap; padding: 0.45rem 0.8rem; font-size: 0.8rem; }
+
+/* ===== Practice hub: picks and a suggestion ===== */
+.practice-pick { width: 34px; flex-shrink: 0; display: grid; place-items: center; }
+.practice-pick .pick { width: 34px; height: auto; }
+.practice-next {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'label label' 'name said';
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  width: 100%;
+  margin-bottom: 1.2rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--primary);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+  font-family: var(--font-ui);
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.practice-next-label { grid-area: label; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
+.practice-next-name { grid-area: name; font-size: 1.05rem; font-weight: 600; }
+.practice-next-said { grid-area: said; font-size: 0.8rem; color: var(--text-secondary); }

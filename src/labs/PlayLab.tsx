@@ -12,6 +12,7 @@ import {
 } from '../utils/musicTheory';
 import { SCALE_FEELINGS, CHORD_FEELINGS, shortScaleName } from '../utils/glossary';
 import { bestClimb, markClimbed } from '../utils/feats';
+import { followedStep } from '../utils/journeyStep';
 import { reportProgress } from '../utils/progress';
 import { IconCheck } from '../components/Icons';
 import { feel } from '../utils/haptics';
@@ -72,7 +73,11 @@ export const PlayLab: React.FC = () => {
   usePracticeTime('challenge', isActive, { mic: true });
   useHeard(pitch);
 
-  const [mode, setMode] = useState<Mode>('scale');
+  // Arriving from a Journey step opens the challenge it asks for.
+  const [mode, setMode] = useState<Mode>(() => {
+    const step = followedStep();
+    return step === 'interval-hunt' ? 'interval' : step === 'build-chords' ? 'chord' : 'scale';
+  });
   const [round, setRound] = useState<Round | null>(null);
   const [progressIdx, setProgressIdx] = useState<number>(0);
   const [phase, setPhase] = useState<'playing' | 'complete'>('playing');

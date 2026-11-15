@@ -1,3 +1,4 @@
+import { followStep } from '../utils/journeyStep';
 import React, { useEffect, useState } from 'react';
 import type { ActiveTab } from './Sidebar';
 import { JOURNEY, ALL_LEVELS, isLevelComplete, getCurrentLevelIndex, levelProgress } from '../utils/journey';
@@ -90,7 +91,7 @@ export const Journey: React.FC<JourneyProps> = ({ setActiveTab }) => {
                         <p className="step-task">{level.task}</p>
                         <div className="step-actions">
                           <button
-                            onClick={() => setActiveTab(level.tab)}
+                            onClick={() => { followStep(done ? null : level.id); setActiveTab(level.tab); }}
                             className={`btn ${done ? '' : 'btn-primary'}`}
                             style={{ padding: '0.42rem 0.9rem', fontSize: '0.8rem' }}
                           >
