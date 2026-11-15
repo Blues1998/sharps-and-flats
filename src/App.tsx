@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
 import { Onboarding } from './components/Onboarding';
 import { UnlockLayer } from './components/UnlockLayer';
+import { StillPlaying } from './components/StillPlaying';
 import { SunburstReveal } from './components/Sunburst';
 import { useBackToClose } from './utils/nativeShell';
 import { AuthProvider } from './context/AuthContext';
@@ -244,6 +245,7 @@ function App() {
         <QuietBoundary where="the badge">
           <UnlockLayer />
         </QuietBoundary>
+        <StillPlaying />
       </div>
     </AuthProvider>
   );

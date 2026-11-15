@@ -14,11 +14,11 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import { getProgressCount, subscribeProgress } from './progress';
-import { getChordSkills } from './chordbook';
+import { chordKey, getChordSkills } from './chordbook';
 import { getSongs, isReady, streakState } from './library';
-import { GOAL_MET_EVENT } from './practiceClock';
+import { GOAL_MET_EVENT, clockEntries } from './practiceClock';
 import { getRecords } from './records';
-import { getVoice, prettyNote, subscribeVoice } from './voice';
+import { prettyNote, subscribeVoice } from './voice';
 import { JOURNEY, isLevelComplete } from './journey';
 import { STORE_CHANGE_EVENT } from './db';
 
@@ -26,7 +26,7 @@ import { STORE_CHANGE_EVENT } from './db';
 // Records
 // ---------------------------------------------------------------------------
 
-export type RecordId = 'hold-streak' | 'hold-steadiest' | 'hold-perfect-run' | 'ear-streak' | 'tap-tightest';
+export type RecordId = 'hold-streak' | 'hold-steadiest' | 'hold-perfect-run' | 'ear-streak' | 'tap-tightest' | 'hold-low' | 'hold-high';
 
 /** Records where a smaller number is the better one. */
 const LOWER_IS_BETTER: Record<RecordId, boolean> = {
@@ -34,7 +34,9 @@ const LOWER_IS_BETTER: Record<RecordId, boolean> = {
   'hold-steadiest': true,
   'hold-perfect-run': false,
   'ear-streak': false,
-  'tap-tightest': true
+  'tap-tightest': true,
+  'hold-low': true,
+  'hold-high': false
 };
 
 export interface PersonalRecord {
@@ -56,6 +58,8 @@ interface FeatsState {
    * deserved by then are granted quietly rather than all at once on launch.
    */
   seeded: boolean;
+  /** Chords whose strum the mic has checked, by chord key, with when. */
+  proven?: Record<string, number>;
   /** The newest pick earned, for Today. */
   latest?: { id: string; name: string; glyph: string; tier: number; at: number };
   /** Data rules this state has been brought up to. See migrate(). */
@@ -130,19 +134,66 @@ export function countHold(): void {
 
 const rec = (id: RecordId): number => state.records[id]?.value ?? 0;
 
-/** Semitones between the lowest and highest notes of the saved voice range. */
+/**
+ * Range you have proven: the lowest and highest notes actually landed in Hold
+ * a note, each held steady for a second and a half. The range finder's own
+ * number stays for fitting songs to your voice, but it can be stretched by a
+ * guitar or a whistle, so a badge does not read it.
+ */
 const rangeSemitones = (): number => {
-  const r = getVoice().range;
-  return r ? r.high - r.low : 0;
+  const low = state.records['hold-low']?.value;
+  const high = state.records['hold-high']?.value;
+  return low !== undefined && high !== undefined ? high - low : 0;
+};
+export const provenRange = (): { low: number; high: number } | null => {
+  const low = state.records['hold-low']?.value;
+  const high = state.records['hold-high']?.value;
+  return low !== undefined && high !== undefined ? { low, high } : null;
 };
 
-/** The most a loop has sped up since the first clean run banked on it. */
-const loopClimb = (): number =>
-  getRecords().reduce((m, r) => Math.max(m, r.best - (r.first ?? r.previous ?? r.best)), 0);
+/**
+ * How much faster a loop has got, counted across days.
+ *
+ * Progress is measured from the best run on the first day it was played, and
+ * can grow by at most 10 bpm for each later day: a loop saved at 40 and then
+ * at 100 five minutes later is a slider moved, not a skill gained. Quick play
+ * cannot hear you, so the spacing is what keeps the number about practice.
+ */
+export const MAX_CLIMB_PER_DAY = 10;
+function climbOf(days: Record<string, number> | undefined): number {
+  const list = Object.entries(days ?? {}).sort(([a], [b]) => (a < b ? -1 : 1));
+  if (list.length < 2) return 0;
+  const base = list[0][1];
+  let credited = 0;
+  for (const [, best] of list.slice(1)) credited = Math.max(credited, Math.min(credited + MAX_CLIMB_PER_DAY, best - base));
+  return credited;
+}
+const loopClimb = (): number => getRecords().reduce((m, r) => Math.max(m, climbOf(r.days)), 0);
 
-const solidChords = (): number => getChordSkills().filter(s => s.comfort === 'solid').length;
+/**
+ * Chords you can play, proven: rated Solid and strummed for the mic, which
+ * checked every note rang. Rating is your word; the strum is the evidence.
+ */
+export const isProven = (symbol: string): boolean => !!state.proven?.[chordKey(symbol)];
+export function markProven(symbol: string): void {
+  state = { ...state, proven: { ...state.proven, [chordKey(symbol)]: Date.now() } };
+  save();
+  checkBadges();
+}
+const solidChords = (): number => getChordSkills().filter(s => s.comfort === 'solid' && !!state.proven?.[s.id]).length;
 
-const playableSongs = (): number => getSongs().filter(s => s.status !== 'learning').length;
+/**
+ * Songs you can play, with the minutes to show for it. Marking a song
+ * Playable is a click; it counts here once the app has also counted at least
+ * 10 minutes of playing it, on 2 or more days.
+ */
+export const SETLIST_MINUTES = 10;
+export const SETLIST_DAYS = 2;
+export function songEarned(songId: string): boolean {
+  const days = clockEntries().filter(e => e.songId === songId);
+  return days.length >= SETLIST_DAYS && days.reduce((n, e) => n + e.minutes, 0) >= SETLIST_MINUTES;
+}
+const playableSongs = (): number => getSongs().filter(s => s.status !== 'learning' && songEarned(s.id)).length;
 
 /** The longest daily streak ever, rests included. See streak.ts. */
 export const longestDailyStreak = (): number => streakState().longest;
@@ -185,8 +236,8 @@ export const TIERED: TieredBadge[] = [
   },
   {
     id: 'range', name: 'Range Finder', glyph: '𝄞', page: 'Voice tuner',
-    what: 'Voice range found, in semitones', tiers: [12, 15, 18, 21, 24],
-    value: rangeSemitones, said: n => `${n} semitones of voice range`,
+    what: 'Semitones between your lowest and highest landed notes', tiers: [12, 15, 18, 21, 24],
+    value: rangeSemitones, said: n => `${n} semitones between your lowest and highest landed notes`,
     need: g => `${g} more semitone${g === 1 ? '' : 's'} of range`
   },
   {
@@ -203,19 +254,19 @@ export const TIERED: TieredBadge[] = [
   },
   {
     id: 'climb', name: 'Speed Climber', glyph: '♬', page: 'Chords',
-    what: 'Tempo gained on one loop since its first clean run', tiers: [10, 20, 30, 45, 60],
+    what: 'Tempo gained on one loop across days (up to 10 bpm a day)', tiers: [10, 20, 30, 45, 60],
     value: loopClimb, fmt: n => `+${n}`, said: n => `${n} bpm faster on one loop`,
     need: g => `${g} more bpm on one loop`
   },
   {
     id: 'collect', name: 'Chord Collector', glyph: '♫', page: 'Chords',
-    what: 'Chords rated Solid', tiers: [3, 8, 15, 25, 40],
-    value: solidChords, said: n => `${n} chords rated Solid`,
-    need: g => `${g} more Solid chord${g === 1 ? '' : 's'}`
+    what: 'Chords rated Solid and proven by strumming for the mic', tiers: [3, 8, 15, 25, 40],
+    value: solidChords, said: n => `${n} chords proven by ear`,
+    need: g => `${g} more chord${g === 1 ? '' : 's'} proven by ear`
   },
   {
     id: 'setlist', name: 'Setlist', glyph: '♪', page: 'Songs',
-    what: 'Songs marked Playable or better', tiers: [1, 3, 5, 10, 20],
+    what: 'Songs marked Playable, with 10 counted minutes over 2 days', tiers: [1, 3, 5, 10, 20],
     value: playableSongs, said: n => n === 1 ? 'A song marked Playable' : `${n} songs marked Playable or better`,
     need: g => `${g} more playable song${g === 1 ? '' : 's'}`
   },
@@ -464,8 +515,8 @@ export function recordRows(): RecordRow[] {
   if (r['hold-streak']) rows.push({ label: 'Longest hold streak', value: `${r['hold-streak'].value}`, sub: `Voice tuner · ${when(r['hold-streak'].at)}` });
   if (r['hold-steadiest']) rows.push({ label: 'Steadiest hold', value: `±${r['hold-steadiest'].value}¢`, sub: `${r['hold-steadiest'].note ?? 'Voice tuner'} · ${when(r['hold-steadiest'].at)}` });
   if (r['hold-perfect-run']) rows.push({ label: 'Most Perfect holds in a run', value: `${r['hold-perfect-run'].value}`, sub: `Voice tuner · ${when(r['hold-perfect-run'].at)}` });
-  const range = getVoice().range;
-  if (range) rows.push({ label: 'Voice range', value: `${prettyNote(range.low)} to ${prettyNote(range.high)}`, sub: `${range.high - range.low} semitones` });
+  const range = provenRange();
+  if (range && range.high > range.low) rows.push({ label: 'Landed range', value: `${prettyNote(range.low)} to ${prettyNote(range.high)}`, sub: `${range.high - range.low} semitones, Hold a note` });
   if (r['ear-streak']) rows.push({ label: 'Ear training streak', value: `${r['ear-streak'].value}`, sub: `${r['ear-streak'].note ?? 'Ear Training'} · ${when(r['ear-streak'].at)}` });
   if (r['tap-tightest']) rows.push({ label: 'Tightest tap test', value: `±${r['tap-tightest'].value} ms`, sub: `Rhythm · ${when(r['tap-tightest'].at)}` });
   const fastest = getRecords().sort((a, b) => b.best - a.best)[0];

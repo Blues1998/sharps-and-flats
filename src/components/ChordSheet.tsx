@@ -13,6 +13,10 @@ import {
   voicingsFor
 } from '../utils/chordbook';
 import { useBackToClose } from '../utils/nativeShell';
+import { useChordCheck } from '../hooks/useChordCheck';
+import { isProven, markProven, useFeats } from '../utils/feats';
+import { feel } from '../utils/haptics';
+import { hitChime } from '../utils/chime';
 
 interface ChordSheetProps {
   symbol: string;
@@ -37,6 +41,7 @@ interface ChordSheetProps {
  */
 export const ChordSheet: React.FC<ChordSheetProps> = ({ symbol, songs, inLoop, onToggleLoop, onDrill, onRemove, onClose }) => {
   useBackToClose(true, onClose);
+  useFeats();
   useEffect(() => {
     const shut = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', shut);
@@ -47,6 +52,16 @@ export const ChordSheet: React.FC<ChordSheetProps> = ({ symbol, songs, inLoop, o
   const mine = preferredVoicing(symbol);
   const rated = skillFor(symbol) !== undefined;
   const comfort = comfortOf(symbol);
+
+  // Rating Solid is your word; strumming it for the mic is the proof.
+  const check = useChordCheck();
+  const proven = isProven(symbol) || check.state === 'passed';
+  useEffect(() => {
+    if (check.state !== 'passed' || isProven(symbol)) return;
+    markProven(symbol);
+    feel('success');
+    hitChime('perfect', mine?.midis[0] ?? 60);
+  }, [check.state, symbol, mine]);
 
   return createPortal(
     <div className="msheet-backdrop is-dialog" onClick={onClose}>
@@ -103,6 +118,30 @@ export const ChordSheet: React.FC<ChordSheetProps> = ({ symbol, songs, inLoop, o
             </button>
           ))}
         </div>
+
+        {rated && comfort === 'solid' && mine && (
+          <div className={`csheet-prove is-${proven ? 'passed' : check.state}`} aria-live="polite">
+            {proven ? (
+              <span className="csheet-prove-t"><b>Proven by ear ✓</b>The mic heard every note of {symbol} ring.</span>
+            ) : check.state === 'listening' ? (
+              <span className="csheet-prove-t"><b>Listening…</b>Strum {symbol} and let it ring.</span>
+            ) : (
+              <>
+                <span className="csheet-prove-t">
+                  <b>{check.state === 'failed' ? 'Not quite' : 'Prove it'}</b>
+                  {check.state === 'failed'
+                    ? check.missing ? `The ${check.missing} was not ringing clearly. Check that string and try again.` : `Did not hear ${symbol}. Strum it once, close to the phone.`
+                    : check.state === 'error'
+                      ? 'The mic is needed for this. Allow it and try again.'
+                      : `Strum ${symbol} for the mic. It counts toward Chord Collector.`}
+                </span>
+                <button type="button" className="btn" onClick={() => void check.start(mine.midis)}>
+                  {check.state === 'failed' || check.state === 'error' ? 'Try again' : 'Strum it'}
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="csheet-actions">
           <button type="button" className={`btn${inLoop ? '' : ' btn-primary'} csheet-loop`} onClick={onToggleLoop} disabled={all.length === 0}>

@@ -357,7 +357,11 @@ export function practiceStats(): PracticeStats {
     })
     .reduce((sum, e) => sum + e.minutes, 0);
 
-  const practisedDays = new Set(ledger.filter(e => e.minutes > 0).map(e => e.date));
+  // The streak reads only time the app counted itself. Minutes typed into an
+  // older version or brought in by a restored file still show in totals, but
+  // a streak built from them would be a number anyone could write, which is
+  // why Strava leaves manual entries out of challenges too.
+  const practisedDays = new Set(ledger.filter(e => e.minutes > 0 && e.source === 'auto').map(e => e.date));
 
   // A streak survives today being blank until the day is out, and a missed
   // day can be covered by a rest. See streak.ts.
@@ -379,13 +383,13 @@ export function practiceStats(): PracticeStats {
   };
 }
 
-/** Minutes practised today, from everything the ledger knows. */
+/** Minutes the app counted today, the ones the daily goal reads. */
 export const minutesPractisedToday = (): number =>
-  practiceLedger().filter(e => e.date === today()).reduce((n, e) => n + e.minutes, 0);
+  practiceLedger().filter(e => e.date === today() && e.source === 'auto').reduce((n, e) => n + e.minutes, 0);
 
 /** The daily streak, with its rests. */
 export function streakState(): StreakState {
-  const days = new Set(practiceLedger().filter(e => e.minutes > 0).map(e => e.date));
+  const days = new Set(practiceLedger().filter(e => e.minutes > 0 && e.source === 'auto').map(e => e.date));
   return walkStreak(days, today(), shiftIso);
 }
 

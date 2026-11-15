@@ -15895,3 +15895,36 @@ a.btn {
 .songtime span { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
 .songtime small { font-size: 0.72rem; color: var(--text-muted); }
 .songtime-how { margin: 0.6rem 0 0.9rem; font-size: 0.8rem; color: var(--text-muted); }
+
+/* "Still playing?": above the tab bar, out of the way of the music. */
+.stillplaying {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--mtabs-h, 64px) + env(safe-area-inset-bottom, 0px) + 5.5rem);
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--primary);
+  border-radius: 16px;
+  background: var(--elevated-bg);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  color: var(--text-primary);
+  transform: translateX(-50%);
+  animation: overlayIn 0.2s ease both;
+}
+.stillplaying b { font-size: 0.95rem; }
+.stillplaying span { font-size: 0.75rem; color: var(--text-secondary); }
+.stillplaying.is-waiting { border-color: var(--panel-border); }
+@media (min-width: 901px) { .stillplaying { bottom: 2rem; } }
+
+/* "Prove it": the mic checks a Solid chord. */
+.csheet-prove { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.75rem; padding: 0.7rem 0.8rem; border: 1px solid var(--panel-border); border-radius: 12px; background: var(--surface-1); }
+.csheet-prove-t { display: flex; flex-direction: column; font-size: 0.8rem; line-height: 1.35; color: var(--text-secondary); min-width: 0; }
+.csheet-prove-t b { font-size: 0.9rem; color: var(--text-primary); }
+.csheet-prove.is-passed { border-color: var(--success); }
+.csheet-prove.is-passed b { color: var(--success); }
+.csheet-prove.is-listening { border-color: var(--primary); }
+.csheet-prove .btn { flex: none; }

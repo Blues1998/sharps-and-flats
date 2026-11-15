@@ -134,6 +134,9 @@ export const EarTrainingLab: React.FC = () => {
   // Mastery as it stood when the set began, so the summary can say what moved.
   const setStart = useRef<Record<string, number>>({});
   const [showCheatSheet, setShowCheatSheet] = useState<boolean>(false);
+  // A perfect set means ten heard and named unaided, like Duolingo's perfect
+  // lesson: opening the clues during a set keeps it from counting as one.
+  const [usedClue, setUsedClue] = useState(false);
 
   // Question details
   const [currentRoot, setCurrentRoot] = useState<number>(60); // Default C4
@@ -410,6 +413,7 @@ export const EarTrainingLab: React.FC = () => {
     setStreak(0);
     setBest(0);
     setSetDone(false);
+    setUsedClue(false);
     setStart.current = Object.fromEntries(strip.items.map(item => [item.id, getMastery(item.id)]));
     setHasStarted(true);
     generateQuestion();
@@ -453,6 +457,7 @@ export const EarTrainingLab: React.FC = () => {
   const tabEmpty = sourceMode === 'tab' && tabSource.candidates.length === 0;
   const isCorrect = (opt: string) => (quizMode === 'intervals' ? correctInterval?.name === opt : correctChord?.name === opt);
   const clueFor = (opt: string) => (quizMode === 'intervals' ? INTERVALS.find(iv => iv.name === opt)?.songClue ?? '' : CHORD_FEELINGS[opt] ?? '');
+  useEffect(() => { if (showCheatSheet && hasStarted && !isAnswered) setUsedClue(true); }, [showCheatSheet, hasStarted, isAnswered]);
   const finished = totalQuestions >= SET;
   usePracticeTime('ear', hasStarted && !setDone);
 
@@ -463,9 +468,9 @@ export const EarTrainingLab: React.FC = () => {
     if (!finished) { markedSet.current = false; return; }
     if (markedSet.current) return;
     markedSet.current = true;
-    if (score === SET) reportProgress('ear-perfect-set');
+    if (score === SET && !usedClue) reportProgress('ear-perfect-set');
     if (best > 0) setRecord('ear-streak', best, quizMode === 'intervals' ? 'Intervals' : 'Chords');
-  }, [finished, score, best, quizMode]);
+  }, [finished, score, best, quizMode, usedClue]);
 
   // What Auto is drilling: the unlocked items you know least, said in words,
   // so the choice of question is not a black box.
@@ -513,6 +518,9 @@ export const EarTrainingLab: React.FC = () => {
               <p className="ear-said">
                 Best streak {best}.{improved.length > 0 ? ` ${improved.slice(0, 2).join(' and ')} ${improved.length === 1 ? 'is' : 'are'} getting stronger.` : ''}
               </p>
+              {score === SET && usedClue && (
+                <p className="ear-said">Clues were open, so this one does not count toward Sharp Ears.</p>
+              )}
               <button type="button" className="btn btn-primary ear-again" onClick={handleStartQuiz}>Another set</button>
             </div>
           ) : (

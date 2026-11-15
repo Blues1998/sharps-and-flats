@@ -5,12 +5,13 @@ import { IconPlay, IconStop } from './Icons';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { audio } from '../utils/audio';
 import { reportProgress } from '../utils/progress';
-import { useHeard, usePracticeTime } from '../hooks/usePracticeTime';
+import { usePracticeTime } from '../hooks/usePracticeTime';
+import { heard } from '../utils/practiceClock';
 import { HoldSummary } from './HoldSummary';
 import {
   GRADE_LABEL, MILESTONES, bestChime, gradeFor, hitChime, milestoneChime, missChime, setChime, useChime, type Grade
 } from '../utils/chime';
-import { countHold, setRecord, unlockShowing, useFeats, useHoldUnlocks } from '../utils/feats';
+import { countHold, provenRange, setRecord, unlockShowing, useFeats, useHoldUnlocks } from '../utils/feats';
 import { endedRun, freshRun, saveRun, type HoldRun } from '../utils/holdRun';
 import { confetti } from '../utils/confetti';
 import { feel } from '../utils/haptics';
@@ -34,6 +35,10 @@ const REFERENCE_MS = 1700;    // the reference note's length, plus its tail in t
 const RANGE_HOLD_MS = 500;    // a note counts toward your range once held this long
 const MISS_MS = 8000;         // to land each note once a streak is going, or it breaks
 const SILENCE_MS = 30000;     // of hearing nothing, and the run is over
+const TOO_STEADY_CENTS = 1.5; // steadier than any voice: a tone from a speaker
+const STRETCH_CHANCE = 1 / 6; // how often a target sits just past your landed range
+const VOICE_LOWEST = 36;      // C2
+const VOICE_HIGHEST = 84;     // C6
 
 const toMidi = (hz: number) => 12 * Math.log2(hz / 440) + 69;
 
@@ -96,7 +101,6 @@ export const VoiceTuner: React.FC = () => {
   const { pitch, isActive, error, start, stop } = useMicPitch('voice');
   // Singing is practice: counted while the mic hears your voice.
   usePracticeTime('voice', isActive, { mic: true });
-  useHeard(pitch);
   const voice = useVoice();
   const { notation, sa } = voice;
   const [mode, setMode] = useState<Mode>('sing');
@@ -171,9 +175,24 @@ export const VoiceTuner: React.FC = () => {
     if (runRef.current.held > 0) saveRun({ ...runRef.current, target: targetRef.current });
   }, []);
 
+  // Now and then a stretch note: one just past the lowest or highest note you
+  // have landed, which is how a proven range grows (see Range Finder).
+  const [stretch, setStretch] = useState(false);
   const newTarget = useCallback((from?: number) => {
     const options = pool().filter(n => n !== (from ?? target));
-    const next = options[Math.floor(Math.random() * options.length)] ?? sa;
+    let next = options[Math.floor(Math.random() * options.length)] ?? sa;
+    const proven = provenRange();
+    const opts = pool();
+    let isStretch = false;
+    if (proven && opts.length > 0 && Math.random() < STRETCH_CHANCE) {
+      const edge = Math.random() < 0.5 ? proven.low - 1 : proven.high + 1;
+      // Within reach: no more than a few notes past the range you saved.
+      if (edge >= Math.max(VOICE_LOWEST, opts[0] - 3) && edge <= Math.min(VOICE_HIGHEST, opts[opts.length - 1] + 3)) {
+        next = edge;
+        isStretch = true;
+      }
+    }
+    setStretch(isStretch);
     setTarget(next);
     holdRef.current = { ms: 0, last: 0, samples: [], quietUntil: holdRef.current.quietUntil };
     missMs.current = 0;
@@ -237,6 +256,16 @@ export const VoiceTuner: React.FC = () => {
     const s = h.samples;
     const mean = s.reduce((a, b) => a + b, 0) / s.length;
     const spread = Math.round(Math.sqrt(s.reduce((a, b) => a + (b - mean) ** 2, 0) / s.length));
+    // No voice holds a note this still: a tone from a speaker does. It does not
+    // land, and nothing about the run changes.
+    if (spread < TOO_STEADY_CENTS) {
+      setFlash({ key: now, grade: 'miss', text: 'Too steady for a voice', sub: 'Sing it yourself' });
+      h.ms = 0;
+      h.samples = [];
+      setHoldMs(0);
+      h.quietUntil = now + 800;
+      return;
+    }
     const grade = gradeFor(spread);
     const r = runRef.current;
     const streak = r.streak + 1;
@@ -260,6 +289,8 @@ export const VoiceTuner: React.FC = () => {
     setRecord('hold-steadiest', spread, prettyNote(target));
     if (grade === 'perfect') setRecord('hold-perfect-run', next.perfect);
     setRecord('hold-streak', streak);
+    setRecord('hold-low', target, prettyNote(target));
+    setRecord('hold-high', target, prettyNote(target));
     const badge = !before && unlockShowing();
 
     let quiet = 1200;
@@ -326,6 +357,17 @@ export const VoiceTuner: React.FC = () => {
   }, [mode, isActive, summary, endRun, setRun]);
 
   const heat = MILESTONES.filter(m => run.streak >= m.n).length / MILESTONES.length;
+  // A note heard is proof of singing, unless it is the app's own sound: the
+  // drone on Sa (and its octaves) or the reference note just played.
+  useEffect(() => {
+    if (!pitch) return;
+    if (performance.now() < holdRef.current.quietUntil) return;
+    if (droning) {
+      const m = toMidi(pitch.frequency);
+      if ([sa - 12, sa - 5, sa, sa + 7, sa + 12, sa + 19, sa + 24].some(d => Math.abs(m - d) < 0.25)) return;
+    }
+    heard();
+  }, [pitch, droning, sa]);
   // Badges earned during a run wait until it is over (the summary lists them too).
   useHoldUnlocks('voice-run', mode === 'hold' && ((isActive && run.held > 0) || !!summary));
 
@@ -438,6 +480,7 @@ export const VoiceTuner: React.FC = () => {
                 <b>in a row</b>
                 {missLeft !== null
                   ? <span className="is-warn">Land it in {missLeft}s</span>
+                  : stretch ? 'Stretch note: just past your range'
                   : run.streak > 0 ? '8 seconds for each note' : 'Miss one and it starts over'}
               </span>
               <span className={`hold-best${run.passedBest ? ' is-new' : ''}`}>

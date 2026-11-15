@@ -20,6 +20,9 @@
 
 import { STORE_CHANGE_EVENT, clearStore, putRecords, readAll } from './db';
 
+const todayIso = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export interface LoopRecord {
   /** The loop's signature. Chords and metre, see loopSignature. */
   id: string;
@@ -39,6 +42,12 @@ export interface LoopRecord {
    * Absent on records banked before it was kept; `previous` stands in.
    */
   first?: number;
+  /**
+   * The best clean run on each day this loop was played (local yyyy-mm-dd).
+   * Speed Climber reads progress across days from this, so a fast run saved
+   * five minutes after a slow one is not "progress".
+   */
+  days?: Record<string, number>;
 }
 
 let records = new Map<string, LoopRecord>();
@@ -111,7 +120,8 @@ export async function bankRun(input: BankInput): Promise<Banked> {
     previous: beat ? existing?.best ?? null : existing?.previous ?? null,
     setAt: beat ? Date.now() : (existing as LoopRecord).setAt,
     runs: (existing?.runs ?? 0) + 1,
-    first: existing ? existing.first : input.tempo
+    first: existing ? existing.first : input.tempo,
+    days: { ...existing?.days, [todayIso()]: Math.max(existing?.days?.[todayIso()] ?? 0, input.tempo) }
   };
   records.set(record.id, record);
   await putRecords('records', [record]);
