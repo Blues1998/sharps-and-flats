@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Pick } from './Pick';
 import { MATERIALS, ROMAN, dismissAllUnlocks, dismissUnlock, initFeats, showOnShelf, useUnlocks } from '../utils/feats';
 import { go } from '../hooks/useRoute';
-import { cadenceChime } from '../utils/chime';
+import { bestChime, cadenceChime } from '../utils/chime';
 import { confetti } from '../utils/confetti';
 import { feel } from '../utils/haptics';
 import { useBackToClose } from '../utils/nativeShell';
@@ -22,6 +22,9 @@ export const UnlockLayer: React.FC = () => {
 
   useEffect(() => {
     if (!top) return;
+    // The daily goal is a good day, not a feat: a brighter chime and a buzz,
+    // and the confetti is kept for picks.
+    if (top.kind === 'goal') { bestChime(60); feel('success'); return; }
     cadenceChime(60);
     confetti();
     feel('celebrate');
@@ -44,6 +47,24 @@ export const UnlockLayer: React.FC = () => {
     go({ tab: 'me', songId: null });
   };
   const single = top.tier === 0;
+  if (top.kind === 'goal') {
+    return createPortal(
+      <div className="unlock-backdrop" onClick={dismissUnlock}>
+        <div className="unlock-card is-goal" role="dialog" aria-modal="true" aria-label={top.name} onClick={e => e.stopPropagation()}>
+          <svg className="unlock-ring" viewBox="0 0 36 36" aria-hidden="true">
+            <circle cx="18" cy="18" r="15" className="streak-ring-track" />
+            <circle cx="18" cy="18" r="15" className="streak-ring-fill" strokeDasharray="94.25 94.25" transform="rotate(-90 18 18)" />
+            <path d="m12 18.5 4 4 8-9" className="unlock-ring-tick" />
+          </svg>
+          <span className="unlock-kicker">Today</span>
+          <h3 className="unlock-name">{top.name}</h3>
+          <p className="unlock-why">{top.why}.</p>
+          <button type="button" className="btn btn-primary unlock-go" onClick={dismissUnlock} autoFocus>Keep going</button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   return createPortal(
     <div className="unlock-backdrop" onClick={dismissUnlock}>

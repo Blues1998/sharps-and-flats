@@ -23,6 +23,18 @@ const KEEP = 8;
  */
 export const MIN_HELD_MS = 15_000;
 
+/**
+ * A run worth remembering: at least 8 bars or 30 seconds, at a tempo a person
+ * plays at (30 to 200 bpm). A slider flung to 220 and left for a few bars is
+ * not a run, and must never appear as a feat.
+ */
+export const isRealRun = (run: Pick<TempoRun, 'from' | 'to' | 'seconds' | 'beatsPerBar'>): boolean => {
+  const top = Math.max(run.from, run.to);
+  const low = Math.min(run.from, run.to);
+  const bars = (run.seconds * low) / 60 / Math.max(1, run.beatsPerBar);
+  return low >= 30 && top <= 200 && (run.seconds >= 30 || bars >= 8);
+};
+
 /** Two runs this close together at the same setting are one run. */
 const SAME_SITTING_MS = 30 * 60 * 1000;
 
@@ -48,7 +60,8 @@ const read = (): TempoRun[] => {
         typeof run === 'object' && run !== null &&
         typeof (run as TempoRun).from === 'number' &&
         typeof (run as TempoRun).to === 'number' &&
-        typeof (run as TempoRun).seconds === 'number'
+        typeof (run as TempoRun).seconds === 'number' &&
+        isRealRun(run as TempoRun)
     );
   } catch {
     return [];
@@ -73,7 +86,7 @@ export const getTempoLog = (): TempoRun[] => read();
  * adds its seconds to the one already there rather than pushing it down.
  */
 export function logTempo(run: Omit<TempoRun, 'at'>): TempoRun[] {
-  if (run.seconds * 1000 < MIN_HELD_MS) return read();
+  if (run.seconds * 1000 < MIN_HELD_MS || !isRealRun(run)) return read();
   const runs = read();
   const head = runs[0];
   if (

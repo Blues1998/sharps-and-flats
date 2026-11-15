@@ -29,7 +29,8 @@ import type { TabIntervalCandidate } from '../utils/tabIntervalSource';
 import { CHORD_FEELINGS } from '../utils/glossary';
 import { IconSounding } from '../components/Icons';
 import { feel } from '../utils/haptics';
-import { setRecord, useHoldUnlocks } from '../utils/feats';
+import { setRecord } from '../utils/feats';
+import { usePracticeTime } from '../hooks/usePracticeTime';
 import { useBackToClose } from '../utils/nativeShell';
 
 /** Questions in a set. A set ends, so a session has a shape and a result. */
@@ -453,7 +454,7 @@ export const EarTrainingLab: React.FC = () => {
   const isCorrect = (opt: string) => (quizMode === 'intervals' ? correctInterval?.name === opt : correctChord?.name === opt);
   const clueFor = (opt: string) => (quizMode === 'intervals' ? INTERVALS.find(iv => iv.name === opt)?.songClue ?? '' : CHORD_FEELINGS[opt] ?? '');
   const finished = totalQuestions >= SET;
-  useHoldUnlocks('ear-set', hasStarted && !setDone);
+  usePracticeTime('ear', hasStarted && !setDone);
 
   // A finished set leaves its mark: a perfect ten counts toward Sharp Ears,
   // and the best streak in it is offered to the record. Once per set.

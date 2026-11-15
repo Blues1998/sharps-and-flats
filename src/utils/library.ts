@@ -34,6 +34,8 @@ import {
   type SavedLoop
 } from './loopbook';
 import { exportRecords, importRecords, loadRecords, type LoopRecord } from './records';
+import { clockEntries, secondsOn } from './practiceClock';
+import { walkStreak, type StreakState } from './streak';
 import { parseProgressions, uniqueChords } from './songText';
 import { linesFromText, type ChartLineRecord } from './chart';
 import { syncUpsertSong, syncDeleteSong } from './cloudSync';
@@ -228,10 +230,15 @@ export const sessionsForSong = (songId: string): PracticeSession[] =>
 export const sessionMinutes = (songId: string): number =>
   sessions.filter(s => s.songId === songId).reduce((sum, s) => sum + s.minutes, 0);
 
-export const totalMinutes = (song: Song): number => song.practiceMinutes + sessionMinutes(song.id);
+/** Minutes the app counted on its own while this song was being played. */
+export const autoMinutes = (songId: string): number =>
+  clockEntries().filter(e => e.songId === songId).reduce((sum, e) => sum + e.minutes, 0);
+
+export const totalMinutes = (song: Song): number => song.practiceMinutes + sessionMinutes(song.id) + autoMinutes(song.id);
 
 export const minutesOn = (songId: string, date: string): number =>
-  sessions.filter(s => s.songId === songId && s.date === date).reduce((sum, s) => sum + s.minutes, 0);
+  sessions.filter(s => s.songId === songId && s.date === date).reduce((sum, s) => sum + s.minutes, 0) +
+  Math.floor(secondsOn(date, songId) / 60);
 
 /**
  * day → song, derived rather than stored. See the note at the top of the file.
@@ -296,8 +303,12 @@ export interface LedgerEntry {
   date: string;
   minutes: number;
   songId: string;
-  /** 'session' was timed here; 'tracker' came in with the song's own total. */
-  source: 'session' | 'tracker';
+  /**
+   * 'auto' was counted by the app while you played; 'session' was timed by
+   * hand in older versions; 'tracker' came in with the song's own total.
+   * songId is empty for practice that was not on a song (drills, the tuner).
+   */
+  source: 'auto' | 'session' | 'tracker';
 }
 
 /**
@@ -317,6 +328,9 @@ export function practiceLedger(): LedgerEntry[] {
   }
   for (const s of sessions) {
     out.push({ date: s.date, minutes: s.minutes, songId: s.songId, source: 'session' });
+  }
+  for (const e of clockEntries()) {
+    out.push({ date: e.date, minutes: e.minutes, songId: e.songId, source: 'auto' });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
@@ -345,18 +359,9 @@ export function practiceStats(): PracticeStats {
 
   const practisedDays = new Set(ledger.filter(e => e.minutes > 0).map(e => e.date));
 
-  // A streak survives today being blank until the day is out, otherwise every
-  // morning would report the run broken before you have had a chance to play.
-  let streakDays = 0;
-  let cursor = practisedDays.has(now) ? 0 : 1;
-  if (practisedDays.has(now) || practisedDays.has(shiftIso(now, -1))) {
-    for (;;) {
-      const date = shiftIso(now, -cursor);
-      if (!practisedDays.has(date)) break;
-      streakDays++;
-      cursor++;
-    }
-  }
+  // A streak survives today being blank until the day is out, and a missed
+  // day can be covered by a rest. See streak.ts.
+  const streakDays = walkStreak(practisedDays, now, shiftIso).current;
 
   const scored = songs.filter(s => s.confidence > 0);
 
@@ -372,6 +377,16 @@ export function practiceStats(): PracticeStats {
     revisitCount: songs.filter(s => s.revisit).length,
     sessionCount: sessions.length
   };
+}
+
+/** Minutes practised today, from everything the ledger knows. */
+export const minutesPractisedToday = (): number =>
+  practiceLedger().filter(e => e.date === today()).reduce((n, e) => n + e.minutes, 0);
+
+/** The daily streak, with its rests. */
+export function streakState(): StreakState {
+  const days = new Set(practiceLedger().filter(e => e.minutes > 0).map(e => e.date));
+  return walkStreak(days, today(), shiftIso);
 }
 
 export function shiftIso(iso: string, days: number): string {

@@ -11,27 +11,20 @@ import { drillReason, songDrill, type SongDrill } from '../utils/songDrill';
 import {
   deleteSession,
   deleteSong,
-  logSession,
   sessionsForSong,
   songChords,
   STATUS_LABEL,
   STATUS_ORDER,
+  shiftIso,
+  today,
   totalMinutes,
   updateSong
 } from '../utils/library';
+import { clockEntries } from '../utils/practiceClock';
 import type { Song, SongStatus } from '../utils/library';
 import { capoLabel } from '../utils/songText';
 import { feel } from '../utils/haptics';
 import { DEFAULT_CHART } from '../utils/chart';
-
-interface SessionDraft {
-  minutes: string;
-  chordsNote: string;
-  strummingNote: string;
-  singingNote: string;
-  problemArea: string;
-  nextAction: string;
-}
 
 interface SongPageProps {
   song: Song;
@@ -47,13 +40,6 @@ const TABS: { id: SongTab; label: string }[] = [
   { id: 'chords', label: 'Chords' },
   { id: 'progress', label: 'Progress' }
 ];
-
-const fmtClock = (ms: number): string => {
-  const total = Math.floor(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-};
 
 const fmtDate = (iso: string): string =>
   new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -78,84 +64,11 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
   // stick to the bottom of the screen whichever tab is open.
   const [dock, setDock] = useState<HTMLDivElement | null>(null);
 
-  // ---- the timer ---------------------------------------------------------
-  // Wall-clock arithmetic rather than an accumulating counter: a background
-  // tab throttles the interval, and a counter that ticks fewer times would
-  // quietly log a shorter session than the one you actually played.
-  const [runningSince, setRunningSince] = useState<number | null>(null);
-  const [banked, setBanked] = useState(0);
-  const [now, setNow] = useState(Date.now());
-  const elapsed = banked + (runningSince ? now - runningSince : 0);
-
-  useEffect(() => {
-    if (!runningSince) return;
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
-  }, [runningSince]);
-
-  const startedAt = useRef<number | null>(null);
-  const start = () => {
-    if (startedAt.current === null) startedAt.current = Date.now();
-    setNow(Date.now());
-    setRunningSince(Date.now());
-  };
-  const pause = () => {
-    if (!runningSince) return;
-    setBanked(b => b + (Date.now() - runningSince));
-    setRunningSince(null);
-  };
-
-  // ---- the session being written ----------------------------------------
-  const [form, setForm] = useState<SessionDraft | null>(null);
-
-  const finish = () => {
-    const ms = banked + (runningSince ? Date.now() - runningSince : 0);
-    setRunningSince(null);
-    setBanked(ms);
-    setForm({
-      // Under a minute still counts as a minute; a session that logs zero
-      // reads as one that never happened.
-      minutes: String(Math.max(1, Math.round(ms / 60000))),
-      chordsNote: '',
-      strummingNote: '',
-      singingNote: '',
-      problemArea: '',
-      nextAction: ''
-    });
-  };
-
-  const discard = () => {
-    setForm(null);
-    setBanked(0);
-    startedAt.current = null;
-  };
-
-  const save = async () => {
-    if (!form) return;
-    await logSession({
-      songId: song.id,
-      minutes: Number(form.minutes) || 0,
-      chordsNote: form.chordsNote,
-      strummingNote: form.strummingNote,
-      singingNote: form.singingNote,
-      problemArea: form.problemArea,
-      nextAction: form.nextAction,
-      startedAt: startedAt.current ?? Date.now()
-    });
-    discard();
-  };
-
-  const field = (key: keyof SessionDraft, label: string, placeholder: string) => (
-    <label className="song-field">
-      <span className="field-label">{label}</span>
-      <input
-        className="text-field"
-        value={form?.[key] ?? ''}
-        placeholder={placeholder}
-        onChange={e => setForm(f => (f ? { ...f, [key]: e.target.value } : f))}
-      />
-    </label>
-  );
+  // Time on this song is counted by the app while it plays along or loops,
+  // never typed in or timed by hand, so the number is one you can trust.
+  const counted = clockEntries().filter(e => e.songId === song.id).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const todayMin = counted.find(e => e.date === today())?.minutes ?? 0;
+  const weekMin = counted.filter(e => e.date >= shiftIso(today(), -6)).reduce((n, e) => n + e.minutes, 0);
 
   // The notes box keeps a local draft and writes when it loses focus. Writing
   // through on every keystroke would put a store round-trip and a re-render of
@@ -321,41 +234,12 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
       {tab === 'progress' && (
         <div className="song-tabpanel" role="tabpanel" id="song-panel-progress" aria-labelledby="song-tab-progress">
           <section className="song-panel practice-panel">
-            {!form ? (
-              <div className="timer">
-                <span className={`timer-clock readout${runningSince ? ' is-running' : ''}`}>{fmtClock(elapsed)}</span>
-                <div className="timer-controls">
-                  {runningSince
-                    ? <button type="button" className="btn btn-secondary" onClick={pause}>Pause</button>
-                    : <button type="button" className="btn btn-primary" onClick={start}>{elapsed > 0 ? 'Resume' : 'Start practice'}</button>}
-                  {elapsed >= 1000 && <button type="button" className="btn" onClick={finish}>Finish &amp; log</button>}
-                  {elapsed > 0 && !runningSince && (
-                    <button type="button" className="btn timer-reset" onClick={discard}>Reset</button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="session-form">
-                <label className="song-field session-minutes">
-                  <span className="field-label">Minutes</span>
-                  <input
-                    className="text-field readout"
-                    inputMode="numeric"
-                    value={form.minutes}
-                    onChange={e => setForm(f => (f ? { ...f, minutes: e.target.value.replace(/\D/g, '') } : f))}
-                  />
-                </label>
-                {field('chordsNote', 'Chords / transitions', 'Which change kept breaking?')}
-                {field('strummingNote', 'Strumming / picking', 'Pattern, tempo, hand feel')}
-                {field('singingNote', 'Singing', 'Playing and singing together?')}
-                {field('problemArea', 'Problem area', 'The bar that fell apart')}
-                {field('nextAction', 'Next action', 'What to do first next time')}
-                <div className="session-actions">
-                  <button type="button" className="btn btn-primary" onClick={() => void save()}>Log session</button>
-                  <button type="button" className="btn" onClick={discard}>Discard</button>
-                </div>
-              </div>
-            )}
+            <div className="songtime">
+              <div><span className="readout">{todayMin}</span><small>min today</small></div>
+              <div><span className="readout">{weekMin}</span><small>this week</small></div>
+              <div><span className="readout">{total}</span><small>in all</small></div>
+            </div>
+            <p className="songtime-how">Counted while this song plays along. Nothing to start or stop.</p>
 
             <div className="song-confidence">
               <span className="field-label">Confidence</span>
@@ -375,9 +259,19 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
 
           <section className="song-panel">
             <div className="surface-label">
-              <IconSection kind="session" /><span>Sessions</span>
-              {total > 0 && <span className="readout">{total} min in all</span>}
+              <IconSection kind="session" /><span>Days played</span>
             </div>
+            {counted.length > 0 && (
+              <ol className="session-log">
+                {counted.map(e => (
+                  <li key={e.date} className="session-row">
+                    <span className="session-when readout">{fmtDate(e.date)}</span>
+                    <span className="session-mins readout">{e.minutes} min</span>
+                    <span className="session-notes">Played along</span>
+                  </li>
+                ))}
+              </ol>
+            )}
             {sessions.length > 0 ? (
               <ol className="session-log">
                 {sessions.map(s => (
@@ -402,7 +296,7 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
                 ))}
               </ol>
             ) : (
-              <p className="song-empty">Nothing logged yet. Start practice above, and finish to log it.</p>
+              counted.length === 0 && <p className="song-empty">Nothing yet. Press Play along and the minutes count here.</p>
             )}
           </section>
 

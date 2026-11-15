@@ -14,6 +14,7 @@ import { SCALE_FEELINGS, CHORD_FEELINGS } from '../utils/glossary';
 import { reportProgress } from '../utils/progress';
 import { IconCheck } from '../components/Icons';
 import { feel } from '../utils/haptics';
+import { useHeard, usePracticeTime } from '../hooks/usePracticeTime';
 
 // ---- Challenge tuning constants ----
 const CONFIRM_MS = 350;  // how long the correct note must be held to count
@@ -64,6 +65,9 @@ const ordinal = (n: number): string => ['Root', '3rd', '5th', '7th'][n] ?? `${n 
 
 export const PlayLab: React.FC = () => {
   const { pitch, isActive, error: micError, start, stop } = useMicPitch();
+  // Counted while the mic hears you play.
+  usePracticeTime('challenge', isActive, { mic: true });
+  useHeard(pitch);
 
   const [mode, setMode] = useState<Mode>('scale');
   const [round, setRound] = useState<Round | null>(null);

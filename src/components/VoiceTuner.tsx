@@ -5,6 +5,7 @@ import { IconPlay, IconStop } from './Icons';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { audio } from '../utils/audio';
 import { reportProgress } from '../utils/progress';
+import { useHeard, usePracticeTime } from '../hooks/usePracticeTime';
 import { HoldSummary } from './HoldSummary';
 import {
   GRADE_LABEL, MILESTONES, bestChime, gradeFor, hitChime, milestoneChime, missChime, setChime, useChime, type Grade
@@ -93,6 +94,9 @@ function startDrone(sa: number): () => void {
 
 export const VoiceTuner: React.FC = () => {
   const { pitch, isActive, error, start, stop } = useMicPitch('voice');
+  // Singing is practice: counted while the mic hears your voice.
+  usePracticeTime('voice', isActive, { mic: true });
+  useHeard(pitch);
   const voice = useVoice();
   const { notation, sa } = voice;
   const [mode, setMode] = useState<Mode>('sing');

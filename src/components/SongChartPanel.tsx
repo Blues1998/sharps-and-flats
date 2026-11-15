@@ -28,6 +28,7 @@ import {
   transposeSymbol
 } from '../utils/chart';
 import type { ChartLine, ChartLineRecord, ChartWord, ParsedChart } from '../utils/chart';
+import { usePracticeTime } from '../hooks/usePracticeTime';
 
 export type ChartMode = 'play' | 'edit' | 'import';
 
@@ -112,6 +113,8 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
   const moving = phase === 'countin' || phase === 'playing';
   const running = moving || phase === 'paused';
   const holding = phase === 'playing' || phase === 'paused';
+  // Playing along is practice on this song, counted while it plays.
+  usePracticeTime('song-chart', moving, { songId: song.id });
   const counting = phase === 'countin' || (phase === 'paused' && beat < 0);
 
   const currentLine = holding ? lineAtBeat(chart, beat) : null;

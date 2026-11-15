@@ -5,8 +5,9 @@ import { assetUrl } from '../utils/assetUrl';
 import { ALL_LEVELS, isLevelComplete } from '../utils/journey';
 import { subscribeProgress } from '../utils/progress';
 import { useLibrary } from '../hooks/useLibrary';
+import { StreakStrip } from '../components/StreakStrip';
 import { go } from '../hooks/useRoute';
-import { getSong, getSongs, lastPractised, minutesOn, practiceStats, STATUS_LABEL, today } from '../utils/library';
+import { getSong, getSongs, lastPractised, minutesPractisedToday, practiceStats, STATUS_LABEL, today } from '../utils/library';
 import type { Song } from '../utils/library';
 import { COMFORT_LABEL } from '../utils/chordbook';
 import { promptForDate } from '../data/tryThis';
@@ -289,7 +290,7 @@ export const DashboardLanding: React.FC<DashboardLandingProps> = ({ setActiveTab
     return id ? getSong(id) ?? null : null;
   };
   const song = songOf(run?.steps) ?? songOf(plan);
-  const minutesToday = songs.reduce((n, s) => n + minutesOn(s.id, today()), 0);
+  const minutesToday = minutesPractisedToday();
 
   // Two songs you might pick up instead: the last one played, then one you
   // marked to come back to (or another you are still learning).
@@ -341,6 +342,7 @@ export const DashboardLanding: React.FC<DashboardLandingProps> = ({ setActiveTab
   return (
     <div className={`tday${fresh ? ' is-fresh' : ''}`}>
       <div className="tday-main">
+        {!fresh && <StreakStrip />}
         <Tonight
           hasSongs={!fresh}
           run={run}

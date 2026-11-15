@@ -52,6 +52,7 @@ export const LoopResult: React.FC<{
   onAgain: (tempo: number) => void;
   onClose: () => void;
 }> = ({ result, onBank, onAgain, onClose }) => {
+  const MIN_BARS = 8;
   const { tempo, laps, bars, seconds, best, banked } = result;
   // The rung climbs from what was just played, not from the record. Somebody
   // who has held this at 120 and has come back to it at 80 is being offered
@@ -59,7 +60,10 @@ export const LoopResult: React.FC<{
   const next = Math.min(TEMPO_MAX, tempo + RAMP);
   const isRecord = banked?.isBest ?? false;
 
-  const said = banked
+  // A record is a loop held, not a lap survived: 8 bars or it is not saved.
+  const said = !banked && bars < MIN_BARS
+    ? `Play ${MIN_BARS} bars or more to save a run.`
+    : banked
     ? banked.isBest
       ? banked.previous === null
         ? 'First saved run on this loop.'
@@ -93,7 +97,7 @@ export const LoopResult: React.FC<{
                 Again at {next}
               </button>
             )
-          : (
+          : bars >= MIN_BARS && (
             <button type="button" className="btn btn-primary" onClick={onBank}>
               Clean, save it
             </button>

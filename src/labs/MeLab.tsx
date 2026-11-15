@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
 import { TrophyShelf } from '../components/TrophyShelf';
+import { GOAL_CHOICES, getGoal, setGoal } from '../utils/practiceClock';
 import { BrandMark, PRIVACY_URL } from '../components/Brand';
 import { audio } from '../utils/audio';
 import { voicingsFor } from '../utils/chordbook';
@@ -65,6 +66,7 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
   const voice = useVoice();
   const haptics = useHaptics();
   const sunburst = useSunburst();
+  const [goal, setGoalState] = useState(getGoal);
 
   const toVoiceRange = () => {
     try { localStorage.setItem('cadenza-tuner-mode', 'voice'); } catch { /* fine */ }
@@ -109,6 +111,19 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
             value={profile.instrument}
             onChange={instrument => setProfile({ instrument })}
             options={[{ value: 'guitar', label: 'Guitar' }, { value: 'ukulele', label: 'Ukulele' }]}
+            size="sm"
+          />
+        </div>
+
+        <div className="me-row">
+          <span className="me-row-label">
+            Daily goal
+            <span className="me-row-sub">Counted while you play, sing or drill</span>
+          </span>
+          <Segmented<number>
+            value={goal}
+            onChange={g => { setGoal(g); setGoalState(g); }}
+            options={GOAL_CHOICES.map(g => ({ value: g, label: `${g} min` }))}
             size="sm"
           />
         </div>

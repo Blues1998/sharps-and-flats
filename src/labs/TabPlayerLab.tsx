@@ -18,6 +18,7 @@ import { assetUrl } from '../utils/assetUrl';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { NOTE_NAMES } from '../utils/musicTheory';
 import { IconCheck, IconX } from '../components/Icons';
+import { usePracticeTime } from '../hooks/usePracticeTime';
 
 const ACCEPTED_EXTENSIONS = '.gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml';
 
@@ -183,6 +184,7 @@ export const TabPlayerLab: React.FC = () => {
   const [scoreArtist, setScoreArtist] = useState<string>('');
   const [trackNames, setTrackNames] = useState<string[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  usePracticeTime('tab-player', isPlaying);
   const [isReady, setIsReady] = useState(false);
   const [tempoPct, setTempoPct] = useState(100);
   const [looping, setLooping] = useState(false);

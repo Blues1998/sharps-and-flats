@@ -9,9 +9,14 @@ import { audio } from '../utils/audio';
 import { clearTempoLog, getTempoLog, heldLabel, logTempo, whenHeld, type TempoRun } from '../utils/tempoLog';
 import { reportProgress } from '../utils/progress';
 import { feel } from '../utils/haptics';
-import { setRecord, useHoldUnlocks } from '../utils/feats';
+import { setRecord } from '../utils/feats';
+import { usePracticeTime } from '../hooks/usePracticeTime';
 import { frameGate } from '../utils/frames';
 import { swingOffbeat } from '../utils/swing';
+
+// A tap test counts toward Clockwork once it is a real test.
+const CLOCKWORK_TAPS = 16;
+const CLOCKWORK_BPM = 70;
 
 interface TapHit {
   id: number;
@@ -269,8 +274,8 @@ export const RhythmLab: React.FC = () => {
   const [bpm, setBpm] = useState<number>(100);
   const [timeSignature, setTimeSignature] = useState<number>(4); // beats per bar
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  // Nothing pops up over a running click: badges wait for Stop.
-  useHoldUnlocks('rhythm', isPlaying);
+  // Counted while the click runs; badges wait for Stop.
+  usePracticeTime('metronome', isPlaying);
   // Clicks to a beat. The pulse is always the beat; this is the texture under
   // it, which is what a strumming hand is actually counting.
   const [subdivision, setSubdivision] = useState<number>(1);
@@ -642,7 +647,12 @@ export const RhythmLab: React.FC = () => {
   const timeSig = timeSignature === 6 ? '6/8' : `${timeSignature}/4`;
   // How close the verdict's taps sat to the beat, unsigned: the Clockwork
   // number. Rushing 10 and dragging 10 are both 10 ms away.
-  const tightness = hits.length >= 8 ? Math.round(hits.reduce((n, h) => n + Math.abs(h.differenceMs), 0) / hits.length) : null;
+  // Only a real test counts toward the record: 16 on-beat taps at 70 bpm or
+  // more. Eight slow taps can land close by luck.
+  const testHits = tapHistory.filter(h => h.rating !== 'miss').slice(0, CLOCKWORK_TAPS);
+  const tightness = testHits.length >= CLOCKWORK_TAPS && bpm >= CLOCKWORK_BPM
+    ? Math.round(testHits.reduce((n, h) => n + Math.abs(h.differenceMs), 0) / testHits.length)
+    : null;
   useEffect(() => {
     if (tightness !== null && tightness > 0) setRecord('tap-tightest', tightness);
   }, [tightness]);
@@ -802,7 +812,12 @@ export const RhythmLab: React.FC = () => {
             </>
           )}
           {verdict ? (
-            <p className="rh-verdict">{verdict}<small>Average of your last {hits.length} hits. Under 20 ms is tight.</small></p>
+            <p className="rh-verdict">{verdict}<small>
+              Average of your last {hits.length} hits. Under 20 ms is tight.
+              {tightness === null && (bpm < CLOCKWORK_BPM
+                ? ` Clockwork counts from ${CLOCKWORK_BPM} bpm.`
+                : ` ${CLOCKWORK_TAPS - testHits.length} more for a Clockwork test.`)}
+            </small></p>
           ) : tapHistory.length > 0 ? (
             <p className="rh-sub">{8 - hits.length} more on-beat taps for a verdict.</p>
           ) : null}

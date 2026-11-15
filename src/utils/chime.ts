@@ -16,8 +16,10 @@ import { audio } from './audio';
 export type Grade = 'perfect' | 'great' | 'good';
 
 /** How steady a held note was, from the spread of its pitch in cents. */
+// Set from real singing, not a sine wave: a steady human voice wobbles by six
+// or seven cents, so ±8 is what dead steady sounds like from a person.
 export const gradeFor = (spreadCents: number): Grade =>
-  spreadCents <= 5 ? 'perfect' : spreadCents <= 12 ? 'great' : 'good';
+  spreadCents <= 8 ? 'perfect' : spreadCents <= 15 ? 'great' : 'good';
 
 export const GRADE_LABEL: Record<Grade, string> = { perfect: 'Perfect', great: 'Great', good: 'Good' };
 

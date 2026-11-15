@@ -50,9 +50,6 @@ export const WeekPanel: React.FC<{ recap: WeekRecap; style?: React.CSSProperties
             {recap.minutes}<small>min</small>
           </div>
         </div>
-        {recap.streakDays > 1 && (
-          <span className="tday-running"><i aria-hidden="true" />{recap.streakDays} days running</span>
-        )}
       </div>
 
       <div

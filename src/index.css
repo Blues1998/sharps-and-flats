@@ -15831,3 +15831,67 @@ a.btn {
 .voice-holdrow .btn { white-space: nowrap; }
 .unlock-go, .unlock-shelf, .hsum-acts .btn { justify-content: center; }
 .unlock-shelf { width: 100%; margin-top: 0.5rem; }
+
+/* ===== Streak, rests and the daily goal (Today) ===== */
+.streak {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: var(--surface-1);
+}
+.streak-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.9rem; }
+.streak-days { display: flex; align-items: center; gap: 0.45rem; }
+.streak-flame { width: 26px; height: 30px; fill: var(--surface-3); }
+.streak-flame .streak-flame-core { fill: var(--panel-bg); opacity: 0.5; }
+.streak-flame.is-lit { fill: var(--primary); filter: drop-shadow(0 0 8px var(--primary-glow)); }
+.streak-flame.is-lit .streak-flame-core { fill: var(--warning); opacity: 1; }
+.streak-n { font-size: 2.1rem; font-weight: 700; line-height: 1; letter-spacing: -0.04em; }
+.streak-l { font-size: 0.7rem; line-height: 1.15; color: var(--text-secondary); }
+.streak-goal { display: flex; align-items: center; gap: 0.55rem; justify-self: center; }
+.streak-ring { width: 40px; height: 40px; flex: none; }
+.streak-ring-track { fill: none; stroke: var(--surface-3); stroke-width: 4; }
+.streak-ring-fill { fill: none; stroke: var(--primary); stroke-width: 4; stroke-linecap: round; transition: stroke-dasharray 0.6s ease; }
+.streak-ring.is-met .streak-ring-fill { stroke: var(--success); }
+.streak-goal-t { display: flex; flex-direction: column; font-size: 0.8rem; line-height: 1.2; color: var(--text-secondary); }
+.streak-goal-t b { font-size: 1rem; color: var(--text-primary); }
+.streak-goal-t small { font-size: 0.68rem; color: var(--text-muted); }
+.streak-rests { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
+.streak-rest-glyphs { display: flex; gap: 0.15rem; font-size: 1.5rem; line-height: 1; }
+.streak-rest-glyphs i { font-style: normal; color: var(--surface-3); }
+.streak-rest-glyphs i.is-on { color: var(--text-primary); }
+.streak-rests small { font-size: 0.66rem; color: var(--text-muted); }
+.streak-line { margin: 0; font-size: 0.8rem; color: var(--text-secondary); }
+.streak-pick {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.streak-pick-img { width: 34px; height: auto; }
+.streak-pick-t { display: flex; flex-direction: column; min-width: 0; font-size: 0.75rem; line-height: 1.3; color: var(--text-secondary); }
+.streak-pick-t small { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.streak-pick-t b { font-size: 0.88rem; color: var(--text-primary); }
+.streak-pick-t span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The goal-met card. */
+.unlock-ring { width: 104px; height: 104px; animation: pickArrive 0.8s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.unlock-ring .streak-ring-fill { stroke: var(--success); }
+.unlock-ring-tick { fill: none; stroke: var(--success); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.unlock-card.is-goal .unlock-kicker { color: var(--success); }
+
+/* Time on a song, counted by the app. */
+.songtime { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.songtime div { display: flex; flex-direction: column; padding: 0.65rem 0.75rem; border-radius: 12px; background: var(--surface-2); }
+.songtime span { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.songtime small { font-size: 0.72rem; color: var(--text-muted); }
+.songtime-how { margin: 0.6rem 0 0.9rem; font-size: 0.8rem; color: var(--text-muted); }

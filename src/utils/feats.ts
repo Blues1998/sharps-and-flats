@@ -15,7 +15,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { getProgressCount, subscribeProgress } from './progress';
 import { getChordSkills } from './chordbook';
-import { getSongs, isReady, practiceLedger, shiftIso } from './library';
+import { getSongs, isReady, streakState } from './library';
+import { GOAL_MET_EVENT } from './practiceClock';
 import { getRecords } from './records';
 import { getVoice, prettyNote, subscribeVoice } from './voice';
 import { JOURNEY, isLevelComplete } from './journey';
@@ -55,18 +56,39 @@ interface FeatsState {
    * deserved by then are granted quietly rather than all at once on launch.
    */
   seeded: boolean;
+  /** The newest pick earned, for Today. */
+  latest?: { id: string; name: string; glyph: string; tier: number; at: number };
+  /** Data rules this state has been brought up to. See migrate(). */
+  version?: number;
 }
 
 const KEY = 'cadenza-feats-v1';
 const CHANGE = 'cadenza-feats-change';
 
 function load(): FeatsState {
-  const empty: FeatsState = { records: {}, tiers: {}, holds: 0, seeded: false };
+  const empty: FeatsState = { records: {}, tiers: {}, holds: 0, seeded: false, version: VERSION };
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...empty, ...JSON.parse(raw) };
+    if (raw) return migrate({ ...empty, version: 1, ...JSON.parse(raw) });
   } catch { /* fresh */ }
   return empty;
+}
+
+const VERSION = 2;
+/**
+ * Version 2 made Clockwork ask for a real test: 16 on-beat taps at 70 bpm or
+ * more, on stricter tiers. A tap record kept under the old 8-tap rule does
+ * not meet that, so it and the tier it earned are cleared rather than carried
+ * onto a scale it was never measured on.
+ */
+function migrate(st: FeatsState): FeatsState {
+  if ((st.version ?? 1) < 2) {
+    const records = { ...st.records };
+    delete records['tap-tightest'];
+    st = { ...st, records, tiers: { ...st.tiers, clock: 0 }, version: 2 };
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* next load tries again */ }
+  }
+  return st;
 }
 
 let state: FeatsState = load();
@@ -122,19 +144,8 @@ const solidChords = (): number => getChordSkills().filter(s => s.comfort === 'so
 
 const playableSongs = (): number => getSongs().filter(s => s.status !== 'learning').length;
 
-/** The longest run of days with practice, from the whole ledger. */
-export function longestDailyStreak(): number {
-  const days = [...new Set(practiceLedger().filter(e => e.minutes > 0).map(e => e.date))].sort();
-  let best = 0;
-  let run = 0;
-  let prev: string | null = null;
-  for (const d of days) {
-    run = prev && shiftIso(prev, 1) === d ? run + 1 : 1;
-    best = Math.max(best, run);
-    prev = d;
-  }
-  return best;
-}
+/** The longest daily streak ever, rests included. See streak.ts. */
+export const longestDailyStreak = (): number => streakState().longest;
 
 // ---------------------------------------------------------------------------
 // Badges
@@ -168,7 +179,7 @@ export const TIERED: TieredBadge[] = [
   },
   {
     id: 'centre', name: 'Dead Centre', glyph: '♮', page: 'Voice tuner',
-    what: 'Perfect holds (wobble within ±5¢) in one run', tiers: [3, 5, 10, 20, 40],
+    what: 'Perfect holds (wobble within ±8¢) in one run', tiers: [3, 5, 10, 20, 40],
     value: () => rec('hold-perfect-run'), said: n => `${n} Perfect holds in one run`,
     need: g => `${g} more Perfect holds in one run`
   },
@@ -186,7 +197,7 @@ export const TIERED: TieredBadge[] = [
   },
   {
     id: 'clock', name: 'Clockwork', glyph: '♩', page: 'Rhythm',
-    what: 'Tap test, average distance from the beat', tiers: [25, 18, 12, 8, 5], lowerIsBetter: true,
+    what: 'Tap test of 16 taps, average distance from the beat', tiers: [30, 22, 16, 12, 8], lowerIsBetter: true,
     value: () => rec('tap-tightest'), fmt: n => `${n} ms`, said: n => `Taps within ${n} ms of the beat, on average`,
     need: (_, m) => `Average within ${m} ms`
   },
@@ -271,6 +282,8 @@ export interface Unlock {
   tier: number;
   /** What earned it, in a line. */
   why: string;
+  /** A badge, or the daily goal met (a lighter moment, no pick). */
+  kind?: 'badge' | 'goal';
   /** The next mark, if there is one. */
   next: string | null;
 }
@@ -366,7 +379,11 @@ export function checkBadges(): void {
   const changed = fresh.length > 0 || !state.seeded;
   if (!changed) return;
   const quiet = !state.seeded;
-  state = { ...state, tiers, seeded: true };
+  const top = fresh[fresh.length - 1];
+  state = {
+    ...state, tiers, seeded: true,
+    latest: !quiet && top ? { id: top.id, name: top.name, glyph: top.glyph, tier: top.tier, at: Date.now() } : state.latest
+  };
   save();
   if (!quiet && fresh.length) {
     queue = [...queue, ...fresh];
@@ -376,6 +393,22 @@ export function checkBadges(): void {
 
 export const heldTier = (id: string): number => state.tiers[id] ?? 0;
 
+/**
+ * The newest pick, with what its next tier needs. Before any pick has been
+ * earned with the app watching, the highest one held stands in.
+ */
+export function latestPick(): (Unlock & { tier: number }) | null {
+  const l = state.latest;
+  const tiered = (id: string) => TIERED.find(b => b.id === id);
+  if (l) {
+    const b = tiered(l.id);
+    const t = b ? Math.max(heldTier(b.id), l.tier) : l.tier;
+    return { id: l.id, name: l.name, glyph: l.glyph, tier: t, why: '', next: b ? nextStep(b) : null };
+  }
+  const best = TIERED.map(b => ({ b, t: heldTier(b.id) })).filter(x => x.t > 0).sort((x, y) => y.t - x.t)[0];
+  return best ? { id: best.b.id, name: best.b.name, glyph: best.b.glyph, tier: best.t, why: '', next: nextStep(best.b) } : null;
+}
+
 let wired = false;
 /** Watches every store a badge reads. Called once, from the app shell. */
 export function initFeats(): void {
@@ -383,6 +416,15 @@ export function initFeats(): void {
   wired = true;
   subscribeProgress(checkBadges);
   subscribeVoice(checkBadges);
+  window.addEventListener(GOAL_MET_EVENT, e => {
+    const minutes = (e as CustomEvent<{ minutes: number }>).detail?.minutes ?? 0;
+    const days = streakState().current;
+    queue = [...queue, {
+      id: 'goal', name: 'Daily goal met', glyph: '', tier: 0, kind: 'goal',
+      why: `${minutes} minutes today${days > 1 ? `, ${days} days in a row` : ''}`, next: null
+    }];
+    announceQueue();
+  });
   window.addEventListener(STORE_CHANGE_EVENT, checkBadges);
   checkBadges();
 }

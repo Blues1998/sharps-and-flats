@@ -19,6 +19,7 @@ import { loopLines, slotShapes, slotVoicing, type Slot } from '../utils/loop';
 import { DEFAULT_PATTERN, parseStrum, strokeCount } from '../utils/strum';
 import { loopSignature, rememberLoop, saveLoop, savedNamed, slotChords, slotShapeNames } from '../utils/loopbook';
 import { bankRun, bestFor } from '../utils/records';
+import { usePracticeTime } from '../hooks/usePracticeTime';
 
 const BEATS_PER_BAR = [3, 4, 6];
 
@@ -122,6 +123,7 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
     { playChords: pattern !== null, loop: true, strum: true, metronome: click, pattern, shapes }
   );
   const moving = phase === 'countin' || phase === 'playing';
+  usePracticeTime('loop', moving);
   const running = moving || phase === 'paused';
 
   // The page has a play button of its own, the one on the bucket, which is
