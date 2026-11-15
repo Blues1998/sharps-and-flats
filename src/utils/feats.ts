@@ -60,6 +60,8 @@ interface FeatsState {
   seeded: boolean;
   /** Chords whose strum the mic has checked, by chord key, with when. */
   proven?: Record<string, number>;
+  /** Scales climbed with the mic in Challenges, by "C Major": best time in seconds. */
+  climbed?: Record<string, number>;
   /** The newest pick earned, for Today. */
   latest?: { id: string; name: string; glyph: string; tier: number; at: number };
   /** Data rules this state has been brought up to. See migrate(). */
@@ -183,6 +185,22 @@ export function markProven(symbol: string): void {
 const solidChords = (): number => getChordSkills().filter(s => s.comfort === 'solid' && !!state.proven?.[s.id]).length;
 
 /**
+ * Scales climbed in Challenges, every note heard by the mic, in order. Each
+ * key and scale counts once ("C Major", "A Natural minor"), and its fastest
+ * climb is kept as a personal best.
+ */
+export const bestClimb = (key: string): number | undefined => state.climbed?.[key];
+export function markClimbed(key: string, seconds: number): { best: number; previous?: number } {
+  const previous = state.climbed?.[key];
+  const best = previous === undefined ? seconds : Math.min(previous, seconds);
+  state = { ...state, climbed: { ...state.climbed, [key]: best } };
+  save();
+  checkBadges();
+  return { best, previous };
+}
+const scalesClimbed = (): number => Object.keys(state.climbed ?? {}).length;
+
+/**
  * Songs you can play, with the minutes to show for it. Marking a song
  * Playable is a click; it counts here once the app has also counted at least
  * 10 minutes of playing it, on 2 or more days.
@@ -263,6 +281,12 @@ export const TIERED: TieredBadge[] = [
     what: 'Chords rated Solid and proven by strumming for the mic', tiers: [3, 8, 15, 25, 40],
     value: solidChords, said: n => `${n} chords proven by ear`,
     need: g => `${g} more chord${g === 1 ? '' : 's'} proven by ear`
+  },
+  {
+    id: 'explorer', name: 'Fretboard Explorer', glyph: '♭', page: 'Challenges',
+    what: 'Scales climbed with the mic, each key counted once', tiers: [1, 3, 5, 10, 20],
+    value: scalesClimbed, said: n => n === 1 ? 'A scale climbed by ear' : `${n} scales climbed by ear`,
+    need: g => `${g} more scale${g === 1 ? '' : 's'} to climb`
   },
   {
     id: 'setlist', name: 'Setlist', glyph: '♪', page: 'Songs',

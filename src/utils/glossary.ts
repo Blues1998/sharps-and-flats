@@ -226,7 +226,7 @@ export const SCALE_FEELINGS: Record<string, ScaleFeeling> = {
 export const shortScaleName = (name: string): string =>
   ({
     'Major (Ionian)': 'Major',
-    'Natural Minor (Aeolian)': 'Minor',
+    'Natural Minor (Aeolian)': 'Natural minor',
     'Harmonic Minor': 'Harmonic minor',
     'Pentatonic Major': 'Major pentatonic',
     'Pentatonic Minor': 'Minor pentatonic',

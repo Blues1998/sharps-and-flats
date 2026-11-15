@@ -10,7 +10,8 @@ import {
   CHORD_QUALITIES,
   SCALE_FORMULAS
 } from '../utils/musicTheory';
-import { SCALE_FEELINGS, CHORD_FEELINGS } from '../utils/glossary';
+import { SCALE_FEELINGS, CHORD_FEELINGS, shortScaleName } from '../utils/glossary';
+import { bestClimb, markClimbed } from '../utils/feats';
 import { reportProgress } from '../utils/progress';
 import { IconCheck } from '../components/Icons';
 import { feel } from '../utils/haptics';
@@ -20,9 +21,6 @@ import { useHeard, usePracticeTime } from '../hooks/usePracticeTime';
 const CONFIRM_MS = 350;  // how long the correct note must be held to count
 const SLIP_MS = 550;     // how long a stable wrong note counts as a real miss
 const CENTS_TOL = 45;    // generous, this game grades WHICH note, not intonation
-
-const NOTE_POINTS = 10;
-const ROUND_BONUS = 20;
 
 const BEST_KEY = 'play-challenges-best-v1';
 
@@ -37,6 +35,8 @@ interface Round {
   referenceMidis: number[]; // played by the "hear it" button (sequential)
   rewardMidis: number[];    // played together when the round is complete
   rootMidi: number;         // reference root (interval mode plays this)
+  /** Scale climbs: "C Major", the key its best time is kept under. */
+  climbKey?: string;
 }
 
 interface Feedback {
@@ -61,6 +61,9 @@ const pcToLowMidi = (pc: number): number => 40 + ((pc - 4 + 12) % 12);
 // Intervals a beginner should meet first (semitone counts)
 const COMMON_INTERVAL_SEMITONES = [2, 3, 4, 5, 7, 12];
 
+/** 24.3 seconds as "0:24". */
+const fmtTime = (sec: number): string => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
 const ordinal = (n: number): string => ['Root', '3rd', '5th', '7th'][n] ?? `${n + 1}th`;
 
 export const PlayLab: React.FC = () => {
@@ -77,9 +80,13 @@ export const PlayLab: React.FC = () => {
   const [feedback, setFeedback] = useState<Feedback>({ type: 'info', text: 'Play the first highlighted note to begin.' });
   const [revealed, setRevealed] = useState<boolean>(false);
   const [showTargets, setShowTargets] = useState<boolean>(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Scale climbs are timed from the first note heard to the last.
+  const startedAtRef = useRef<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [lastClimb, setLastClimb] = useState<{ key: string; seconds: number; previous?: number } | null>(null);
 
-  // Session score/streak + persisted best streak per mode
-  const [score, setScore] = useState<number>(0);
+  // Session streak + persisted best streak per mode
   const [streak, setStreak] = useState<number>(0);
   const [best, setBest] = useState<Record<Mode, number>>(() => {
     try {
@@ -116,12 +123,13 @@ export const PlayLab: React.FC = () => {
       return {
         targets,
         chipLabels: targets.map(pc => NOTE_NAMES[pc]),
-        promptTitle: `Climb the ${NOTE_NAMES[rootPc]} ${scale.name} scale`,
+        promptTitle: `Climb the ${NOTE_NAMES[rootPc]} ${shortScaleName(scale.name)} scale`,
         promptDetail: `${SCALE_FEELINGS[scale.name]?.feeling ?? ''}. Play each note in order, any octave. Orange is the one to play now.`,
         contextPcs: targets,
         referenceMidis: refMidis,
         rewardMidis: refMidis,
-        rootMidi: pcToLowMidi(rootPc)
+        rootMidi: pcToLowMidi(rootPc),
+        climbKey: `${NOTE_NAMES[rootPc]} ${shortScaleName(scale.name)}`
       };
     }
 
@@ -176,6 +184,8 @@ export const PlayLab: React.FC = () => {
     setPhase('playing');
     setHoldPct(0);
     setRevealed(false);
+    startedAtRef.current = null;
+    setElapsed(0);
     holdMsRef.current = 0;
     wrongMsRef.current = 0;
     wrongPcRef.current = null;
@@ -201,7 +211,6 @@ export const PlayLab: React.FC = () => {
 
   // New round whenever the mode or its settings change; reset session stats on mode switch
   useEffect(() => {
-    setScore(0);
     setStreak(0);
   }, [mode]);
 
@@ -230,8 +239,22 @@ export const PlayLab: React.FC = () => {
     };
   }, []);
 
+  // The clock on screen, while a climb is under way.
+  useEffect(() => {
+    if (mode !== 'scale' || phase !== 'playing' || !isActive) return;
+    const id = window.setInterval(() => {
+      if (startedAtRef.current !== null) setElapsed((performance.now() - startedAtRef.current) / 1000);
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [mode, phase, isActive, round]);
+
   const completeRound = () => {
-    setScore(s => s + ROUND_BONUS);
+    if (mode === 'scale' && round?.climbKey && startedAtRef.current !== null) {
+      const seconds = Math.round((performance.now() - startedAtRef.current) / 100) / 10;
+      setElapsed(seconds);
+      const { previous } = markClimbed(round.climbKey, seconds);
+      setLastClimb({ key: round.climbKey, seconds, previous });
+    }
     setStreak(s => s + 1);
     setPhase('complete');
     reportProgress(`play-${mode}-completed`);
@@ -296,12 +319,12 @@ export const PlayLab: React.FC = () => {
         setHoldPct(0);
         armedRef.current = false;
         eventPcRef.current = targetPc;
-        setScore(s => s + NOTE_POINTS);
 
         audio.init();
         audio.playMidi(93, 0.18); // bright confirmation ping
 
         const nextIdx = progressIdx + 1;
+        if (progressIdx === 0) startedAtRef.current = performance.now();
         if (nextIdx < round.targets.length) feel('success');
         if (nextIdx >= round.targets.length) {
           completeRound();
@@ -372,223 +395,160 @@ export const PlayLab: React.FC = () => {
     feedback.type === 'ok' ? 'var(--success)' :
     feedback.type === 'slip' ? 'var(--danger)' : 'var(--text-secondary)';
 
-  return (
-    <div className="lab-stack">
+  const scaleBest = round?.climbKey ? bestClimb(round.climbKey) : undefined;
+  const settingsSummary =
+    mode === 'scale'
+      ? `${shortScaleName(SCALE_FORMULAS[scaleIdx].name)} · ${scaleRootPc === 'random' ? 'Any key' : NOTE_NAMES[scaleRootPc]}`
+      : mode === 'chord'
+        ? chordSevenths ? 'Triads and 7th chords' : 'Triads'
+        : trickyIntervals ? 'All intervals' : 'Common intervals';
 
-      {/* Header */}
+  return (
+    <div className="lab-stack play">
       <div className="lab-header">
         <h2 className="lab-title"><LabIcon tab="play" />Challenges</h2>
       </div>
 
-      {/* The screen before it can hear you.
-          This used to be a permission prompt and nothing else: a microphone
-          icon, one sentence, a button, and not a single clue what the app was
-          about to do with the answer. The tuner had the same problem and the
-          fix there works here too, show the thing, greyed where it depends on
-          a signal and live where it does not. A round is already dealt, the
-          reference note still plays, the fretboard still explains its colours,
-          and the ask sits in the row it will later hand back to the score. */}
-      {/* Mode tabs + scoreboard */}
-      <section className="glass-panel" style={{ padding: '1rem 1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Segmented<Mode>
-          value={mode}
-          onChange={setMode}
-          ariaLabel="Challenge"
-          options={[
-            { value: 'scale', label: 'Scale Climb' },
-            { value: 'interval', label: 'Interval Hunt' },
-            { value: 'chord', label: 'Chord Builder' }
-          ]}
-        />
-        {/* A score of nought and a streak of nought are not facts about you,
-            they are the absence of a game. Until one is running the only
-            figure worth showing is the one a previous session left behind,
-            and only when there is one. */}
-        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', fontSize: '0.9rem' }}>
-          {isActive ? (
+      <Segmented<Mode>
+        value={mode}
+        onChange={setMode}
+        ariaLabel="Challenge"
+        options={[
+          { value: 'scale', label: 'Scales' },
+          { value: 'interval', label: 'Intervals' },
+          { value: 'chord', label: 'Chords' }
+        ]}
+      />
+
+      {/* The settings, behind one line that says what they are set to. */}
+      <button type="button" className={`play-settings-line${settingsOpen ? ' is-open' : ''}`} onClick={() => setSettingsOpen(o => !o)} aria-expanded={settingsOpen}>
+        <span>{settingsSummary}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {settingsOpen && (
+        <div className="play-settings">
+          {mode === 'scale' && (
             <>
-              <span>Score <strong style={{ color: 'var(--primary)' }}>{score}</strong></span>
-              <span style={{ color: 'var(--warning)' }}>Streak <strong>{streak}</strong></span>
-              <span style={{ color: 'var(--text-secondary)' }}>Best <strong>{best[mode]}</strong></span>
-              <button onClick={stop} className="btn" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
-                <span style={{ width: '8px', height: '8px', background: 'var(--danger)', borderRadius: '50%' }}></span>
-                Stop
-              </button>
+              <label>
+                Key
+                <select value={String(scaleRootPc)} className="select-field"
+                  onChange={e => setScaleRootPc(e.target.value === 'random' ? 'random' : Number(e.target.value))}>
+                  {NOTE_NAMES.map((n, i) => <option key={n} value={i}>{n}</option>)}
+                  <option value="random">Surprise me</option>
+                </select>
+              </label>
+              <label>
+                Scale
+                <select value={scaleIdx} className="select-field" onChange={e => setScaleIdx(Number(e.target.value))}>
+                  {SCALE_FORMULAS.map((sc, i) => <option key={sc.name} value={i}>{shortScaleName(sc.name)}</option>)}
+                </select>
+              </label>
             </>
-          ) : (
-            best[mode] > 0 && (
-              <span className="play-best">Best so far · <strong>{best[mode]}</strong></span>
-            )
           )}
-        </div>
-      </section>
-
-      <div className="grid-2">
-        {/* Challenge prompt */}
-        <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ fontSize: '1.05rem', color: 'var(--secondary)' }}>{round?.promptTitle ?? '…'}</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.55, minHeight: '3.1em' }}>{round?.promptDetail}</p>
-
-          {/* Step chips */}
-          {round && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {round.chipLabels.map((label, i) => {
-                const done = i < progressIdx || phase === 'complete';
-                const current = i === progressIdx && phase === 'playing';
-                return (
-                  <span
-                    key={`${label}-${i}`}
-                    style={{
-                      padding: '0.35rem 0.6rem',
-                      borderRadius: '8px',
-                      fontSize: '0.78rem',
-                      fontWeight: current ? 700 : 500,
-                      border: `1px solid ${done ? 'var(--success)' : current ? 'var(--primary)' : 'rgba(var(--surface-tint-rgb),0.1)'}`,
-                      background: done ? 'rgba(70, 192, 138, 0.12)' : current ? 'rgba(255, 106, 42, 0.12)' : 'var(--surface-2)',
-                      color: done ? 'var(--success)' : current ? 'var(--primary)' : 'var(--text-muted)',
-                      display: 'inline-flex', alignItems: 'center', gap: '0.3rem'
-                    }}
-                  >
-                    {done && <IconCheck size={11} />}{targetsHidden && !done ? '?' : label}
-                  </span>
-                );
-              })}
-            </div>
+          {mode === 'chord' && (
+            <label className="play-check">
+              <input type="checkbox" checked={chordSevenths} onChange={e => setChordSevenths(e.target.checked)} />
+              7th chords too
+            </label>
           )}
-
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: 'auto', paddingTop: '0.5rem' }}>
-            <button onClick={playReference} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              {mode === 'interval' ? 'Hear the note' : 'Hear it'}
-            </button>
-            {mode === 'interval' && !revealed && (
-              <button onClick={revealAnswer} className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}>
-                Show answer
-              </button>
-            )}
-            <button onClick={() => startNewRound()} className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}>
-              Skip
-            </button>
-          </div>
-
-          {/* Mode-specific settings */}
-          <div style={{ paddingTop: '0.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-            {mode === 'scale' && (
-              <>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  Root
-                  <select
-                    value={String(scaleRootPc)}
-                    onChange={e => setScaleRootPc(e.target.value === 'random' ? 'random' : Number(e.target.value))}
-                    className="select-field"
-                    style={{ width: 'auto', padding: '0.3rem 1.7rem 0.3rem 0.5rem', fontSize: '0.78rem' }}
-                  >
-                    {NOTE_NAMES.map((n, i) => <option key={n} value={i}>{n}</option>)}
-                    <option value="random">Surprise me</option>
-                  </select>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  Scale
-                  <select
-                    value={scaleIdx}
-                    onChange={e => setScaleIdx(Number(e.target.value))}
-                    className="select-field"
-                    style={{ width: 'auto', padding: '0.3rem 1.7rem 0.3rem 0.5rem', fontSize: '0.78rem' }}
-                  >
-                    {SCALE_FORMULAS.map((s, i) => (
-                      <option key={s.name} value={i}>{s.name}</option>
-                    ))}
-                  </select>
-                </label>
-              </>
-            )}
-            {mode === 'chord' && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                <input type="checkbox" checked={chordSevenths} onChange={e => setChordSevenths(e.target.checked)} />
-                7th chords too
-              </label>
-            )}
-            {mode === 'interval' && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                <input type="checkbox" checked={trickyIntervals} onChange={e => setTrickyIntervals(e.target.checked)} />
-                Harder intervals too
-              </label>
-            )}
-          </div>
-        </section>
-
-        {/* Live listening panel. The only part of this screen that is a lie
-            without a microphone, so it is the only part that goes grey. */}
-        <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
-          {/* Nothing to show until the mic is on: an empty readout and a 0% bar
-              above the button that would fill them only looked broken. */}
-          {isActive && (
-          <div className="playhear">
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Hearing</span>
-              <div style={{ fontSize: '3.2rem', fontWeight: 700, lineHeight: 1.1, color: pitch ? (currentTargetPc !== null && ((pitch.midi % 12) + 12) % 12 === currentTargetPc ? 'var(--success)' : 'var(--primary)') : 'var(--text-muted)' }}>
-                {pitch ? pitch.note : '--'}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                {pitch ? `${pitch.frequency.toFixed(1)} Hz · ${pitch.cents > 0 ? '+' : ''}${pitch.cents}c` : isActive ? 'silent' : 'not listening'}
-              </div>
-            </div>
-
-            {/* Hold-to-confirm progress */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                <span>Hold to confirm</span>
-                <span>{holdPct}%</span>
-              </div>
-              <div style={{ height: '8px', background: 'var(--surface-3)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${holdPct}%`, height: '100%', background: 'var(--success)', boxShadow: '0 0 10px var(--success-glow)', transition: 'width 0.08s linear' }} />
-              </div>
-            </div>
-          </div>
+          {mode === 'interval' && (
+            <label className="play-check">
+              <input type="checkbox" checked={trickyIntervals} onChange={e => setTrickyIntervals(e.target.checked)} />
+              Harder intervals too
+            </label>
           )}
-
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: isActive ? feedbackColor : 'var(--text-muted)', minHeight: '2.4em', lineHeight: 1.4 }}>
-            {isActive
-              ? feedback.text
-              : 'Answer by playing. Nothing is recorded or uploaded.'}
-          </p>
-
-          {!isActive && (
-            <div className="micbar">
-              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-              <span className="micbar-said">Grading starts once the challenge can hear you.</span>
-              <button onClick={start} className="btn btn-primary">Turn on the mic</button>
-            </div>
-          )}
-          {micError && <p className="micbar-error">{micError}</p>}
-        </section>
-      </div>
-
-      {/* Fretboard */}
-      <section className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.15rem', marginBottom: '0.75rem', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <span>Fretboard</span>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', fontWeight: 400, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <label className="play-check">
             <input type="checkbox" checked={showTargets} onChange={e => setShowTargets(e.target.checked)} />
-            Show targets
+            Show notes on the fretboard
           </label>
-        </h3>
-        {/* Keyed to the colours the fretboard actually draws (note-root,
-            note-scale, note-active), so the legend cannot drift from the board. */}
-        <div className="fb-legend">
-          <span><span className="fb-key is-target" />Play this now</span>
-          <span><span className="fb-key is-context" />{mode === 'interval' ? 'Reference note' : 'Other notes in this challenge'}</span>
-          {isActive && <span><span className="fb-key is-heard" />What you're playing</span>}
         </div>
+      )}
+
+      {/* One card: what to play, then where it is. */}
+      <section className="glass-panel play-card">
+        <h3 className="play-title">{round?.promptTitle ?? '…'}</h3>
+        <p className="play-detail">{round?.promptDetail}</p>
+
+        {round && (
+          <div className="play-chips">
+            {round.chipLabels.map((label, i) => {
+              const done = i < progressIdx || phase === 'complete';
+              const current = i === progressIdx && phase === 'playing';
+              return (
+                <span key={`${label}-${i}`} className={`play-chip${done ? ' is-done' : current ? ' is-now' : ''}`}>
+                  {done && <IconCheck size={11} />}{targetsHidden && !done ? '?' : label}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         <Fretboard
           activeMidis={heardMidis}
           highlightCorrectMidis={contextMidis}
           rootMidis={rootMidis}
           interactive={false}
         />
+        <div className="fb-legend">
+          <span><span className="fb-key is-target" />Play this now</span>
+          <span><span className="fb-key is-context" />{mode === 'interval' ? 'Reference note' : 'In this challenge'}</span>
+          {isActive && <span><span className="fb-key is-heard" />You</span>}
+        </div>
+
+        <div className="play-stats readout">
+          {mode === 'scale' ? (
+            <>
+              <span>{fmtTime(elapsed)}</span>
+              {scaleBest !== undefined && <span className="play-stat-best">best {fmtTime(scaleBest)}</span>}
+            </>
+          ) : (
+            <>
+              {isActive && <span>Streak {streak}</span>}
+              {best[mode] > 0 && <span className="play-stat-best">best {best[mode]}</span>}
+            </>
+          )}
+        </div>
+        {mode === 'scale' && lastClimb && (
+          <p className="play-last">
+            {lastClimb.key} in {fmtTime(lastClimb.seconds)}
+            {lastClimb.previous === undefined ? ' · first climb' : lastClimb.seconds < lastClimb.previous ? ` · new best (was ${fmtTime(lastClimb.previous)})` : ''}
+          </p>
+        )}
+
+        <div className="play-actions">
+          <button onClick={playReference} className="btn btn-secondary">
+            {mode === 'interval' ? 'Hear the note' : 'Hear it'}
+          </button>
+          {mode === 'interval' && !revealed && (
+            <button onClick={revealAnswer} className="btn">Show answer</button>
+          )}
+          <button onClick={() => startNewRound()} className="btn">Skip</button>
+        </div>
       </section>
+
+      {/* Docked, like Start in Rhythm: the mic is always in reach. */}
+      <div className="play-dock">
+        {isActive ? (
+          <div className="play-live">
+            <span className={`play-live-note${pitch && currentTargetPc !== null && ((pitch.midi % 12) + 12) % 12 === currentTargetPc ? ' is-match' : ''}`}>
+              {pitch ? pitch.note : '--'}
+            </span>
+            <span className="play-live-text">
+              <span className="play-live-said" style={{ color: feedbackColor }}>{feedback.text}</span>
+              <span className="play-hold" aria-hidden="true"><span style={{ width: `${holdPct}%` }} /></span>
+            </span>
+            <button onClick={stop} className="btn play-stop">Stop</button>
+          </div>
+        ) : (
+          <button onClick={start} className="btn btn-primary play-mic">
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+            Turn on the mic
+          </button>
+        )}
+        {micError && <p className="micbar-error">{micError}</p>}
+      </div>
     </div>
   );
 };
