@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Keyboard } from '../components/Keyboard';
 import { LabIcon } from '../components/LabIcon';
 import { Fretboard } from '../components/Fretboard';
@@ -6,6 +7,7 @@ import { Segmented } from '../components/Segmented';
 import { audio } from '../utils/audio';
 import { reportProgress } from '../utils/progress';
 import {
+  getMastery,
   pickNextItem,
   recordAttempt,
   resetMastery,
@@ -27,6 +29,21 @@ import type { TabIntervalCandidate } from '../utils/tabIntervalSource';
 import { CHORD_FEELINGS } from '../utils/glossary';
 import { IconSounding } from '../components/Icons';
 import { feel } from '../utils/haptics';
+import { useBackToClose } from '../utils/nativeShell';
+
+/** Questions in a set. A set ends, so a session has a shape and a result. */
+const SET = 10;
+
+type Mode = 'intervals' | 'chords' | 'tab';
+const MODES: { value: Mode; label: string }[] = [
+  { value: 'intervals', label: 'Intervals' },
+  { value: 'chords', label: 'Chords' },
+  { value: 'tab', label: 'From my tabs' }
+];
+
+const DIFFICULTY_LABEL: Record<string, string> = {
+  auto: 'Auto', 'super-beginner': 'Starter', easy: 'Easy', medium: 'Medium', hard: 'Hard'
+};
 
 // Two of the longer 7th-chord names get an abbreviated parenthetical
 // (everything else is short enough to show in full), the feeling word
@@ -108,6 +125,12 @@ export const EarTrainingLab: React.FC = () => {
   const [score, setScore] = useState<number>(0);
   const [totalQuestions, setTotalQuestions] = useState<number>(0);
   const [streak, setStreak] = useState<number>(0);
+  const [best, setBest] = useState<number>(0);
+  const [setDone, setSetDone] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [see, setSee] = useState<'guitar' | 'piano'>('guitar');
+  // Mastery as it stood when the set began, so the summary can say what moved.
+  const setStart = useRef<Record<string, number>>({});
   const [showCheatSheet, setShowCheatSheet] = useState<boolean>(false);
 
   // Question details
@@ -331,15 +354,6 @@ export const EarTrainingLab: React.FC = () => {
     }
   };
 
-  // Play reference sound from cheat sheet list
-  const playCheatSheetInterval = (semitones: number) => {
-    audio.init();
-    const now = audio.getCurrentTime();
-    const referenceRoot = 60; // C4 Middle C
-    audio.playMidi(referenceRoot, 1.2, now);
-    audio.playMidi(referenceRoot + semitones, 1.2, now + 0.55);
-  };
-
   // Translates complex terms to beginner-friendly labels
   const getDisplayOptionName = (opt: string) => {
     if (quizMode === 'chords') {
@@ -375,7 +389,7 @@ export const EarTrainingLab: React.FC = () => {
 
     if (isCorrect) {
       setScore(prev => prev + 1);
-      setStreak(prev => prev + 1);
+      setStreak(prev => { setBest(b => Math.max(b, prev + 1)); return prev + 1; });
       // Every fifth in a row is a moment; the rest are just right.
       feel((streak + 1) % 5 === 0 ? 'celebrate' : 'success');
       reportProgress(quizMode === 'intervals' ? 'ear-interval-correct' : 'ear-chord-correct');
@@ -392,6 +406,9 @@ export const EarTrainingLab: React.FC = () => {
     setScore(0);
     setTotalQuestions(0);
     setStreak(0);
+    setBest(0);
+    setSetDone(false);
+    setStart.current = Object.fromEntries(strip.items.map(item => [item.id, getMastery(item.id)]));
     setHasStarted(true);
     generateQuestion();
   };
@@ -422,372 +439,230 @@ export const EarTrainingLab: React.FC = () => {
     }
   }, [correctMidis]);
 
+  const mode: Mode = sourceMode === 'tab' ? 'tab' : quizMode;
+  const setMode = (m: Mode) => {
+    setSetDone(false);
+    if (m === 'tab') { setSourceMode('tab'); setQuizMode('intervals'); }
+    else { setSourceMode('random'); setQuizMode(m); }
+  };
+  const closeSettings = () => setSettingsOpen(false);
+  useBackToClose(settingsOpen, closeSettings);
+
+  const tabEmpty = sourceMode === 'tab' && tabSource.candidates.length === 0;
+  const isCorrect = (opt: string) => (quizMode === 'intervals' ? correctInterval?.name === opt : correctChord?.name === opt);
+  const clueFor = (opt: string) => (quizMode === 'intervals' ? INTERVALS.find(iv => iv.name === opt)?.songClue ?? '' : CHORD_FEELINGS[opt] ?? '');
+  const finished = totalQuestions >= SET;
+
+  // What Auto is drilling: the unlocked items you know least, said in words,
+  // so the choice of question is not a black box.
+  const focus = difficulty === 'auto'
+    ? strip.items.slice(0, strip.unlocked).filter(item => getMastery(item.id) < 0.7)
+      .sort((a, b) => getMastery(a.id) - getMastery(b.id)).slice(0, 2)
+    : [];
+  const improved = setDone
+    ? strip.items.filter(item => getMastery(item.id) - (setStart.current[item.id] ?? 0) > 0.05).map(item => item.name)
+    : [];
+
+  const explain = (() => {
+    const root = midiToNoteName(currentRoot);
+    if (quizMode === 'intervals' && correctInterval) {
+      const top = midiToNoteName(currentRoot + correctInterval.semitones);
+      const from = sourceMode === 'tab' && currentCandidate && tabSource.selectedTab
+        ? ` · ${tabSource.selectedTab.title || tabSource.selectedTab.fileName}, bar ${currentCandidate.barNumber}`
+        : '';
+      return <><strong>{correctInterval.name}</strong>: {root.name}{root.octave} up to {top.name}{top.octave}{from}</>;
+    }
+    if (correctChord) {
+      const notes = correctChord.intervals.map(offset => midiToNoteName(currentRoot + offset).name).join(' ');
+      return <><strong>{getDisplayOptionName(correctChord.name)}</strong>: {notes}</>;
+    }
+    return null;
+  })();
+
+  const settingsLine = `${DIFFICULTY_LABEL[difficulty]} · ${sourceMode === 'tab' || playbackStyle === 'melodic' ? 'one after another' : 'together'}`;
+
   return (
-    <div className="lab-stack">
-      
-      {/* Header */}
-      <div className="lab-header">
+    <div className="lab-stack ear">
+      <div className="ear-head">
         <h2 className="lab-title"><LabIcon tab="ear-training" />Ear Training</h2>
+        {hasStarted && !setDone && (
+          <span className="ear-score readout">{score} of {totalQuestions} · streak {streak}</span>
+        )}
       </div>
 
-      <div className="grid-2">
-        
-        {/* Settings Panel */}
-        <section className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h3 style={{ fontSize: '1.15rem', paddingBottom: '0.5rem' }}>Settings</h3>
-
-          <Segmented
-            label="Source"
-            value={sourceMode}
-            onChange={(v) => { setSourceMode(v); if (v === 'tab') setQuizMode('intervals'); }}
-            options={[
-              { value: 'random', label: 'Random notes' },
-              { value: 'tab', label: 'My tabs' }
-            ]}
-            full
-          />
-
-          {/* One slot, the same height whichever source is on, so switching
-              never moves the rows below it. */}
-          <div className="settings-slot">
-          {sourceMode === 'tab' && (
-            <div>
-              <span className="field-label">Tab</span>
-              {tabSource.libraryEntries.length === 0 ? (
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                  Nothing saved yet. Open a tab file first.
-                </p>
-              ) : (
-                <select
-                  value={tabSource.selectedTab?.id ?? ''}
-                  onChange={(e) => {
-                    const entry = tabSource.libraryEntries.find(t => t.id === e.target.value);
-                    if (entry) tabSource.selectTab(entry);
-                  }}
-                  className="select-field"
-                >
-                  <option value="" disabled>Choose a piece…</option>
-                  {tabSource.libraryEntries.map(entry => (
-                    <option key={entry.id} value={entry.id}>{entry.title || entry.fileName}</option>
-                  ))}
-                </select>
-              )}
-              {tabSource.isLoading && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>Loading…</p>
-              )}
-              {tabSource.error && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: '0.4rem' }}>{tabSource.error}</p>
-              )}
-              {tabSource.selectedTab && !tabSource.isLoading && !tabSource.error && tabSource.candidates.length === 0 && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-                  No clear single-note jumps in this piece.
-                </p>
-              )}
+      <section className="ear-card" aria-live="polite">
+        {!hasStarted || setDone ? (
+          setDone ? (
+            <div className="ear-start">
+              <span className="surface-label">Set done</span>
+              <div className="ear-final readout">{score} of {SET}</div>
+              <p className="ear-said">
+                Best streak {best}.{improved.length > 0 ? ` ${improved.slice(0, 2).join(' and ')} ${improved.length === 1 ? 'is' : 'are'} getting stronger.` : ''}
+              </p>
+              <button type="button" className="btn btn-primary ear-again" onClick={handleStartQuiz}>Another set</button>
             </div>
-          )}
+          ) : (
+            <div className="ear-start">
+              <Segmented<Mode> value={mode} onChange={setMode} options={MODES} ariaLabel="What to hear" size="sm" />
+              {mode === 'tab' && (
+                tabSource.libraryEntries.length === 0 ? (
+                  <p className="ear-said">No tabs saved yet. Open a tab file in Tabs first.</p>
+                ) : (
+                  <select
+                    value={tabSource.selectedTab?.id ?? ''}
+                    onChange={e => {
+                      const entry = tabSource.libraryEntries.find(t => t.id === e.target.value);
+                      if (entry) tabSource.selectTab(entry);
+                    }}
+                    className="select-field ear-tabpick"
+                    aria-label="Which tab"
+                  >
+                    <option value="" disabled>Choose a piece…</option>
+                    {tabSource.libraryEntries.map(entry => (
+                      <option key={entry.id} value={entry.id}>{entry.title || entry.fileName}</option>
+                    ))}
+                  </select>
+                )
+              )}
+              {mode === 'tab' && tabSource.selectedTab && !tabSource.isLoading && tabSource.candidates.length === 0 && (
+                <p className="ear-said">No clear single-note jumps in this piece.</p>
+              )}
+              <button
+                type="button"
+                className="ear-orb ear-start-go"
+                onClick={handleStartQuiz}
+                disabled={tabEmpty}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20" /></svg>
+                Start
+              </button>
+              <p className="ear-said">A set of {SET}. Hear it, then name it.</p>
+              <button type="button" className="chip-btn ear-settings" onClick={() => setSettingsOpen(true)}>{settingsLine} ▾</button>
+            </div>
+          )
+        ) : (
+          <div className="ear-q">
+            <div className="ear-q-top">
+              <button type="button" className="ear-orb is-small" onClick={playSound} aria-label="Hear it again">
+                <IconSounding />
+                Replay
+              </button>
+            </div>
 
-          {sourceMode === 'random' && (
+            <div className="ear-answers">
+              {options.map(opt => {
+                const right = isAnswered && isCorrect(opt);
+                const wrong = isAnswered && userAnswer === opt && !isCorrect(opt);
+                const clue = clueFor(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={`ear-ans${right ? ' is-right' : ''}${wrong ? ' is-wrong' : ''}${isAnswered && !right && !wrong ? ' is-dim' : ''}`}
+                    onClick={() => handleAnswerSubmit(opt)}
+                    disabled={isAnswered}
+                    aria-pressed={userAnswer === opt}
+                  >
+                    <span className="ear-ans-name">{getDisplayOptionName(opt)}</span>
+                    {(showCheatSheet || isAnswered) && quizMode === 'intervals' && clue && (
+                      <span className="ear-ans-clue">{clue}</span>
+                    )}
+                    {right && <span className="sr-only">, correct</span>}
+                    {wrong && <span className="sr-only">, your answer, wrong</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {!isAnswered && quizMode === 'intervals' && (
+              <button type="button" className="linklike ear-clue" onClick={() => setShowCheatSheet(v => !v)}>
+                {showCheatSheet ? 'Hide clues' : 'Need a clue?'}
+              </button>
+            )}
+
+            {isAnswered && (
+              <>
+                <p className="ear-explain">{userAnswer && isCorrect(userAnswer) ? '✓ ' : ''}{explain}</p>
+                <div className="ear-see">
+                  <Segmented<'guitar' | 'piano'>
+                    value={see}
+                    onChange={setSee}
+                    ariaLabel="See it on"
+                    size="sm"
+                    options={[{ value: 'guitar', label: 'Guitar' }, { value: 'piano', label: 'Piano' }]}
+                  />
+                  {see === 'guitar'
+                    ? <Fretboard highlightCorrectMidis={correctMidis} interactive={false} />
+                    : <Keyboard highlightCorrectMidis={correctMidis} interactive={false} />}
+                </div>
+                <div className="ear-next">
+                  <button type="button" className="btn" onClick={playSound}>Hear it again</button>
+                  {finished ? (
+                    <button type="button" className="btn btn-primary" onClick={() => setSetDone(true)}>See how it went</button>
+                  ) : (
+                    <button type="button" className="btn btn-primary" onClick={generateQuestion}>Next</button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="ear-mastery">
+        <MasteryStrip
+          items={strip.items}
+          unlocked={strip.unlocked}
+          highlightId={latestItemId}
+        />
+        {focus.length > 0 && (
+          <p className="ear-focus">Auto is working on {focus.map(item => item.name).join(' and ')}.</p>
+        )}
+      </section>
+
+      {settingsOpen && createPortal(
+        <div className="msheet-backdrop is-dialog" onClick={closeSettings}>
+          <div className="msheet ear-sheet" role="dialog" aria-modal="true" aria-label="Ear training settings" onClick={e => e.stopPropagation()}>
+            <h3 className="removesheet-title">Settings</h3>
             <Segmented
-              label="Type"
-              value={quizMode}
-              onChange={setQuizMode}
+              label="Difficulty"
+              value={difficulty}
+              onChange={setDifficulty}
+              size="sm"
               options={[
-                { value: 'intervals', label: 'Intervals' },
-                { value: 'chords', label: 'Chords' }
+                { value: 'auto' as Difficulty, label: 'Auto', title: 'Focuses on what you miss most' },
+                { value: 'super-beginner' as Difficulty, label: 'Starter', title: 'Unison, 5th, octave' },
+                { value: 'easy' as Difficulty, label: 'Easy' },
+                { value: 'medium' as Difficulty, label: 'Medium' },
+                { value: 'hard' as Difficulty, label: 'Hard' }
               ]}
               full
             />
-          )}
-          </div>
-
-          <Segmented
-            label="Difficulty"
-            value={difficulty}
-            onChange={setDifficulty}
-            tone="secondary"
-            size="sm"
-            options={[
-              { value: 'auto' as Difficulty, label: 'Auto', title: 'Focuses on what you miss most' },
-              { value: 'super-beginner' as Difficulty, label: 'Starter', title: 'Unison, 5th, octave' },
-              { value: 'easy' as Difficulty, label: 'Easy' },
-              { value: 'medium' as Difficulty, label: 'Medium' },
-              { value: 'hard' as Difficulty, label: 'Hard' }
-            ]}
-            full
-          />
-
-          {/* Always shown, so the panel keeps its shape: a tab's jumps are
-              played one note after the other, so "together" is off there. */}
-          <Segmented
-            label="Playback"
-            value={sourceMode === 'tab' ? 'melodic' : playbackStyle}
-            onChange={setPlaybackStyle}
-            size="sm"
-            options={[
-              { value: 'melodic', label: 'One after another' },
-              { value: 'harmonic', label: 'Together', disabled: sourceMode === 'tab' }
-            ]}
-            full
-          />
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginTop: 'auto' }}>
-          {hasStarted && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', background: 'var(--surface-2)', padding: '0.75rem 0.9rem', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.8rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Accuracy</span>
-                <span className="readout" style={{ color: 'var(--text-primary)' }}>
-                  {totalQuestions > 0 ? `${Math.round((score / totalQuestions) * 100)}%` : '0%'}
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}> {score}/{totalQuestions}</span>
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.8rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Streak</span>
-                <span className="readout" style={{ color: streak > 0 ? 'var(--primary)' : 'var(--text-muted)' }}>{streak}</span>
-              </div>
-            </div>
-          )}
-
-          {/* The record, kept across sessions. What the drill reads to decide
-              the next question, shown so the decision isn't a black box. */}
-          <MasteryStrip
-            items={strip.items}
-            unlocked={strip.unlocked}
-            highlightId={latestItemId}
-            onReset={() => {
-              resetMastery();
-              setLatestItemId(null);
-              setMasteryTick(t => t + 1);
-            }}
-          />
-          </div>
-        </section>
-
-        {/* Quiz Arena Panel. First on a phone: it is what the screen is for,
-            and the settings above it pushed Start off the bottom. */}
-        <section className="glass-panel ear-arena" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: '320px', justifyContent: 'center', alignItems: 'center', gap: '1.5rem' }}>
-          {!hasStarted ? (
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '300px', margin: 0 }}>
-                {sourceMode === 'tab'
-                  ? 'Hear a jump from your tab, then name it.'
-                  : 'Hear it, then name it.'}
-              </p>
-              <button
-                onClick={handleStartQuiz}
-                className="btn btn-primary ear-start"
-                disabled={sourceMode === 'tab' && tabSource.candidates.length === 0}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg>
-                Start
-              </button>
-            </div>
-          ) : (
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              
-              {/* Audio Playback controls */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.1rem', whiteSpace: 'nowrap' }}>Name it</h3>
-                <div style={{ display: 'flex', gap: '0.5rem', whiteSpace: 'nowrap' }}>
-                  <button onClick={playSound} className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                    <IconSounding />
-                    Replay
-                  </button>
-                  {quizMode === 'intervals' && (
-                    <button 
-                      onClick={() => setShowCheatSheet(!showCheatSheet)} 
-                      className={`btn ${showCheatSheet ? 'active' : ''}`}
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                    >
-                      Song clues
-                    </button>
-                  )}
-                  {isAnswered && (
-                    <button onClick={generateQuestion} className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                      Next
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Multiple Choice Options */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                {options.map((opt) => {
-                  const isCorrectOpt = quizMode === 'intervals' 
-                    ? correctInterval?.name === opt 
-                    : correctChord?.name === opt;
-
-                  const isUserAnswer = userAnswer === opt;
-                  
-                  let cardStyle: React.CSSProperties = {
-                    padding: '1rem',
-                    textAlign: 'center',
-                    fontWeight: 500,
-                    fontSize: '0.95rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: '60px'
-                  };
-
-                  let borderClass = 'glass-card';
-                  if (isAnswered) {
-                    if (isCorrectOpt) {
-                      borderClass += ' answer-right';
-                    } else if (isUserAnswer) {
-                      borderClass += ' answer-wrong';
-                    } else {
-                      cardStyle.opacity = 0.55;
-                    }
-                  }
-
-                  return (
-                    <div
-                      key={opt}
-                      onClick={() => handleAnswerSubmit(opt)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleAnswerSubmit(opt);
-                        }
-                      }}
-                      className={borderClass}
-                      style={{ ...cardStyle, cursor: 'pointer' }}
-                    >
-                      <span>{getDisplayOptionName(opt)}</span>
-                      {isAnswered && isCorrectOpt && (
-                        <span style={{ fontSize: '0.65rem', color: 'var(--success)', marginTop: '2px' }}>Correct</span>
-                      )}
-                      {isAnswered && isUserAnswer && !isCorrectOpt && (
-                        <span style={{ fontSize: '0.65rem', color: 'var(--danger)', marginTop: '2px' }}>Incorrect</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Collapsible Melody Cheat Sheet Drawer */}
-              {showCheatSheet && quizMode === 'intervals' && (
-                <div 
-                  className="glass-panel" 
-                  style={{ 
-                    padding: '1rem', 
-                    background: 'var(--surface-2)',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem',
-                    maxHeight: '200px',
-                    overflowY: 'auto'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    <span>Melody clue</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>Click <IconSounding size={12} /> to hear reference</span>
-                  </div>
-                  {getPossibleIntervals().map((interval) => (
-                    <div 
-                      key={interval.name} 
-                      style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        fontSize: '0.8rem',
-                        padding: '2px 0'
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{interval.name} ({interval.shortName}):</span>
-                        <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>{interval.songClue}</span>
-                      </div>
-                      <button 
-                        onClick={() => playCheatSheetInterval(interval.semitones)} 
-                        className="btn" 
-                        style={{ padding: '2px 6px', fontSize: '0.7rem' }}
-                        title="Hear reference interval"
-                      >
-                        <IconSounding />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Status Message */}
-              {isAnswered && (
-                <div style={{ textAlign: 'center', background: 'var(--surface-2)', border: '1px dashed rgba(var(--surface-tint-rgb),0.06)', padding: '0.75rem', borderRadius: '8px' }}>
-                  {(() => {
-                    const rootNote = midiToNoteName(currentRoot);
-                    if (quizMode === 'intervals' && correctInterval) {
-                      const secondNote = midiToNoteName(currentRoot + correctInterval.semitones);
-                      return (
-                        <div style={{ fontSize: '0.85rem' }}>
-                          <div>
-                            Root note was <strong style={{ color: 'var(--primary)' }}>{rootNote.name}{rootNote.octave}</strong>.
-                            Interval is {correctInterval.name} ({correctInterval.songClue}) to <strong style={{ color: 'var(--secondary)' }}>{secondNote.name}{secondNote.octave}</strong>.
-                          </div>
-                          {sourceMode === 'tab' && currentCandidate && tabSource.selectedTab && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              From <strong>{tabSource.selectedTab.title || tabSource.selectedTab.fileName}</strong>, bar {currentCandidate.barNumber}
-                              {currentCandidate.toMidi > currentCandidate.fromMidi
-                                ? ' (ascending)'
-                                : currentCandidate.toMidi < currentCandidate.fromMidi
-                                  ? ' (descending)'
-                                  : ''}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    } else if (correctChord) {
-                      const chordNotes = correctChord.intervals.map(offset => midiToNoteName(currentRoot + offset).name).join(' - ');
-                      const label = getDisplayOptionName(correctChord.name);
-                      return (
-                        <div style={{ fontSize: '0.85rem' }}>
-                          Root note was <strong style={{ color: 'var(--primary)' }}>{rootNote.name}{rootNote.octave}</strong>. 
-                          It is a <strong style={{ color: 'var(--secondary)' }}>{label}</strong> chord: <strong style={{ color: 'var(--secondary)' }}>{chordNotes}</strong>.
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* Visual Feedback - Piano/Fretboard show up during review to reinforce chord shapes/intervals */}
-      {hasStarted && (
-        <>
-          <section className="glass-panel" style={{ padding: '1.5rem', opacity: isAnswered ? 1.0 : 0.45, transition: 'opacity 0.3s ease' }}>
-            <h3 style={{ fontSize: '1.15rem', marginBottom: '1.25rem', paddingBottom: '0.5rem' }}>
-              Piano Notation Assistant
-            </h3>
-            <Keyboard 
-              activeMidis={isAnswered ? [] : correctMidis}
-              highlightCorrectMidis={isAnswered ? correctMidis : []}
-              interactive={false}
+            <Segmented
+              label="Playback"
+              value={sourceMode === 'tab' ? 'melodic' : playbackStyle}
+              onChange={setPlaybackStyle}
+              size="sm"
+              options={[
+                { value: 'melodic', label: 'One after another' },
+                { value: 'harmonic', label: 'Together', disabled: sourceMode === 'tab' }
+              ]}
+              full
             />
-          </section>
-
-          <section className="glass-panel" style={{ padding: '1.5rem', opacity: isAnswered ? 1.0 : 0.45, transition: 'opacity 0.3s ease' }}>
-            <h3 style={{ fontSize: '1.15rem', marginBottom: '1.25rem', paddingBottom: '0.5rem' }}>
-              Guitar Fretboard Helper (Standard Tuning)
-            </h3>
-            <Fretboard 
-              activeMidis={isAnswered ? [] : correctMidis}
-              highlightCorrectMidis={isAnswered ? correctMidis : []}
-              interactive={false}
-            />
-          </section>
-        </>
+            <button
+              type="button"
+              className="linklike ear-reset"
+              onClick={() => { resetMastery(); setLatestItemId(null); setMasteryTick(t => t + 1); }}
+            >
+              Clear my mastery history
+            </button>
+            <button type="button" className="btn btn-primary ear-sheet-done" onClick={closeSettings}>Done</button>
+          </div>
+        </div>,
+        document.body
       )}
-
     </div>
   );
 };
+
 export default EarTrainingLab;
