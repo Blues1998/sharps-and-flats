@@ -1,0 +1,1 @@
+function e(e){return`/sharps-and-flats/`+e.replace(/^\/+/,``)}export{e as t};

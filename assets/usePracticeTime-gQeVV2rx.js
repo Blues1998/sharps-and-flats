@@ -1,0 +1,1 @@
+import{a as e,s as t}from"./progress-Cq00OJ5y.js";import{E as n,Kt as r,Xt as i,Zt as a}from"./feats-CbbSpO4Q.js";var o=t(e(),1);function s(e,t,r={}){let s=r.songId??``,c=!!r.mic;(0,o.useEffect)(()=>{a()},[]),(0,o.useEffect)(()=>(i(e,t,s,c),()=>i(e,!1)),[e,t,s,c]),n(`practice:${e}`,t)}function c(e){(0,o.useEffect)(()=>{e&&r()},[e])}export{s as n,c as t};
