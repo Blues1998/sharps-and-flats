@@ -3,8 +3,13 @@ import type { ActiveTab } from '../components/navGroups';
 export interface Prompt {
   text: string;
   tab: ActiveTab;
-  /** Only makes sense once there is a song in the library. */
+  /** Only makes sense once there is a song in the library. Opens your current song. */
   needsSong?: boolean;
+  /** A chord change to drill: opens Chords with this loop ready, at `tempo`. */
+  loop?: [string, number][];
+  tempo?: number;
+  /** Opens the voice tuner in this mode. */
+  voice?: 'sing' | 'hold';
 }
 
 // One small thing to go and do. Each one is a minute or two at the instrument
@@ -19,9 +24,9 @@ export const PROMPTS: Prompt[] = [
   { text: 'Name every interval you hear for two minutes straight.', tab: 'ear-training' },
   { text: 'Set 60 BPM and play one clean downstroke per beat.', tab: 'rhythm' },
   { text: 'Tune by ear first. Then check how close you got.', tab: 'tuner' },
-  { text: 'Change Am → F ten times without stopping.', tab: 'play' },
+  { text: 'Change Am → F ten times without stopping.', tab: 'chordbook', loop: [['Am', 1], ['F', 1]], tempo: 60 },
   { text: 'Find every C on the fretboard in under a minute.', tab: 'theory' },
-  { text: 'Hum the root while you strum the chord.', tab: 'ear-training' },
+  { text: 'Hum the root while you strum the chord.', tab: 'tuner', voice: 'sing' },
   { text: "Play your song's progression at half speed, perfectly.", tab: 'library', needsSong: true },
   { text: 'Read one bar of tab, look away, play it back.', tab: 'tabs' },
   { text: 'Sing the melody while you strum.', tab: 'library', needsSong: true }

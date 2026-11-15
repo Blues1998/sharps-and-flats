@@ -100,7 +100,9 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
     [lines, settings.beatsPerBar, transpose]
   );
 
-  const [isLooping, setIsLooping] = useState(false);
+  // Looping by default: a song you are learning is played round and round,
+  // not once. Turn Loop off to play it through and stop.
+  const [isLooping, setIsLooping] = useState(true);
   const [speedRamp, setSpeedRamp] = useState<number>(0); // 0 = off, 1 = +1 BPM/lap, 2 = +2 BPM/lap
   const lastLapRef = useRef(0);
 
@@ -116,6 +118,18 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
   // Playing along is practice on this song, counted while it plays.
   usePracticeTime('song-chart', moving, { songId: song.id });
   const counting = phase === 'countin' || (phase === 'paused' && beat < 0);
+  const lap = chart.totalBeats > 0 && beat >= 0 ? Math.floor(beat / chart.totalBeats) + 1 : 1;
+
+  // When a play-through ends, the big button takes Stop's place. For a moment
+  // it says Done and ignores taps, so a tap meant for Stop cannot start it all
+  // over again.
+  const [cooling, setCooling] = useState(false);
+  useEffect(() => {
+    if (phase !== 'done') return;
+    setCooling(true);
+    const t = window.setTimeout(() => setCooling(false), 2500);
+    return () => window.clearTimeout(t);
+  }, [phase]);
 
   const currentLine = holding ? lineAtBeat(chart, beat) : null;
   const { current, next } = holding
@@ -218,11 +232,15 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
     <div className={`song-player${running ? ' is-live' : ''}`}>
       <span className="song-player-progress" style={{ width: `${running ? progress * 100 : 0}%` }} aria-hidden="true" />
       {!running ? (
-        <button type="button" className="song-player-go" onClick={start} disabled={!canPlay}>
-          <IconPlay size={15} fill="currentColor" strokeWidth={1.5} />
-          {!canPlay ? 'Add chords to play along' : phase === 'done' ? 'Play again' : 'Play along'}
-          {canPlay && <span className="readout">{settings.tempo} bpm</span>}
-        </button>
+        cooling ? (
+          <div className="song-player-go is-done" role="status">Done</div>
+        ) : (
+          <button type="button" className="song-player-go" onClick={start} disabled={!canPlay}>
+            <IconPlay size={15} fill="currentColor" strokeWidth={1.5} />
+            {!canPlay ? 'Add chords to play along' : phase === 'done' ? 'Play again' : 'Play along'}
+            {canPlay && <span className="readout">{settings.tempo} bpm</span>}
+          </button>
+        )
       ) : (
         <div className="song-player-live">
           <button
@@ -246,6 +264,7 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
             <div className="song-player-chords">
               <HeldChord label="Hold" symbol={current?.symbol ?? chart.chords[0] ?? null} voicing={currentVoicing} />
               <HeldChord label="Next" symbol={next?.symbol ?? null} voicing={nextVoicing} faint />
+              {isLooping && <span className="song-player-lap readout">Lap {lap}</span>}
             </div>
           )}
         </div>

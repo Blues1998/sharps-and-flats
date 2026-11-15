@@ -29,6 +29,7 @@ import {
 
 type Mode = 'sing' | 'hold' | 'range';
 
+const MODE_KEY = 'cadenza-voice-mode';
 const BAND_CENTS = 30;        // in tune, for a held sung note
 const HOLD_TARGET_MS = 1500;  // long enough that you have stopped arriving and are holding
 const REFERENCE_MS = 1700;    // the reference note's length, plus its tail in the room
@@ -103,7 +104,17 @@ export const VoiceTuner: React.FC = () => {
   usePracticeTime('voice', isActive, { mic: true });
   const voice = useVoice();
   const { notation, sa } = voice;
-  const [mode, setMode] = useState<Mode>('sing');
+  // Opens where you left it: most people come back for the same thing.
+  const [mode, setModeState] = useState<Mode>(() => {
+    try {
+      const saved = localStorage.getItem(MODE_KEY);
+      return saved === 'hold' || saved === 'range' ? saved : 'sing';
+    } catch { return 'sing'; }
+  });
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    try { localStorage.setItem(MODE_KEY, m); } catch { /* fine */ }
+  };
 
   const live = pitch ? toMidi(pitch.frequency) : null;
   const nearest = live !== null ? Math.round(live) : null;

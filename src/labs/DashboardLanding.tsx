@@ -5,6 +5,7 @@ import { assetUrl } from '../utils/assetUrl';
 import { ALL_LEVELS, isLevelComplete } from '../utils/journey';
 import { subscribeProgress } from '../utils/progress';
 import { useLibrary } from '../hooks/useLibrary';
+import { makeSlot } from '../utils/loop';
 import { StreakStrip } from '../components/StreakStrip';
 import { go } from '../hooks/useRoute';
 import { getSong, getSongs, lastPractised, minutesPractisedToday, practiceStats, STATUS_LABEL, today } from '../utils/library';
@@ -315,8 +316,25 @@ export const DashboardLanding: React.FC<DashboardLandingProps> = ({ setActiveTab
 
   const at = (i: number) => ({ ['--i' as string]: i } as React.CSSProperties);
 
+  // A tip opens the thing it is about: the song, the loop, the tuner mode.
+  const openTip = () => {
+    if (prompt.needsSong) { go({ tab: 'library', songId: song?.id ?? null }); return; }
+    if (prompt.loop) {
+      handLoop({ slots: prompt.loop.map(([c, b]) => makeSlot(c, b)), tempo: prompt.tempo ?? 60, beatsPerBar: 4, name: prompt.text });
+      go({ tab: 'chordbook', songId: null });
+      return;
+    }
+    if (prompt.voice) {
+      try {
+        localStorage.setItem('cadenza-tuner-mode', 'voice');
+        localStorage.setItem('cadenza-voice-mode', prompt.voice);
+      } catch { /* opens on its defaults */ }
+    }
+    setActiveTab(prompt.tab);
+  };
+
   const tip = (
-    <button type="button" className="tday-row tday-tip" style={at(4)} onClick={() => setActiveTab(prompt.tab)}>
+    <button type="button" className="tday-row tday-tip" style={at(4)} onClick={openTip}>
       <span className="tday-row-text"><small>Two minutes only?</small><b>{prompt.text}</b></span>
       <Chev />
     </button>

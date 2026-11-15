@@ -483,7 +483,7 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
             </span>
           )}
           <span className="cdock-sub readout">
-            {slots.length === 0 ? 'Add chords from any chord, or start from a template' : `Loop · ${tempo} bpm · ${bars} bar${bars === 1 ? '' : 's'}`}
+            {slots.length === 0 ? "Empty · tap a chord's + to add it" : `Loop · ${tempo} bpm · ${bars} bar${bars === 1 ? '' : 's'}`}
           </span>
         </button>
         {running && (
@@ -491,17 +491,16 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
             <IconStop size={13} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
           </button>
         )}
-        <button
+        {slots.length > 0 && <button
           type="button"
           className="cdock-play"
           onClick={moving ? pause : phase === 'paused' ? resume : start}
-          disabled={slots.length === 0}
           aria-label={moving ? 'Pause' : phase === 'paused' ? 'Resume' : 'Play the loop'}
         >
           {moving
             ? <IconPause size={16} fill="currentColor" strokeWidth={1} aria-hidden="true" />
             : <IconPlay size={16} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />}
-        </button>
+        </button>}
       </div>
     </div>,
     dock

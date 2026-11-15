@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GUITAR_STRINGS, midiToNoteName } from '../utils/musicTheory';
 import { useNotePress } from '../hooks/useNotePress';
 
@@ -90,6 +90,18 @@ const FretboardComponent: React.FC<FretboardProps> = ({
     return Number.isFinite(midi) ? midi : null;
   };
 
+  // The neck always opens at the nut, with the open strings in view. Scroll
+  // snapping could otherwise settle it a fret along on first layout.
+  const neckRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const neck = neckRef.current;
+    if (!neck) return;
+    neck.scrollLeft = 0;
+    // Once more after fonts and layout settle, which is when snapping moved it.
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => { neck.scrollLeft = 0; }));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   // Dragging across the strings strums them. Mouse and pen only: on a touch
   // screen the neck is wider than the display and a horizontal drag has to
   // stay available for scrolling it, which is worth more than the gesture.
@@ -169,6 +181,7 @@ const FretboardComponent: React.FC<FretboardProps> = ({
       <p className="fretboard-more">Swipe the neck for frets 7 to 12 →</p>
 
       <div
+        ref={neckRef}
         className="fretboard-container"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

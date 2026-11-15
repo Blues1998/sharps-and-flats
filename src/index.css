@@ -46,6 +46,7 @@ h1, h2, h3, h4, .lab-title {
   color-scheme: dark;
   color: #F1F0EC;
   background-color: #111214;
+  --page-bg: #111214;
 
   /* Flat. A gradient ground is the tell of a dashboard template; an
      instrument panel is one matte colour and lets the content sit on it. */
@@ -137,6 +138,7 @@ h1, h2, h3, h4, .lab-title {
   color-scheme: light;
   color: #17181A;
   background-color: #FAFAF8;
+  --page-bg: #FAFAF8;
 
   --bg-gradient: none;
   --panel-bg: #FFFFFF;
@@ -1449,10 +1451,13 @@ html {
    column pins in place while scrolling so you always know which string
    you're looking at. */
 @media (max-width: 640px) {
+  /* No left padding: the pinned string names sit flush against the frame,
+     so nothing scrolls past them on the left. */
   .fretboard-container {
-    padding: 0.8rem 0.4rem;
+    padding: 0.8rem 0.4rem 0.8rem 0;
     scroll-snap-type: x proximity;
   }
+  .fretboard-strings-container { scroll-snap-align: start; }
 
   .fretboard-strings-container {
     min-width: 560px;
@@ -1466,14 +1471,16 @@ html {
     height: 32px;
   }
 
+  /* Pinned above the frets that slide under it (the markers sit at z 10), with
+     a shadow edge so the frets read as going underneath, not through. */
   .nut-cell {
     flex-basis: 44px;
     width: 44px;
     position: sticky;
     left: 0;
-    z-index: 6;
+    z-index: 20;
     background: #1C1D20;
-    scroll-snap-align: start;
+    box-shadow: 8px 0 10px -6px rgba(0, 0, 0, 0.75);
   }
 
   .guitar-note-marker {
@@ -1487,9 +1494,15 @@ html {
     height: 9px;
   }
 
+  /* The ruler's 0 is pinned with the strings' names, so the numbers beside
+     it stay under their own frets while the neck scrolls. */
   .fret-ruler-nut {
     flex-basis: 44px;
     width: 44px;
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    background: #1C1D20;
   }
 
   .fret-ruler-cell,
@@ -7286,6 +7299,18 @@ button.progression-chord:hover {
 @media (max-width: 1000px) {
   .cb-dock {
     bottom: calc(var(--mtabs-h, 64px) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+  /* The gap between the dock and the tab bar is filled with the page's own
+     colour, so the list scrolling underneath does not show through it. */
+  .cb-dock::after {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    right: -1rem;
+    top: 60%;
+    height: calc(40% + 0.5rem + 1px);
+    background: var(--page-bg, #111214);
+    z-index: -1;
   }
 }
 
@@ -14064,6 +14089,7 @@ a.btn {
    greys warmed toward tobacco brown, the colours of a sunburst top. */
 :root[data-theme='dark'][data-finish='sunburst'] {
   background-color: #14100C;
+  --page-bg: #14100C;
   --panel-bg: #1B1611;
   --panel-border: #30271E;
   --panel-border-hover: #403427;
@@ -14094,6 +14120,7 @@ a.btn {
 
 :root[data-theme='light'][data-finish='sunburst'] {
   background-color: #F5EEE2;
+  --page-bg: #F5EEE2;
   --panel-bg: #FFFCF6;
   --panel-border: #E8DDCB;
   --panel-border-hover: #D8C9B2;
@@ -15928,3 +15955,7 @@ a.btn {
 .csheet-prove.is-passed b { color: var(--success); }
 .csheet-prove.is-listening { border-color: var(--primary); }
 .csheet-prove .btn { flex: none; }
+
+/* Play along: the end of a play-through, and the lap count while looping. */
+.song-player-go.is-done { justify-content: center; background: var(--surface-2); color: var(--text-secondary); cursor: default; }
+.song-player-lap { margin-left: auto; align-self: center; font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
