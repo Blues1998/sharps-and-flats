@@ -12,12 +12,14 @@
 // Neither plays a chime on a hit. The phone's own sound would reach the mic,
 // and a riff often repeats the note just played.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ExProps } from './LessonPlayer';
 import { Player } from './Player';
 import { OPEN_MIDI, STRING_NAME, riffBeats, riffMidi } from './riff';
 import type { RiffNote } from './riff';
-import { appSounding, audioNow, startClicks } from './sound';
+import { appSounding } from './sound';
+import { Stage } from './Stage';
+import type { StageResult } from './Stage';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { audio } from '../utils/audio';
 import { feel } from '../utils/haptics';
@@ -35,15 +37,22 @@ interface BoardProps {
   /** What to draw on a fret, keyed "string-fret". */
   dots: Map<string, Dot>;
   onTap: (st: number, f: number) => void;
+  /** A held fret let go: lets a long note be held on screen. */
+  onRelease?: () => void;
   flash: { st: number; f: number; k: number } | null;
+  /** Drawing width and row height, for a wider board on the landscape stage. */
+  width?: number;
+  row?: number;
+  /** A colour per string for the lit frets. */
+  tint?: (st: number) => string;
 }
 
-const Board: React.FC<BoardProps> = ({ strings, from, to, dots, onTap, flash }) => {
+export const Board: React.FC<BoardProps> = ({ strings, from, to, dots, onTap, onRelease, flash, width, row, tint }) => {
   const cols = to - from + 1;
-  const W = 352;
+  const W = width ?? 352;
   const left = 18;
   const cw = (W - left - 4) / cols;
-  const rowH = strings.length === 1 ? 46 : 30;
+  const rowH = row ?? (strings.length === 1 ? 46 : 30);
   const top = 10;
   const H = top * 2 + rowH * strings.length + 16;
   const x = (f: number) => left + (f - from) * cw + cw / 2;
@@ -74,7 +83,9 @@ const Board: React.FC<BoardProps> = ({ strings, from, to, dots, onTap, flash }) 
         const d = dots.get(`${st}-${f}`);
         const lit = flash && flash.st === st && flash.f === f;
         return (
-          <g key={`${st}-${f}`} className="lp-board-cell" onPointerDown={() => onTap(st, f)}>
+          <g key={`${st}-${f}`} className="lp-board-cell" style={tint ? { ['--tint' as string]: tint(st) } as React.CSSProperties : undefined}
+            onPointerDown={e => { (e.target as Element).releasePointerCapture?.(e.pointerId); onTap(st, f); }}
+            onPointerUp={onRelease} onPointerLeave={onRelease} onPointerCancel={onRelease}>
             <rect x={left + c * cw} y={top + i * rowH} width={cw} height={rowH} fill="transparent" />
             {d && d !== 'next' && <circle className={`lp-board-dot is-${d}`} cx={x(f)} cy={y(i)} r={Math.min(9, cw / 2.6)} />}
             {d === 'next' && <circle className="lp-board-next" cx={x(f)} cy={y(i)} r={Math.min(11, cw / 2.2)} />}
@@ -124,7 +135,6 @@ export const Explore: React.FC<ExProps<'explore'> & { onNext: () => void }> = ({
 // ---- Riff --------------------------------------------------------------------------
 
 type Mark = 'hit' | 'miss' | undefined;
-const COUNT_IN = 4;
 const PPB = 44; // pixels per beat
 const LEAD = 64; // where the play line sits
 /** Once someone plays on screen, the next part of the lesson starts that way too. */
@@ -134,25 +144,35 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
   const mic = useMicPitch('instrument');
   const { start, stop, lastPluck } = mic;
   const notes = ex.notes;
-  const beat = 60 / ex.bpm;
   const starts = useMemo(() => { let t = 0; return notes.map(nt => { const s0 = t; t += nt[2]; return s0; }); }, [notes]);
   const total = riffBeats(notes);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [at, setAt] = useState(0);
   const [slips, setSlips] = useState(0);
-  const [t0, setT0] = useState<number | null>(null);
   const strip = useRef<SVGSVGElement>(null);
   // No guitar to hand: the notes are tapped on a fretboard on screen instead.
   const [screen, setScreenState] = useState(preferScreen);
   const setScreen = (on: boolean) => { preferScreen = on; setScreenState(on); };
   const [flash, setFlash] = useState<{ st: number; f: number; k: number } | null>(null);
-  const resRef = useRef<Mark[]>([]);
 
+  // The in-time take runs on the stage, which has its own mic.
+  const [staged, setStaged] = useState(false);
   useEffect(() => {
-    if (screen) { stop(); return; }
+    if (screen || ex.time) { stop(); return; }
     void start();
     return () => stop();
-  }, [screen, start, stop]);
+  }, [screen, start, stop, ex.time]);
+
+  const onStage = (r: StageResult | null) => {
+    setStaged(false);
+    if (!r) return;
+    const need = ex.need ?? 0.7;
+    const how = screen ? ' Played on screen.' : '';
+    const said = `${r.hits + r.short} of ${r.total} notes in time${r.short ? `, ${r.short} cut short` : ''}.`;
+    onVerdict(r.score >= need
+      ? { ok: true, score: r.score, explain: said + how }
+      : { ok: false, score: r.score, answer: `${Math.round(r.score * 100)}%, ${Math.round(need * 100)}% needed`, explain: `${said} Let the long notes ring for their whole bar.${how}` });
+  };
 
   // Readings while the app itself sounds (the count-in, the example) never count.
   const [quiet, setQuiet] = useState(appSounding);
@@ -217,93 +237,15 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
     }
   };
 
-  /** When a note may be played: from just before its beat to just before the next note. */
-  const windowOf = (i: number, t: number) => {
-    const s0 = t + (COUNT_IN + starts[i]) * beat;
-    const len = notes[i][2] * beat;
-    const close = i + 1 < notes.length ? Math.min(s0 + Math.min(len, 0.55) + 0.08, s0 + len - 0.06) : s0 + Math.min(len, 0.55) + 0.08;
-    return { open: s0 - 0.16, close };
-  };
-
   /** A fret tapped on screen: it sounds, and counts if it is the note due. */
   const tapScreen = (st: number, f: number) => {
     const midi = OPEN_MIDI[st] + f;
     audio.playMidi(midi, 1.2);
     feel('select');
     setFlash({ st, f, k: Date.now() });
-    if (verdict) return;
-    if (!ex.time) {
-      if (at >= notes.length) return;
-      if (midi === riffMidi(notes[at])) landed(); else setSlips(n => n + 1);
-      return;
-    }
-    if (t0 === null) return;
-    const now = audioNow();
-    const res = resRef.current;
-    for (let i = 0; i < notes.length; i++) {
-      if (res[i]) continue;
-      const w = windowOf(i, t0);
-      if (now < w.open) break;
-      if (now <= w.close && midi === riffMidi(notes[i])) { res[i] = 'hit'; break; }
-    }
+    if (verdict || at >= notes.length) return;
+    if (midi === riffMidi(notes[at])) landed(); else setSlips(n => n + 1);
   };
-
-  // ---- Time mode: a click, a moving strip, a window per note. ----
-  const begin = useCallback(() => {
-    feel('tap');
-    setMarks([]);
-    const t = startClicks(ex.bpm, COUNT_IN + Math.ceil(total) + 1, COUNT_IN);
-    setT0(t);
-    if (import.meta.env.DEV) Object.assign(window, { __riff: { t0: t, beat: 60 / ex.bpm, countIn: COUNT_IN, starts, now: audioNow } });
-  }, [ex.bpm, total, starts]);
-
-  useEffect(() => {
-    if (!ex.time || t0 === null || verdict) return;
-    let raf = 0;
-    const res: Mark[] = [];
-    resRef.current = res;
-    // Audio clock to performance clock, for comparing with pluck times.
-    const skew = performance.now() / 1000 - audioNow();
-    let shown = '';
-    // Each pluck counts for one note only: a repeated note needs its own.
-    let usedPluck = 0;
-    const loop = () => {
-      const now = audioNow();
-      const beatsIn = (now - t0) / beat - COUNT_IN;
-      if (strip.current) strip.current.style.transform = `translateX(${LEAD - beatsIn * PPB}px)`;
-      // On screen, taps mark their own notes; the mic is off.
-      const cur = screenRef.current ? null : pRef.current;
-      for (let i = 0; i < notes.length; i++) {
-        if (res[i]) continue;
-        // A note's window ends before the next note starts, so a missed note
-        // can't borrow the next pluck.
-        const { open, close } = windowOf(i, t0);
-        if (now < open) break;
-        const want = pcOf(riffMidi(notes[i]));
-        const same = i > 0 && pcOf(riffMidi(notes[i - 1])) === want;
-        const pluck = lastPluck() / 1000 - skew;
-        const plucked = !same || (pluck >= open && pluck > usedPluck);
-        if (cur && pcOf(cur.midi) === want && plucked) { res[i] = 'hit'; usedPluck = Math.max(usedPluck, pluck); }
-        else if (now > close) res[i] = 'miss';
-      }
-      const key = res.map(r => (r === 'hit' ? 'h' : r === 'miss' ? 'm' : '.')).join('');
-      if (key !== shown) { shown = key; setMarks([...res]); if (import.meta.env.DEV) Object.assign(window, { __riffKey: key }); }
-      if (beatsIn > total + 0.6) {
-        stop();
-        const hits = res.filter(r => r === 'hit').length;
-        const score = hits / notes.length;
-        const need = ex.need ?? 0.7;
-        onVerdict(score >= need
-          ? { ok: true, score, explain: `${hits} of ${notes.length} notes in time.${screenRef.current ? ' Played on screen.' : ''}` }
-          : { ok: false, score, answer: `${hits} of ${notes.length} in time, ${Math.ceil(need * notes.length)} needed`, explain: 'Count the four clicks, then play as the click sounds. Slow and steady beats fast and early.' });
-        return;
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t0, verdict]);
 
   // In wait mode the strip steps to the next note.
   useEffect(() => {
@@ -316,20 +258,18 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
     const swap = screen
       ? <button type="button" className="lp-btn is-quiet" onClick={() => { feel('tap'); setScreen(false); }} data-feel="off">Back to my guitar</button>
       : <button type="button" className="lp-btn is-quiet" onClick={() => { feel('tap'); setScreen(true); }} data-feel="off">No guitar? Play on screen</button>;
-    if (ex.time && t0 === null) {
-      setFoot(<><button type="button" className="lp-btn" onClick={begin} data-feel="off">Start the click</button>{swap}</>);
-    } else if (ex.time) {
-      setFoot(<span className="lp-hint">{screen ? 'Tap the lit fret on the beat' : 'Playing along'}</span>);
+    if (ex.time) {
+      setFoot(<><button type="button" className="lp-btn" onClick={() => { feel('tap'); setStaged(true); }} data-feel="off">{screen ? 'Play along on screen' : 'Play along'}</button>{swap}</>);
     } else {
       setFoot(swap);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setFoot, verdict, ex.time, t0, begin, onSkip, stop, screen]);
+  }, [setFoot, verdict, ex.time, onSkip, stop, screen]);
 
   const W = Math.ceil(total * PPB + LEAD + 80);
   const rowY = (st: number) => 12 + (st - 1) * 15;
   const H = 12 * 2 + 15 * 5;
-  const cur = ex.time ? (() => { for (let i = 0; i < notes.length; i++) if (!marks[i]) return i; return notes.length; })() : at;
+  const cur = at;
   const now = notes[cur] as RiffNote | undefined;
   const heard = p ? noteName(p.midi) : null;
   const want = now ? pcOf(riffMidi(now)) : null;
@@ -359,7 +299,11 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
           <i className="lp-tab-now" style={{ left: LEAD }} aria-hidden="true" />
         </div>
       </div>
-      {screen && !verdict && (() => {
+      {ex.time && !verdict && (
+        <p className="lp-screen-say">Turn your phone sideways. The music starts when you play the first note, and long bars mean let the note ring.</p>
+      )}
+      {staged && <Stage notes={notes} bpm={ex.bpm} title={ex.prompt} screen={screen} onDone={onStage} />}
+      {screen && !ex.time && !verdict && (() => {
         const frets = notes.map(n => n[1]);
         const lo = Math.min(...frets);
         const from = lo <= 1 ? 0 : lo - 1;
@@ -371,21 +315,17 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
         return (
           <>
             <Board strings={[1, 2, 3, 4, 5, 6]} from={from} to={to} dots={dots} onTap={tapScreen} flash={flash} />
-            <p className="lp-screen-say">{ex.time
-              ? (t0 === null ? 'Start the click, then tap each lit fret as its note reaches the line.' : `${marks.filter(m => m === 'hit').length} of ${notes.length} in time`)
-              : now ? `Tap the lit fret: ${now[1] === 0 ? `open ${STRING_NAME[now[0]]}` : `${STRING_NAME[now[0]]} string, fret ${now[1]}`}.` : ''}</p>
+            <p className="lp-screen-say">{now ? `Tap the lit fret: ${now[1] === 0 ? `open ${STRING_NAME[now[0]]}` : `${STRING_NAME[now[0]]} string, fret ${now[1]}`}.` : ''}</p>
           </>
         );
       })()}
-      {now && !verdict && !screen && (
+      {now && !verdict && !screen && !ex.time && (
         <div className={`lp-ear${mic.isActive && !quiet ? ' is-on' : ''}`}>
           <div className="lp-ear-note"><small>{mic.error ? 'Mic off' : !mic.isActive ? 'Starting the mic' : 'Next'}</small><b>{noteName(riffMidi(now))}</b></div>
           <p className="lp-ear-say">
             <b>{now[1] === 0 ? `Open ${STRING_NAME[now[0]]}` : `${STRING_NAME[now[0]]} string, fret ${now[1]}`}</b>
             <br />
             {mic.error ? 'Allow the mic in your phone\'s settings, or skip for now.'
-              : ex.time && t0 === null ? 'Start the click when you are ready.'
-              : ex.time ? `${marks.filter(m => m === 'hit').length} of ${notes.length} in time`
               : !heard || want === null ? 'Play when you are ready.'
               : pcOf(p!.midi) === want ? 'That is it.'
               : noteMiss(pcOf(p!.midi), want)}

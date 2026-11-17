@@ -18,6 +18,7 @@
     "@capacitor/core": "^8.6.2",
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/screen-orientation": "^8.0.2",
     "@capacitor/share": "^8.0.3",
     "@coderline/alphatab": "^1.8.4",
     "@coderline/alphatab-vite": "^1.8.4",

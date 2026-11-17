@@ -9,3 +9,6 @@ export const STRING_NAME = ['', 'high E', 'B', 'G', 'D', 'A', 'low E'];
 
 export const riffMidi = ([st, f]: RiffNote | [number, number]): number => OPEN_MIDI[st] + f;
 export const riffBeats = (notes: RiffNote[]): number => notes.reduce((t, n) => t + n[2], 0);
+
+/** One colour per string, thin to thick: the tab bar and the fret to press share it. */
+export const STRING_TINT = ['', '#f2c14e', '#6fb3ff', '#7fd38b', '#ff8c5a', '#c08cff', '#ff6f91'];
