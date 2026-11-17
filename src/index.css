@@ -16980,3 +16980,15 @@ a.btn {
 /* A unit's first fret: its label sits under the chip. */
 .np-row.has-chip .np-side { top: 52px; transform: none; }
 .neckpath .np-board { z-index: 1; }
+
+/* ===== Me: three tabs ====================================================== */
+.me-tabs { margin: 0 0 14px; }
+.tday-week-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tday-xp { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.tday-xp > small { font-size: 0.72rem; color: var(--text-muted); }
+.me-about .btn { margin-left: auto; }
+.me-settings .me-licences { margin: 6px 0 0; }
+.me .me-progress { display: flex; flex-direction: column; gap: 12px; }
+.me .me-progress > * { margin: 0; order: 0 !important; }
+.me .me-xp { margin: 4px 0 0; text-align: center; }
+.trophy-hint { margin: 10px 0 0; font-size: 0.78rem; color: var(--text-muted); text-align: center; }

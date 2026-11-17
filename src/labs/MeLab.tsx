@@ -1,7 +1,7 @@
 import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
-import { TrophyShelf } from '../components/TrophyShelf';
+import { RecordsCard, TrophyShelf } from '../components/TrophyShelf';
 import { StreakStrip } from '../components/StreakStrip';
 import { WeekPanel } from '../components/WeekPanel';
 import { weekRecap } from '../utils/weekly';
@@ -10,6 +10,7 @@ import { exportLibrary, getSongs, importLibrary, isoDate, practiceStats } from '
 import { saveTextFile } from '../utils/saveFile';
 import { CAN_REMIND, SLOTS, getReminders, reminderStats, setReminders, subscribeReminders } from '../utils/reminders';
 import { totalXp } from '../utils/xp';
+import { peekShelfPick } from '../utils/feats';
 import { GOAL_CHOICES, getGoal, setGoal } from '../utils/practiceClock';
 import { BrandMark, PRIVACY_URL } from '../components/Brand';
 import { audio } from '../utils/audio';
@@ -23,9 +24,9 @@ import type { Theme } from '../hooks/useTheme';
 import { restartOnboarding, setProfile, useProfile, type ProfileInstrument } from '../utils/profile';
 import { prettyNote, setVoice, useVoice, type Notation } from '../utils/voice';
 
-// You: your account, and the handful of settings that shape the rest of the
-// app. On a phone this is also where the theme switch and sign-in live, now
-// that the tab bar has no room for a "More".
+// You, in three tabs, one per job: how you are doing (streak, week, bests),
+// what you have earned (picks), and the settings that shape the rest of the
+// app. Each tab is short; nothing is said twice.
 
 // Everything the app ships that someone else made, and the terms it came on.
 const CREDITS: { name: string; what: string; licence: string }[] = [
@@ -77,17 +78,11 @@ const YourData: React.FC = () => {
     <section className="glass-panel me-card me-settings">
       <h3 className="me-heading">Your data</h3>
       <div className="me-row">
-        <span className="me-row-label">
-          Back up
-          <span className="me-row-sub">Save your songs and progress to a file</span>
-        </span>
+        <span className="me-row-label">Back up to a file</span>
         <button type="button" className="btn" onClick={() => void backUp()} disabled={count === 0}>Save file</button>
       </div>
       <div className="me-row">
-        <span className="me-row-label">
-          Restore
-          <span className="me-row-sub">Load a backup from another phone</span>
-        </span>
+        <span className="me-row-label">Restore from a file</span>
         <button type="button" className="btn" onClick={() => fileInput.current?.click()} disabled={!ready}>Open file</button>
         <input
           ref={fileInput}
@@ -100,6 +95,10 @@ const YourData: React.FC = () => {
             if (file) void restore(file);
           }}
         />
+      </div>
+      <div className="me-row">
+        <span className="me-row-label">Welcome setup</span>
+        <button type="button" className="btn" onClick={restartOnboarding}>Run again</button>
       </div>
       {notice && <p className="me-notice" role="status">{notice}</p>}
     </section>
@@ -118,7 +117,7 @@ const Reminders: React.FC = () => {
       <div className="me-row">
         <span className="me-row-label">
           Practice reminder
-          <span className="me-row-sub">{r.on ? (stats.sent ? `${stats.sent} sent · ${stats.opened} opened` : 'One a day, only if you have not played') : 'Off'}</span>
+          {r.on && stats.sent > 0 && <span className="me-row-sub">{stats.sent} sent · {stats.opened} opened</span>}
         </span>
         <Segmented<boolean>
           value={r.on}
@@ -130,10 +129,7 @@ const Reminders: React.FC = () => {
       {r.on && (
         <>
           <div className="me-row">
-            <span className="me-row-label">
-              When
-              <span className="me-row-sub">Auto learns when you usually play</span>
-            </span>
+            <span className="me-row-label">When</span>
             <select
               className="select-field me-select"
               value={r.time ?? 'auto'}
@@ -144,10 +140,7 @@ const Reminders: React.FC = () => {
             </select>
           </div>
           <div className="me-row">
-            <span className="me-row-label">
-              Streak warning
-              <span className="me-row-sub">At night, if a 3+ day streak is about to end</span>
-            </span>
+            <span className="me-row-label">Streak warning</span>
             <Segmented<boolean>
               value={r.warn}
               onChange={warn => void setReminders({ warn })}
@@ -199,167 +192,158 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
 
   const synced = lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
 
+  type MeTab = 'progress' | 'trophies' | 'settings';
+  // Opens on Progress (the top bar on Today lands here), or on Trophies when a pick sent you.
+  const [tab, setTab] = useState<MeTab>(() => (peekShelfPick() ? 'trophies' : 'progress'));
+  const xp = totalXp();
+
   return (
     <div className="lab-narrow me">
       <div className="lab-header">
         <h2 className="lab-title"><LabIcon tab="me" />Me</h2>
       </div>
 
-      {/* Your streak and week: the top bar on Today opens here. */}
-      <div className="me-progress" id="me-streak">
-        <StreakStrip />
-        <WeekPanel recap={weekRecap()} />
+      <div className="me-tabs">
+      <Segmented<MeTab>
+        full
+        value={tab}
+        onChange={setTab}
+        options={[{ value: 'progress', label: 'Progress' }, { value: 'trophies', label: 'Trophies' }, { value: 'settings', label: 'Settings' }]}
+      />
       </div>
 
-      {ACCOUNTS_ENABLED && <section className="glass-panel me-card">
-        <div className="me-account">
-          <span className={`me-avatar${user ? ' is-in' : ''}`} aria-hidden="true">
-            {user?.email ? user.email.charAt(0).toUpperCase() : '?'}
-          </span>
-          <div className="me-account-text">
-            <span className="me-account-name">{user ? user.email : 'Not signed in'}</span>
-            <span className="me-account-sub">
-              {user
-                ? syncStatus === 'syncing' ? 'Syncing…' : syncStatus === 'error' ? 'Sync failed. Retrying.' : synced ? `Backed up at ${synced}` : 'Backed up'
-                : 'Songs are saved on this device only'}
-            </span>
-          </div>
+      {tab === 'progress' && (
+        <div className="me-progress" id="me-streak">
+          <StreakStrip />
+          <WeekPanel recap={weekRecap()} />
+          <RecordsCard />
+          {xp > 0 && <p className="me-xp readout">{xp} XP in all</p>}
         </div>
-        <button type="button" className={`btn${user ? '' : ' btn-primary'}`} onClick={openAuthModal}>
-          {user ? 'Account & sync' : 'Sign in to back up'}
-        </button>
-      </section>}
+      )}
 
-      <TrophyShelf />
-      {totalXp() > 0 && <p className="me-xp readout">{totalXp()} XP earned in all</p>}
+      {tab === 'trophies' && <TrophyShelf />}
 
-      <Reminders />
-
-      <section className="glass-panel me-card me-settings">
-        <h3 className="me-heading">Preferences</h3>
-
-        <div className="me-row">
-          <span className="me-row-label">Instrument</span>
-          <Segmented<ProfileInstrument>
-            value={profile.instrument}
-            onChange={instrument => setProfile({ instrument })}
-            options={[{ value: 'guitar', label: 'Guitar' }, { value: 'ukulele', label: 'Ukulele' }]}
-            size="sm"
-          />
-        </div>
-
-        <div className="me-row">
-          <span className="me-row-label">
-            Daily goal
-            <span className="me-row-sub">Counted while you play, sing or drill</span>
-          </span>
-          <Segmented<number>
-            value={goal}
-            onChange={g => { setGoal(g); setGoalState(g); }}
-            options={GOAL_CHOICES.map(g => ({ value: g, label: `${g} min` }))}
-            size="sm"
-          />
-        </div>
-
-        <div className="me-row">
-          <span className="me-row-label">Note names</span>
-          <Segmented<Notation>
-            value={voice.notation}
-            onChange={notation => setVoice({ notation })}
-            options={[{ value: 'names', label: 'C D E' }, { value: 'sargam', label: 'Sa Re Ga' }]}
-            size="sm"
-          />
-        </div>
-
-        <div className="me-row">
-          <span className="me-row-label">Theme</span>
-          <Segmented<Theme>
-            value={theme}
-            onChange={next => { if (next !== theme) toggleTheme(); }}
-            options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]}
-            size="sm"
-          />
-        </div>
-
-        {sunburst.earned && (
-          <div className="me-row">
-            <span className="me-row-label">
-              Finish
-              <span className="me-row-sub">Earned with a 7 day streak</span>
-            </span>
-            <Segmented<boolean>
-              value={sunburst.on}
-              onChange={setSunburst}
-              options={[{ value: false, label: 'Classic' }, { value: true, label: 'Sunburst' }]}
-              size="sm"
-            />
-          </div>
-        )}
-
-        {HAS_HAPTICS && (
-          <div className="me-row">
-            <span className="me-row-label">Haptics</span>
-            <Segmented<boolean>
-              value={haptics}
-              onChange={setHaptics}
-              options={[{ value: true, label: 'On' }, { value: false, label: 'Off' }]}
-              size="sm"
-            />
-          </div>
-        )}
-
-        <div className="me-row">
-          <span className="me-row-label">
-            Your voice
-            <span className="me-row-sub">
-              {voice.range ? `${prettyNote(voice.range.low)} to ${prettyNote(voice.range.high)}` : 'Not measured'}
-            </span>
-          </span>
-          <button type="button" className="btn" onClick={toVoiceRange}>{voice.range ? 'Measure again' : 'Find my range'}</button>
-        </div>
-      </section>
-
-      <YourData />
-
-      <section className="glass-panel me-card">
-        <div className="me-account-text">
-          <span className="me-account-name">Welcome setup</span>
-          <span className="me-account-sub">Instrument, level and songs</span>
-        </div>
-        <button type="button" className="btn" onClick={restartOnboarding}>Run it again</button>
-      </section>
-
-      <section className="glass-panel me-card me-settings">
-        <h3 className="me-heading">About</h3>
-        <div className="me-row me-about">
-          <PlayableMark />
-          <span className="me-row-label">
-            Sharps&amp;Flats
-            <span className="me-row-sub">Version {__APP_VERSION__}</span>
-          </span>
-        </div>
-        <div className="me-row">
-          <span className="me-row-label">
-            Privacy
-            <span className="me-row-sub">Everything stays on this device</span>
-          </span>
-          <a className="btn" href={PRIVACY_URL} target="_blank" rel="noreferrer">Read policy</a>
-        </div>
-      </section>
-
-      {/* Owed to the people whose work ships inside the app, and kept out of
-          the way: one small line under everything else. */}
-      <details className="me-licences">
-        <summary>Open-source licences</summary>
-        <dl>
-          {CREDITS.map(c => (
-            <div key={c.name}>
-              <dt>{c.name}</dt>
-              <dd>{c.what}. {c.licence}.</dd>
+      {tab === 'settings' && (
+        <>
+          {ACCOUNTS_ENABLED && <section className="glass-panel me-card">
+            <div className="me-account">
+              <span className={`me-avatar${user ? ' is-in' : ''}`} aria-hidden="true">
+                {user?.email ? user.email.charAt(0).toUpperCase() : '?'}
+              </span>
+              <div className="me-account-text">
+                <span className="me-account-name">{user ? user.email : 'Not signed in'}</span>
+                <span className="me-account-sub">
+                  {user
+                    ? syncStatus === 'syncing' ? 'Syncing…' : syncStatus === 'error' ? 'Sync failed. Retrying.' : synced ? `Backed up at ${synced}` : 'Backed up'
+                    : 'Songs are saved on this device only'}
+                </span>
+              </div>
             </div>
-          ))}
-        </dl>
-      </details>
+            <button type="button" className={`btn${user ? '' : ' btn-primary'}`} onClick={openAuthModal}>
+              {user ? 'Account & sync' : 'Sign in to back up'}
+            </button>
+          </section>}
+
+          <section className="glass-panel me-card me-settings">
+            <h3 className="me-heading">Practice</h3>
+            <div className="me-row">
+              <span className="me-row-label">Instrument</span>
+              <Segmented<ProfileInstrument>
+                value={profile.instrument}
+                onChange={instrument => setProfile({ instrument })}
+                options={[{ value: 'guitar', label: 'Guitar' }, { value: 'ukulele', label: 'Ukulele' }]}
+                size="sm"
+              />
+            </div>
+            <div className="me-row">
+              <span className="me-row-label">Daily goal</span>
+              <Segmented<number>
+                value={goal}
+                onChange={g => { setGoal(g); setGoalState(g); }}
+                options={GOAL_CHOICES.map(g => ({ value: g, label: `${g} min` }))}
+                size="sm"
+              />
+            </div>
+            <div className="me-row">
+              <span className="me-row-label">Note names</span>
+              <Segmented<Notation>
+                value={voice.notation}
+                onChange={notation => setVoice({ notation })}
+                options={[{ value: 'names', label: 'C D E' }, { value: 'sargam', label: 'Sa Re Ga' }]}
+                size="sm"
+              />
+            </div>
+            <div className="me-row">
+              <span className="me-row-label">
+                Your voice
+                <span className="me-row-sub">{voice.range ? `${prettyNote(voice.range.low)} to ${prettyNote(voice.range.high)}` : 'Not measured'}</span>
+              </span>
+              <button type="button" className="btn" onClick={toVoiceRange}>{voice.range ? 'Measure' : 'Find range'}</button>
+            </div>
+          </section>
+
+          <Reminders />
+
+          <section className="glass-panel me-card me-settings">
+            <h3 className="me-heading">Look and feel</h3>
+            <div className="me-row">
+              <span className="me-row-label">Theme</span>
+              <Segmented<Theme>
+                value={theme}
+                onChange={next => { if (next !== theme) toggleTheme(); }}
+                options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]}
+                size="sm"
+              />
+            </div>
+            {sunburst.earned && (
+              <div className="me-row">
+                <span className="me-row-label">Finish</span>
+                <Segmented<boolean>
+                  value={sunburst.on}
+                  onChange={setSunburst}
+                  options={[{ value: false, label: 'Classic' }, { value: true, label: 'Sunburst' }]}
+                  size="sm"
+                />
+              </div>
+            )}
+            {HAS_HAPTICS && (
+              <div className="me-row">
+                <span className="me-row-label">Haptics</span>
+                <Segmented<boolean>
+                  value={haptics}
+                  onChange={setHaptics}
+                  options={[{ value: true, label: 'On' }, { value: false, label: 'Off' }]}
+                  size="sm"
+                />
+              </div>
+            )}
+          </section>
+
+          <YourData />
+
+          <section className="glass-panel me-card me-settings">
+            <div className="me-row me-about">
+              <PlayableMark />
+              <span className="me-row-label">
+                Sharps&amp;Flats
+                <span className="me-row-sub">Version {__APP_VERSION__}</span>
+              </span>
+              <a className="btn" href={PRIVACY_URL} target="_blank" rel="noreferrer">Privacy</a>
+            </div>
+            <details className="me-licences">
+              <summary>Open-source licences</summary>
+              <dl>
+                {CREDITS.map(c => (
+                  <div key={c.name}>
+                    <dt>{c.name}</dt>
+                    <dd>{c.what}. {c.licence}.</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          </section>
+        </>
+      )}
     </div>
   );
 };

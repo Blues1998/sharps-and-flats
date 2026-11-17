@@ -420,6 +420,8 @@ export function dismissAllUnlocks(): void {
 // Which pick the Trophies shelf should open on, when a badge sent you there.
 let shelfPick: string | null = null;
 export const showOnShelf = (id: string): void => { shelfPick = id; };
+/** Whether Me was opened to show a pick, without taking it. */
+export const peekShelfPick = (): boolean => shelfPick !== null;
 export function takeShelfPick(): string | null {
   const id = shelfPick;
   shelfPick = null;

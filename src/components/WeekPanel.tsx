@@ -1,3 +1,5 @@
+import { xpBetween, xpWeek } from '../utils/xp';
+import { shiftIso, today } from '../utils/library';
 import React from 'react';
 import type { WeekRecap } from '../utils/weekly';
 import { heldLabel } from '../utils/tempoLog';
@@ -21,6 +23,8 @@ const FLOOR = 20;
 const MIN_SHOWN = 0.09;
 
 export const WeekPanel: React.FC<{ recap: WeekRecap; style?: React.CSSProperties }> = ({ recap, style }) => {
+  const weekXp = xpWeek(shiftIso).reduce((a, d) => a + d.xp, 0);
+  const lastWeekXp = xpBetween(shiftIso(today(), -13), shiftIso(today(), -7));
   const top = Math.max(FLOOR, ...recap.days.map(day => day.minutes));
 
   const facts: React.ReactNode[] = [];
@@ -50,6 +54,12 @@ export const WeekPanel: React.FC<{ recap: WeekRecap; style?: React.CSSProperties
             {recap.minutes}<small>min</small>
           </div>
         </div>
+        {(weekXp > 0 || lastWeekXp > 0) && (
+          <div className="tday-xp" title="XP is earned for getting better: notes landed, answers right, scales climbed, records beaten.">
+            <span className="tday-big readout">{weekXp}<small>XP</small></span>
+            {lastWeekXp > 0 && <small>{weekXp >= lastWeekXp ? `Up on last week's ${lastWeekXp}` : `${lastWeekXp - weekXp} to match last week`}</small>}
+          </div>
+        )}
       </div>
 
       <div

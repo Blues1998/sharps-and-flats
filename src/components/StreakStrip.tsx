@@ -1,12 +1,10 @@
 import React, { useEffect, useReducer } from 'react';
-import { Pick } from './Pick';
 import { minutesPractisedToday, shiftIso, streakRepair, streakState, today } from '../utils/library';
-import { XP_EVENT, xpBetween, xpWeek } from '../utils/xp';
+import { XP_EVENT } from '../utils/xp';
 import { CLOCK_EVENT, getGoal } from '../utils/practiceClock';
 import { MAX_RESTS } from '../utils/streak';
-import { ROMAN, latestPick, showOnShelf, useFeats } from '../utils/feats';
+import { useFeats } from '../utils/feats';
 import { STORE_CHANGE_EVENT } from '../utils/db';
-import { go } from '../hooks/useRoute';
 import { MUSIC_FONT } from '../utils/musicFont';
 
 const Flame: React.FC<{ lit: boolean }> = ({ lit }) => (
@@ -43,16 +41,11 @@ export const StreakStrip: React.FC = () => {
   const pct = Math.min(1, mins / goal);
   const met = mins >= goal;
   const restYesterday = s.restDays.includes(shiftIso(today(), -1));
-  const pick = latestPick();
 
   const r = 15;
   const c = 2 * Math.PI * r;
 
   const repair = streakRepair();
-  const week = xpWeek(shiftIso);
-  const weekXp = week.reduce((a, d) => a + d.xp, 0);
-  const lastWeekXp = xpBetween(shiftIso(today(), -13), shiftIso(today(), -7));
-  const topXp = Math.max(1, ...week.map(d => d.xp));
 
   const line = repair
     ? `Play ${goal * 2} min today to repair your ${repair.lost}-day streak.`
@@ -90,29 +83,6 @@ export const StreakStrip: React.FC = () => {
       </div>
       <p className="streak-line">{line}</p>
 
-      {(weekXp > 0 || lastWeekXp > 0) && (
-        <div className="streak-xp" title="XP is earned for getting better: notes landed, answers right, scales climbed, records beaten.">
-          <span className="streak-xp-bars" aria-hidden="true">
-            {week.map(d => <i key={d.date} style={{ height: `${Math.max(8, (d.xp / topXp) * 100)}%` }} className={d.xp ? 'is-on' : ''} />)}
-          </span>
-          <span className="streak-xp-t">
-            <b className="readout">{weekXp} XP</b> this week
-            {lastWeekXp > 0 && <small>{weekXp >= lastWeekXp ? `Up on last week's ${lastWeekXp}` : `${lastWeekXp - weekXp} to match last week`}</small>}
-          </span>
-        </div>
-      )}
-
-      {pick && (
-        <button type="button" className="streak-pick" onClick={() => { showOnShelf(pick.id); go({ tab: 'me', songId: null }); }}>
-          <Pick tier={pick.tier || 1} glyph={pick.glyph} single={pick.tier === 0} className="streak-pick-img" />
-          <span className="streak-pick-t">
-            <small>Latest pick</small>
-            <b>{pick.name}{pick.tier ? ` ${ROMAN[pick.tier]}` : ''}</b>
-            {pick.next && <span>Next: {pick.next}</span>}
-          </span>
-          <svg className="tday-chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-        </button>
-      )}
     </section>
   );
 };

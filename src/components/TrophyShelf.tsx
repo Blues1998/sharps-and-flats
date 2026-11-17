@@ -15,17 +15,17 @@ export const TrophyShelf: React.FC = () => {
   useFeats();
   // Sent here from a badge: open on that pick and bring the shelf into view.
   const [sentFor] = useState(takeShelfPick);
-  const [open, setOpen] = useState<string>(() => TIERED.find(b => b.id === sentFor)?.id ?? TIERED[0].id);
+  // Nothing is open until you tap a pick (or arrive from one); tap it again to close.
+  const [open, setOpen] = useState<string | null>(() => TIERED.find(b => b.id === sentFor)?.id ?? null);
   const shelfRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (sentFor) shelfRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [sentFor]);
   const earned = TIERED.reduce((n, b) => n + Math.max(heldTier(b.id), tierOf(b)), 0) + ONE_OFFS.filter(o => heldTier(o.id) > 0).length;
   const total = TIERED.length * 5 + ONE_OFFS.length;
-  const sel = TIERED.find(b => b.id === open) ?? TIERED[0];
-  const selTier = Math.max(heldTier(sel.id), tierOf(sel));
-  const step = nextStep(sel);
-  const rows = recordRows();
+  const sel = TIERED.find(b => b.id === open) ?? null;
+  const selTier = sel ? Math.max(heldTier(sel.id), tierOf(sel)) : 0;
+  const step = sel ? nextStep(sel) : null;
 
   return (
     <section ref={shelfRef} id="trophies" className="glass-panel me-card trophies">
@@ -44,7 +44,7 @@ export const TrophyShelf: React.FC = () => {
               className={`trophy${b.id === open ? ' is-open' : ''}`}
               aria-pressed={b.id === open}
               aria-label={`${b.name}, ${t ? `tier ${ROMAN[t]}` : 'not earned yet'}`}
-              onClick={() => setOpen(b.id)}
+              onClick={() => setOpen(o => (o === b.id ? null : b.id))}
             >
               <Pick tier={t} glyph={b.glyph} className="trophy-pick" />
               <b>{b.name}</b>
@@ -56,7 +56,8 @@ export const TrophyShelf: React.FC = () => {
         })}
       </div>
 
-      <div className="trophy-detail" aria-live="polite">
+      {!sel && <p className="trophy-hint">Tap a pick to see its tiers.</p>}
+      {sel && <div className="trophy-detail" aria-live="polite">
         <h4>{sel.name}{selTier ? ` ${ROMAN[selTier]}` : ''}<span>{selTier ? `${MATERIALS[selTier]} pick` : 'Not earned yet'}</span></h4>
         <p>{sel.what} · {sel.page}</p>
         <div className="trophy-tiers">
@@ -68,7 +69,7 @@ export const TrophyShelf: React.FC = () => {
           ))}
         </div>
         <p className="trophy-next">{step ? `Next: ${step}` : 'Every tier earned.'}</p>
-      </div>
+      </div>}
 
       <div className="trophy-ones">
         {ONE_OFFS.map(o => {
@@ -82,7 +83,17 @@ export const TrophyShelf: React.FC = () => {
         })}
       </div>
 
-      <h3 className="me-heading trophies-recs-h">Personal records</h3>
+    </section>
+  );
+};
+
+/** Every personal best the app keeps, with where and when it was set. */
+export const RecordsCard: React.FC = () => {
+  useFeats();
+  const rows = recordRows();
+  return (
+    <section className="glass-panel me-card trophies">
+      <h3 className="me-heading">Personal records</h3>
       {rows.length ? (
         <div className="trophy-recs">
           {rows.map(r => (
@@ -93,7 +104,7 @@ export const TrophyShelf: React.FC = () => {
           ))}
         </div>
       ) : (
-        <p className="trophy-empty">Your bests land here the moment you set them: hold a note in the tuner to start.</p>
+        <p className="trophy-empty">Your bests land here the moment you set them.</p>
       )}
     </section>
   );
