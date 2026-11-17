@@ -16913,3 +16913,44 @@ a.btn {
 .np-stars > span.is-on { color: #f2c14e; }
 .np-card-stars > span.is-on { color: #f2c14e; }
 .np-card-meta { margin: 8px 0 0; font-size: 0.8rem; color: var(--text-muted); }
+
+/* ===== Units as sections of the neck =======================================
+   The neck stops at the end of each unit (a double bar, as a score ends a
+   section) and the next unit opens under a header with its number boxed like
+   a rehearsal mark. */
+.np-unit { all: unset; box-sizing: border-box; cursor: pointer; position: absolute; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+  border-radius: 16px; background: var(--surface-1); border: 1px solid var(--panel-border); box-shadow: 0 0 0 10px var(--page-bg); }
+.np-unit.is-first { position: relative; display: flex; height: 64px; margin: 0 0 14px; box-shadow: none; }
+.np-unit:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.np-unit:active { transform: scale(0.99); }
+.np-unit-mark { flex: none; display: grid; place-items: center; width: 34px; height: 34px; box-sizing: border-box; border: 2px solid currentColor; border-radius: 6px;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; color: var(--text-muted); }
+.np-unit-mark.is-8va { font-size: 0.72rem; font-style: italic; letter-spacing: -0.02em; }
+.np-unit.is-now .np-unit-mark { color: var(--primary); }
+.np-unit.is-done .np-unit-mark { color: #d9b26a; }
+.np-unit-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.np-unit-text b { font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; color: var(--text-primary); }
+.np-unit-text small { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-unit.is-now .np-unit-text small { color: var(--primary); }
+.np-unit.is-ahead .np-unit-text b, .np-unit.is-later .np-unit-text b { color: var(--text-secondary); }
+.np-unit.is-later { cursor: default; }
+.np-unit.is-later > * { opacity: 0.7; }
+.np-unit-state { flex: none; display: grid; place-items: center; color: var(--text-muted); }
+.np-unit-state svg { width: 18px; height: 18px; }
+.np-unit.is-done .np-unit-state { color: #d9b26a; }
+.np-unit-stars { display: flex; gap: 2px; }
+.np-unit-stars > span { display: inline-flex; color: var(--surface-3); }
+.np-unit-stars > span.is-on { color: #f2c14e; }
+.np-unit-stars svg { width: 15px; height: 15px; }
+/* The final barline: thin, gap, thick. */
+.np-dbar { position: absolute; z-index: 2; height: 8px; pointer-events: none; border-radius: 1px;
+  background: linear-gradient(to bottom, #e6e1d6 0 2px, transparent 2px 4px, #e6e1d6 4px 8px); box-shadow: 0 2px 3px rgba(0,0,0,0.5); }
+.np-guide-sheet .np-octave-sheet { overscroll-behavior: contain; }
+.np-octave { overscroll-behavior: contain; touch-action: none; }
+.np-octave .np-octave-sheet { touch-action: pan-y; }
+.np-guide-list li > div { gap: 6px; }
+.np-unit.is-first { width: 100%; }
+.np-unit.is-flash { animation: np-unit-flash 1.4s ease-out; }
+@keyframes np-unit-flash { 0% { border-color: #f2c14e; box-shadow: 0 0 0 10px var(--page-bg), 0 0 28px rgba(242,193,78,0.55); } 100% { box-shadow: 0 0 0 10px var(--page-bg); } }
+.np-unit.is-first.is-flash { animation-name: np-unit-flash-first; }
+@keyframes np-unit-flash-first { 0% { border-color: #f2c14e; box-shadow: 0 0 28px rgba(242,193,78,0.55); } 100% { box-shadow: none; } }

@@ -36,6 +36,8 @@ interface Props {
 
 const FIRST = 112;           // height of fret 1, px; each fret after is 2^(-1/12) of the last
 const NUT = 12;
+/** The break between two units: the neck stops, a header opens the next section. */
+const GAP = 84;
 const XP_STEP = 20;
 const STARS = 3;
 const INTRO_KEY = 'cadenza-neck-intro';
@@ -107,7 +109,6 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const [octave, setOctave] = useState(false);
   const [focus, setFocus] = useState<number | null>(null);
   const [shake, setShake] = useState<{ id: string; k: number } | null>(null);
-  const [viewUnit, setViewUnit] = useState<number | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
   const [flash, setFlash] = useState<{ unit: number; k: number } | null>(null);
   const [intro, setIntro] = useState(() => { try { return !localStorage.getItem(INTRO_KEY); } catch { return false; } });
@@ -122,7 +123,6 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const [away, setAway] = useState<'up' | 'down' | null>(null);
   const playing = useRef(false);
   const lastUnder = useRef(0);
-  const bannerRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const cur = currentIn(shown);
@@ -139,7 +139,9 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     const tops: number[] = [];
     const heights: number[] = [];
     let y = NUT;
+    const breaks = new Set([...UNITS.slice(1).map(u => u.from), OCTAVE + 1]);
     for (let n = 1; n <= lastFret; n++) {
+      if (breaks.has(n)) y += GAP;
       tops[n] = y;
       heights[n] = Math.round(fretHeight(n, FIRST));
       y += heights[n];
@@ -241,15 +243,9 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     let raf = 0;
     const measure = () => {
       raf = 0;
-      // Read where the eye is: a third of the way down the space under the banner.
-      const top = bannerRef.current?.getBoundingClientRect().bottom ?? 0;
+      // Read where the eye is: a third of the way down the space under the top bar.
+      const top = document.querySelector('.mtop')?.getBoundingClientRect().bottom ?? 0;
       const line = top + (window.innerHeight - top) * 0.35;
-      let unit = 0;
-      for (let n = 1; n <= OCTAVE; n++) {
-        const r = rowRefs.current[n]?.getBoundingClientRect();
-        if (r && r.top <= line) unit = unitOf(n);
-      }
-      setViewUnit(unit);
       let under = 0;
       for (let n = 1; n <= lastFret; n++) {
         const r = rowRefs.current[n]?.getBoundingClientRect();
@@ -278,6 +274,17 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const closeGuide = useCallback(() => setGuide(null), []);
   useBackToClose(focus !== null, closeFocus);
   useBackToClose(guide !== null, closeGuide);
+
+  // A sheet over the page holds the page still behind it.
+  const sheetOpen = guide !== null || octave;
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const el = document.documentElement;
+    const before = [el.style.overflow, document.body.style.overflow];
+    el.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => { [el.style.overflow, document.body.style.overflow] = before; };
+  }, [sheetOpen]);
 
   // ---- Actions ------------------------------------------------------------------
   // A step with a lesson opens it; the rest (setup) go to their screen.
@@ -323,7 +330,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       id = requestAnimationFrame(() => {
       const r = pop.getBoundingClientRect();
       const floor = (document.querySelector('.mtabs')?.getBoundingClientRect().top ?? window.innerHeight) - 12;
-      const ceiling = (document.querySelector('.np-banner-wrap')?.getBoundingClientRect().bottom ?? 0) + 8;
+      const ceiling = (document.querySelector('.mtop')?.getBoundingClientRect().bottom ?? 0) + 8;
       const need = r.bottom - floor;
       if (need <= 0) return;
       const room = r.top - 90 - ceiling; // keep the tapped fret (just above the card) on screen
@@ -340,34 +347,6 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
 
   // ---- Banner -------------------------------------------------------------------
   const myUnit = unitOf(curFret);
-  const shownUnit = viewUnit ?? myUnit;
-  const unit = UNITS[shownUnit];
-  const unitState = cur > OCTAVE || shownUnit < myUnit ? 'is-done' : shownUnit > myUnit ? 'is-ahead' : 'is-now';
-  const banner = (
-    <div className="np-banner-wrap" ref={bannerRef}>
-      <header key={flash?.unit === shownUnit ? flash.k : 'b'} className={`np-banner ${unitState}${flash?.unit === shownUnit ? ' is-flash' : ''}`}>
-        <div className="np-banner-text">
-          <span className="np-banner-kicker">
-            Unit {shownUnit + 1} of {UNITS.length}
-            {unitState === 'is-done' && ' · Done'}
-            {unitState === 'is-now' && ` · Fret ${curFret}`}
-          </span>
-          <b key={shownUnit}>{unit.name}</b>
-        </div>
-        <button
-          type="button"
-          className="np-guide"
-          data-feel="off"
-          onClick={() => { feel('select'); setFocus(null); setGuide(shownUnit); }}
-          aria-label={`What ${unit.name} teaches`}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" /><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" /><path d="M9 8h7M9 11.5h5" />
-          </svg>
-        </button>
-      </header>
-    </div>
-  );
 
   // ---- Cards ----------------------------------------------------------------------
   const Lock = () => (
@@ -452,30 +431,70 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   // ---- Labels: a name, and only your fret says more ----------------------------
   const label = (f: FretDef) => {
     const done = fretDoneIn(f, shown);
+    const go = f.n === cur && tag?.place === 'label' && focus === null
+      ? <small className="np-label-gorow"><span className="np-label-go">Start<Chevron /></span></small> : null;
     if (f.check) {
-      return (
-        <span className={`np-label is-check${done ? ' is-done' : ''}`}>
-          <small>{f.n === OCTAVE ? 'Octave' : 'Milestone'}</small>{f.check.title}
-          {f.n === cur && tag?.place === 'label' && focus === null && <small className="np-label-gorow"><span className="np-label-go">Start<Chevron /></span></small>}
-        </span>
-      );
+      return <span className={`np-label is-check${done ? ' is-done' : ''}`}>{f.check.title}{go}</span>;
     }
-    if (f.n === cur) {
-      const levels = f.steps.map(id => levelOf(id)).filter((l): l is JourneyLevel => !!l);
-      const next = levels.find(l => !shown.has(l.id));
-      return (
-        <span className="np-label is-now">
-          {next?.title ?? f.title}
-          {tag?.place === 'label' && focus === null
-            ? <small className="np-label-gorow"><span className="np-label-go">Start<Chevron /></span></small>
-            : <small>Fret {f.n} · Step {next ? levels.indexOf(next) + 1 : levels.length} of {levels.length}</small>}
-        </span>
-      );
-    }
-    if (done) return <span className="np-label is-done"><Check />{f.title}</span>;
-    const some = f.steps.filter(id => shown.has(id)).length;
-    return <span className="np-label is-ahead">{f.title}{some > 0 && <small>{some} of {f.steps.length} done</small>}</span>;
+    if (f.n !== cur) return null; // done and locked frets speak through their notes
+    const levels = f.steps.map(id => levelOf(id)).filter((l): l is JourneyLevel => !!l);
+    const next = levels.find(l => !shown.has(l.id));
+    return (
+      <span className="np-label is-now">
+        {next?.title ?? f.title}
+        {go ?? <small>Step {next ? levels.indexOf(next) + 1 : levels.length} of {levels.length}</small>}
+      </span>
+    );
   };
+
+  // ---- Units: each one a section of the neck -----------------------------------
+  // Like a score marks its sections, the neck stops at the end of a unit with a
+  // double bar, and the next unit opens under a numbered header.
+  const unitBand = (i: number, top?: number) => {
+    const u = UNITS[i];
+    const frets = FRETS.filter(f => f.n >= u.from && f.n <= u.to);
+    const ids = frets.flatMap(f => (f.check ? [checkId(f.n)] : f.steps));
+    const doneCount = ids.filter(id => shown.has(id)).length;
+    const state = doneCount === ids.length ? 'is-done' : u.from <= cur ? 'is-now' : 'is-ahead';
+    const check = frets.find(f => f.check);
+    const st = check ? checkStars(checkId(check.n)) : 0;
+    return (
+      <button
+        key={`u${i}-${flash?.unit === i ? flash.k : 0}`}
+        type="button"
+        data-feel="off"
+        className={`np-unit ${state}${top === undefined ? ' is-first' : ''}${flash?.unit === i ? ' is-flash' : ''}`}
+        style={top === undefined ? undefined : { top: top + 10, height: GAP - 20 }}
+        onClick={() => { feel('select'); setGuide(i); }}
+        aria-label={`Unit ${i + 1}, ${u.name}: what it teaches`}
+      >
+        <span className="np-unit-mark">{i + 1}</span>
+        <span className="np-unit-text">
+          <b>{u.name}</b>
+          <small>
+            {state === 'is-done' ? 'Done' : state === 'is-now' ? `${doneCount} of ${ids.length} done` : 'Locked'}
+            {` · Frets ${u.from} to ${u.to}`}
+          </small>
+        </span>
+        <span className="np-unit-state" aria-hidden="true">
+          {state === 'is-done' && st > 0
+            ? <span className="np-unit-stars">{Array.from({ length: STARS }, (_, k) => <span key={k} className={k < st ? 'is-on' : ''}><Star /></span>)}</span>
+            : state === 'is-done' ? <Check /> : state === 'is-ahead' ? <Lock /> : <Chevron />}
+        </span>
+      </button>
+    );
+  };
+  const bands = (
+    <>
+      {UNITS.slice(1).map((u, k) => unitBand(k + 1, geo.tops[u.from] - GAP))}
+      {/* The end of each unit: a double bar across the neck. */}
+      {UNITS.map(u => <i key={`db${u.to}`} className="np-dbar" style={{ top: geo.tops[u.to] + geo.heights[u.to] - 2, left: 'var(--np-left)', width }} />)}
+      <div className="np-unit is-later" style={{ top: geo.tops[OCTAVE + 1] - GAP + 10, height: GAP - 20 }}>
+        <span className="np-unit-mark is-8va">8va</span>
+        <span className="np-unit-text"><b>Second octave</b><small>Chords, strumming and lead. Coming next.</small></span>
+      </div>
+    </>
+  );
 
   // ---- The board ------------------------------------------------------------------
   const curDef = FRETS.find(f => f.n === cur) ?? null;
@@ -508,7 +527,9 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       return f.steps.map((_, i) => ({ x: strX(shape[i] ?? 3), y: noteY(n), r: 14 }));
     };
     const near = (n: number) => things(n).filter(o => Math.abs(o.x - curNote.x) < half + o.r);
-    const ceiling = Math.max(cur === 1 ? geo.tops[1] : -Infinity, ...near(cur - 1).map(o => o.y + o.r));
+    // The nut, or a unit header, closes the space above the first fret of a section.
+    const opensSection = cur === 1 || UNITS.some(u => u.from === cur);
+    const ceiling = Math.max(opensSection ? geo.tops[cur] : -Infinity, ...(opensSection ? [] : near(cur - 1).map(o => o.y + o.r)));
     const floor = Math.min(Infinity, ...near(cur + 1).map(o => o.y - o.r));
     const room = curNote.y - ring - ceiling;
     const roomBelow = floor - (curNote.y + 30);
@@ -529,7 +550,6 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
         const cls = ['np-wire', n === OCTAVE ? 'is-octave' : '', sweep === n ? 'is-sweep' : '', lit !== null && n <= lit ? 'is-lit' : ''].join(' ');
         return <i key={`w${n}`} className={cls} style={{ top: geo.tops[n] + geo.heights[n] - (n === OCTAVE ? 3 : 2) }} />;
       })}
-      <span className="np-octave-tag" style={{ top: geo.tops[OCTAVE] + geo.heights[OCTAVE] + 6 }}>Octave</span>
       {/* Past the octave the neck fades into what comes next. */}
       <i className="np-beyond" style={{ top: geo.tops[OCTAVE + 1] }} />
       {/* A pearl at 15, as a real neck has. */}
@@ -637,20 +657,16 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     const n = k + 1;
     const f = FRETS.find(g => g.n === n);
     const ahead = AHEAD.find(a => a.n === n);
-    const starts = UNITS.findIndex(u => u.from === n);
     return (
       <div
         key={n}
         ref={el => { rowRefs.current[n] = el; }}
-        className={`np-row${n === cur ? ' is-now' : ''}${n > OCTAVE ? ' is-far' : ''}${starts > 0 ? ' has-div' : ''}`}
+        className={`np-row${n === cur ? ' is-now' : ''}${n > OCTAVE ? ' is-far' : ''}`}
         style={{ top: geo.tops[n], height: geo.heights[n] }}
       >
-        {starts > 0 && <span className="np-divider"><span>{UNITS[starts].name}</span></span>}
         <button type="button" className="np-num" data-feel="off" onClick={() => tapFret(n)} aria-label={`Fret ${n}`} tabIndex={n > OCTAVE ? -1 : 0}>{n}</button>
         <div className="np-side">
-          {ahead ? (
-            <span className="np-label is-far">{ahead.title}{n === OCTAVE + 1 && <small>Second octave</small>}</span>
-          ) : f ? (
+          {ahead ? null : f ? (
             <button type="button" className="np-label-btn" data-feel="off" onClick={() => tapFret(n)} aria-pressed={focus === n}>{label(f)}</button>
           ) : null}
         </div>
@@ -660,16 +676,17 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
 
   return (
     <section className={`neckpath is-${mode}${strings === 4 ? ' is-uke' : ''}`} aria-label="Your progress up the neck">
-      {banner}
       {intro && (
         <div className="np-intro" role="note">
           <p><b>Each note is a step.</b> Finish a fret's notes to move up the neck. Milestones sit on the pearl inlays, and fret 12 is the octave.</p>
           <button type="button" onClick={() => { setIntro(false); try { localStorage.setItem(INTRO_KEY, '1'); } catch { /* shows again */ } }}>Got it</button>
         </div>
       )}
+      {unitBand(0)}
       <div className="np-view" style={{ height: geo.length + 16 }}>
         <div className="np-grid" style={{ ['--neck-w' as string]: `${width}px` } as React.CSSProperties}>
           {board}
+          {bands}
           {rows}
           {focusedDef && (
             <div
@@ -701,10 +718,10 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
                   <span className="np-guide-fret">{f.n}</span>
                   <div>
                     {f.check ? (
-                      <><b>{fretDoneIn(f, shown) && <Check />}{f.check.title}</b><p>{f.check.task}</p></>
+                      <b>{fretDoneIn(f, shown) && <Check />}{f.check.title}</b>
                     ) : f.steps.map(id => {
                       const l = levelOf(id);
-                      return l ? <div key={id} className={`np-guide-step${shown.has(id) ? ' is-done' : ''}`}><b>{shown.has(id) && <Check />}{l.title}</b><p>{l.idea}</p></div> : null;
+                      return l ? <div key={id} className={`np-guide-step${shown.has(id) ? ' is-done' : ''}`}><b>{shown.has(id) && <Check />}{l.title}</b></div> : null;
                     })}
                   </div>
                 </li>
