@@ -333,7 +333,7 @@ export const Stage: React.FC<{
               {take > 0 ? <small key={take} className="stg-again">Two missed in a row. From the top.</small> : <small>{where(first)}</small>}</>
             : word ? <span key={word.k} className={`stg-word is-${word.tone}`}>{word.text}</span> : <span className="stg-word is-quiet">{title}</span>}
         </p>
-        <span className="stg-count readout">{done}<small>/{notes.length}</small></span>
+        <span className="stg-count readout"><span key={done} className="is-tick">{done}</span><small>/{notes.length}</small></span>
       </header>
 
       <div className="stg-tab">

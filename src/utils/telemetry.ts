@@ -30,6 +30,8 @@ export type EventName =
   | 'screen_viewed'         // screen
   | 'goal_met'              // goal, minutes
   | 'goal_set'              // minutes
+  | 'goal_bump_offered'     // from, to, why
+  | 'goal_bump_answered'    // from, to, why, yes
   | 'reminders_set'         // on, granted
   | 'reminder_opened'       // kind
   // Lessons and songs

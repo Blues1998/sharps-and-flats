@@ -107,7 +107,7 @@ const Game: React.FC<{ id: GameId }> = ({ id }) => {
         <button type="button" className="lp-stop" onClick={() => { feel('select'); finish(); }} aria-label="End the game" data-feel="off">{STOP}</button>
         <span className="gm-level">Level {level}<small> of {LEVELS}</small></span>
         <span className="gm-picks" aria-label={`${STRIKES - strikes} strikes left`}>{Array.from({ length: STRIKES }, (_, i) => <Pick key={i} on={i < STRIKES - strikes} />)}</span>
-        <span className="gm-score readout" aria-label={`${right} right`}>{right}</span>
+        <span key={right} className="gm-score readout is-tick" aria-label={`${right} right`}>{right}</span>
       </header>
 
       <main className="lp-body gm-body" key={n}>

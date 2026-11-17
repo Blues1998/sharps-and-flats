@@ -7,15 +7,37 @@ import { MAX_RESTS, REST_EVERY } from '../utils/streak';
 import { go } from '../hooks/useRoute';
 import { Segmented } from './Segmented';
 import { GameShelf } from '../games/GameShelf';
+import { gameOpen } from '../games/store';
+import { lessonOpen } from '../lesson/store';
+import { answerOffer, goalOffer, offerShown, type GoalOffer } from '../utils/goalBump';
 
 // The top bar on Today, where the app name used to be: you, what you are
 // learning, your streak, and how much of today's goal is done. Tapping one
 // opens a small panel right under the bar with its detail and, where there is
 // one, its setting. Only the person icon goes to Me.
+//
+// Motion here is small and cheap: the flame flickers only once today's
+// practice has lit it, numbers tick only when they change, and the ring draws
+// in once. All of it is transform and opacity on tiny elements, and the
+// app-wide reduced-motion rule stills it.
 
 const GOAL_SEEN = 'cadenza-goal-seen-today';
 
-type Pop = 'inst' | 'streak' | 'goal';
+type Pop = 'inst' | 'streak' | 'goal' | 'bump';
+
+/** True for a moment after `value` changes (not on first render): drives a one-off tick. */
+function useChanged(value: number | boolean, ms = 700): boolean {
+  const first = useRef(value);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (value === first.current) return;
+    first.current = value;
+    setOn(true);
+    const id = window.setTimeout(() => setOn(false), ms);
+    return () => window.clearTimeout(id);
+  }, [value, ms]);
+  return on;
+}
 
 const Guitar = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -52,11 +74,39 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
   const playedToday = mins > 0 || s.restDays.includes(today());
   const r = 9;
   const c = 2 * Math.PI * r;
+  // The ring draws in from empty once, then follows the minutes.
+  const [drawn, setDrawn] = useState(false);
+  useEffect(() => { const id = requestAnimationFrame(() => setDrawn(true)); return () => cancelAnimationFrame(id); }, []);
+  const ignite = useChanged(playedToday, 900);
+  const streakTick = useChanged(s.current);
+  const minsTick = useChanged(mins);
   const instrument = profile.instrument === 'ukulele' ? 'Ukulele' : 'Guitar';
 
   const [pop, setPop] = useState<Pop | null>(null);
   const [notch, setNotch] = useState(0);
   const barRef = useRef<HTMLDivElement>(null);
+  const goalRef = useRef<HTMLButtonElement>(null);
+
+  // A bigger goal, offered here once it is clearly too easy. Never over a
+  // lesson or a game: it waits until Today is what you are looking at.
+  const [offer, setOffer] = useState<GoalOffer | null>(null);
+  useEffect(() => {
+    if (pop || offer || lessonOpen() || gameOpen() || document.visibilityState !== 'visible') return;
+    const o = goalOffer();
+    if (!o) return;
+    const b = goalRef.current?.getBoundingClientRect();
+    const bar = barRef.current?.getBoundingClientRect();
+    if (b && bar) setNotch(b.left + b.width / 2 - bar.left);
+    offerShown(o);
+    setOffer(o);
+    setPop('bump');
+  }, [mins, pop, offer]);
+  const answer = (yes: boolean) => {
+    if (!offer) return;
+    answerOffer(offer, yes);
+    if (yes) setGoal(offer.to);
+    setPop(null);
+  };
   const toggle = (which: Pop) => (e: React.MouseEvent<HTMLButtonElement>) => {
     if (pop === which) { setPop(null); return; }
     const b = e.currentTarget.getBoundingClientRect();
@@ -96,20 +146,30 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
       <button type="button" className={`tstat-item tstat-inst${pop === 'inst' ? ' is-open' : ''}`} onClick={toggle('inst')} aria-expanded={pop === 'inst'} aria-label={`Learning on ${instrument}`}>
         <Guitar /><span>{instrument}</span>
       </button>
-      <button type="button" className={`tstat-item tstat-streak${playedToday ? ' is-lit' : ''}${pop === 'streak' ? ' is-open' : ''}`} onClick={toggle('streak')} aria-expanded={pop === 'streak'} aria-label={`${s.current} day streak`}>
-        <Flame lit={playedToday} /><span className="readout">{s.current}</span>
+      <button type="button" className={`tstat-item tstat-streak${playedToday ? ' is-lit' : ''}${ignite ? ' is-ignite' : ''}${pop === 'streak' ? ' is-open' : ''}`} onClick={toggle('streak')} aria-expanded={pop === 'streak'} aria-label={`${s.current} day streak`}>
+        <Flame lit={playedToday} /><span className={`readout${streakTick ? ' is-tick' : ''}`}>{s.current}</span>
       </button>
-      <button type="button" className={`tstat-item tstat-goal${met ? ' is-met' : ''}${pulse ? ' is-pulse' : ''}${pop === 'goal' ? ' is-open' : ''}`} onClick={toggle('goal')} aria-expanded={pop === 'goal'} aria-label={`${Math.min(mins, goal)} of ${goal} minutes today`}>
+      <button type="button" ref={goalRef} className={`tstat-item tstat-goal${met ? ' is-met' : ''}${pulse ? ' is-pulse' : ''}${pop === 'goal' || pop === 'bump' ? ' is-open' : ''}`} onClick={toggle('goal')} aria-expanded={pop === 'goal'} aria-label={`${mins} of ${goal} minutes today`}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r={r} className="tstat-ring-track" />
-          <circle cx="12" cy="12" r={r} className="tstat-ring-fill" strokeDasharray={`${(c * Math.min(1, mins / goal)).toFixed(1)} ${c.toFixed(1)}`} transform="rotate(-90 12 12)" />
+          <circle cx="12" cy="12" r={r} className="tstat-ring-fill" strokeDasharray={`${(drawn ? c * Math.min(1, mins / goal) : 0).toFixed(1)} ${c.toFixed(1)}`} transform="rotate(-90 12 12)" />
         </svg>
-        <span className="readout">{Math.min(mins, goal)}<small> / {goal} min</small></span>
+        {/* The real minutes, past the goal too: 12 / 5 min, not 5 / 5. */}
+        <span className={`readout${minsTick ? ' is-tick' : ''}`}>{mins}<small> / {goal} min</small></span>
       </button>
 
       {pop && <>
         <button type="button" className="tstat-scrim" aria-label="Close" onClick={() => setPop(null)} />
         <div className="tstat-pop" role="dialog" style={{ '--notch': `${notch}px` } as React.CSSProperties}>
+          {pop === 'bump' && offer && <>
+            <p className="tstat-pop-title">Daily goal</p>
+            <p className="tstat-pop-big">Make it <b>{offer.to}</b> min a day?</p>
+            <p className="tstat-pop-note">{offer.said} Your goal is {offer.from} min.</p>
+            <div className="tstat-pop-actions">
+              <button type="button" className="btn btn-primary" onClick={() => answer(true)}>Make it {offer.to} min</button>
+              <button type="button" className="btn" onClick={() => answer(false)}>Keep {offer.from} min</button>
+            </div>
+          </>}
           {pop === 'inst' && <>
             <p className="tstat-pop-title">Learning on</p>
             <Segmented<ProfileInstrument>
