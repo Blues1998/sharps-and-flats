@@ -6,6 +6,7 @@ import { setProfile, useProfile, type ProfileInstrument } from '../utils/profile
 import { MAX_RESTS, REST_EVERY } from '../utils/streak';
 import { go } from '../hooks/useRoute';
 import { Segmented } from './Segmented';
+import { GameShelf } from '../games/GameShelf';
 
 // The top bar on Today, where the app name used to be: you, what you are
 // learning, your streak, and how much of today's goal is done. Tapping one
@@ -144,6 +145,15 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
               ariaLabel="Daily goal"
               full
             />
+            {!met && <>
+              <p className="tstat-pop-title">A quick way in</p>
+              <GameShelf compact onPick={() => setPop(null)} />
+            </>}
+            <details className="tstat-counts">
+              <summary>What counts</summary>
+              <p>Time counts while you play, with the app open: lessons, songs, ear games, ear training, challenges, the metronome, loops, chord checks and both tuners.</p>
+              <p>Anything that listens counts only while it hears you. After ten minutes without a tap the app asks if you are still playing.</p>
+            </details>
           </>}
         </div>
       </>}

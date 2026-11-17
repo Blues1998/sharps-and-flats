@@ -14,6 +14,7 @@ import {
 } from '../utils/chordbook';
 import { useBackToClose } from '../utils/nativeShell';
 import { useChordCheck } from '../hooks/useChordCheck';
+import { usePracticeTime } from '../hooks/usePracticeTime';
 import { isProven, markProven, useFeats } from '../utils/feats';
 import { feel } from '../utils/haptics';
 import { hitChime } from '../utils/chime';
@@ -55,6 +56,8 @@ export const ChordSheet: React.FC<ChordSheetProps> = ({ symbol, songs, inLoop, o
 
   // Rating Solid is your word; strumming it for the mic is the proof.
   const check = useChordCheck();
+  // Strumming a chord for the mic is practice while it listens.
+  usePracticeTime('chords', check.state === 'listening');
   const proven = isProven(symbol) || check.state === 'passed';
   useEffect(() => {
     if (check.state !== 'passed' || isProven(symbol)) return;

@@ -14,6 +14,7 @@ import { audio } from '../utils/audio';
 import { getProgressCount, reportProgress } from '../utils/progress';
 import { useHoldUnlocks } from '../utils/feats';
 import { useBackToClose } from '../utils/nativeShell';
+import { usePracticeTime } from '../hooks/usePracticeTime';
 import { checkStars, saveCheckStars } from '../utils/neck';
 import { award } from '../utils/xp';
 
@@ -560,6 +561,9 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   const take = useRef(getProgressCount(`lesson:${lesson.id}`) + 1);
   const [secs, setSecs] = useState(0);
   useHoldUnlocks('lesson', true);
+  // A lesson, check, song or drill is practice while it runs. The clock's own
+  // rules still apply: on screen only, and "Still playing?" after ten idle minutes.
+  usePracticeTime('lesson', !s.done);
 
   const starred = !!lesson.check || !!lesson.song;
   const songScore = lesson.song ? songTake(first, s.scores) : null;

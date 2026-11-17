@@ -5,6 +5,7 @@ import { TunerDial } from '../components/TunerDial';
 import { VoiceTuner } from '../components/VoiceTuner';
 import { IconCheck } from '../components/Icons';
 import { useMicPitch } from '../hooks/useMicPitch';
+import { useHeard, usePracticeTime } from '../hooks/usePracticeTime';
 import { useSpringValue } from '../hooks/useSpringValue';
 import { audio } from '../utils/audio';
 import { HOLD_MS, INSTRUMENTS, IN_TUNE_CENTS, TUNINGS, nearestString, stringsOf, tuningsFor, type Instrument } from '../utils/tuning';
@@ -99,6 +100,9 @@ const InstrumentTuner: React.FC = () => {
     start: initMicrophone,
     stop: stopMicrophone
   } = useMicPitch();
+  // Tuning up is practice: counted while the mic hears a string.
+  usePracticeTime('tuner', isMicrophoneActive, { mic: true });
+  useHeard(pitchData);
 
   // The gauge runs on a sprung value rather than the raw estimate. Pitch
   // detection re-reads every audio frame and its output jitters by a few cents

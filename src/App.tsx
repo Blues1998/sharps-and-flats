@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { KeySheet } from './components/KeySheet';
 import { JumpTo } from './components/JumpTo';
 import { LessonPlayer } from './lesson/LessonPlayer';
+import { GamePlayer } from './games/GamePlayer';
 import { RunBar, useRunning } from './components/RunBar';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
@@ -246,6 +247,7 @@ function App() {
         </QuietBoundary>
         <QuietBoundary where="the lesson">
           <LessonPlayer />
+          <GamePlayer />
         </QuietBoundary>
         <QuietBoundary where="sign-in">
           <AuthModal />

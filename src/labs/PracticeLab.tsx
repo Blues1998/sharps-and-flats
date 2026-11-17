@@ -1,3 +1,4 @@
+import { GameShelf } from '../games/GameShelf';
 import React from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { PRACTICE_GROUPS, type ActiveTab } from '../components/navGroups';
@@ -61,6 +62,12 @@ export const PracticeLab: React.FC<PracticeLabProps> = ({ setActiveTab }) => {
       <div className="lab-header">
         <h2 className="lab-title"><LabIcon tab="practice" />Practice</h2>
       </div>
+
+      <section className="practice-group gm-section">
+        <h3 className="practice-label">Ear games</h3>
+        <p className="gm-section-say">Quick rounds, three strikes. Every minute counts toward today's goal.</p>
+        <GameShelf />
+      </section>
 
       {suggestItem && !fresh && (
         <button type="button" className="practice-next" onClick={() => setActiveTab(suggestItem.id)}>
