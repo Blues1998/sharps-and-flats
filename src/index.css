@@ -17177,3 +17177,5 @@ a.btn {
 .stg-ear b { font-family: var(--font-display); font-size: 3rem; line-height: 1; }
 .stg-ear span { font-size: 1rem; color: var(--text-secondary); }
 .stg-ear small { margin-top: 6px; font-size: 0.85rem; color: var(--text-muted); }
+.stg-say small.stg-again { color: var(--danger); font-weight: 700; animation: lp-pop 0.35s ease-out; }
+.stg-play .lp-board { width: 100%; height: auto; max-height: 100%; }

@@ -57,6 +57,8 @@ export const Board: React.FC<BoardProps> = ({ strings, from, to, dots, onTap, on
   const H = top * 2 + rowH * strings.length + 16;
   const x = (f: number) => left + (f - from) * cw + cw / 2;
   const y = (i: number) => top + i * rowH + rowH / 2;
+  // Bigger rows (the landscape stage) get bigger targets to aim at.
+  const cap = Math.max(11, rowH * 0.3);
   return (
     <svg className="lp-board" viewBox={`0 0 ${W} ${H}`} role="group" aria-label="Fretboard">
       <rect className="lp-board-wood" x={left} y={top} width={W - left - 4} height={rowH * strings.length} rx="4" />
@@ -85,11 +87,11 @@ export const Board: React.FC<BoardProps> = ({ strings, from, to, dots, onTap, on
         return (
           <g key={`${st}-${f}`} className="lp-board-cell" style={tint ? { ['--tint' as string]: tint(st) } as React.CSSProperties : undefined}
             onPointerDown={e => { (e.target as Element).releasePointerCapture?.(e.pointerId); onTap(st, f); }}
-            onPointerUp={onRelease} onPointerLeave={onRelease} onPointerCancel={onRelease}>
+            onPointerUp={onRelease} onPointerCancel={onRelease}>
             <rect x={left + c * cw} y={top + i * rowH} width={cw} height={rowH} fill="transparent" />
-            {d && d !== 'next' && <circle className={`lp-board-dot is-${d}`} cx={x(f)} cy={y(i)} r={Math.min(9, cw / 2.6)} />}
-            {d === 'next' && <circle className="lp-board-next" cx={x(f)} cy={y(i)} r={Math.min(11, cw / 2.2)} />}
-            {lit && <g key={flash.k} className="lp-board-lit"><circle cx={x(f)} cy={y(i)} r={Math.min(12, cw / 2.1)} /><text x={x(f)} y={y(i) + 4}>{noteName(OPEN_MIDI[st] + f)}</text></g>}
+            {d && d !== 'next' && <circle className={`lp-board-dot is-${d}`} cx={x(f)} cy={y(i)} r={Math.min(cap * 0.8, cw / 2.6)} />}
+            {d === 'next' && <circle className="lp-board-next" cx={x(f)} cy={y(i)} r={Math.min(cap, cw / 2.2)} />}
+            {lit && <g key={flash.k} className="lp-board-lit"><circle cx={x(f)} cy={y(i)} r={Math.min(cap * 1.1, cw / 2.1)} /><text x={x(f)} y={y(i) + 4}>{noteName(OPEN_MIDI[st] + f)}</text></g>}
           </g>
         );
       }))}
