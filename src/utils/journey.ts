@@ -70,6 +70,20 @@ export const JOURNEY: JourneyChapter[] = [
     ]
   },
   {
+    title: 'Rhythm',
+    levels: [
+      {
+        id: 'steady-hands',
+        title: 'Lock into the beat',
+        idea: 'Timing matters as much as the notes.',
+        task: 'Land 5 taps within 45 ms of the beat.',
+        tab: 'rhythm',
+        buttonText: 'Rhythm',
+        requirements: [{ event: 'rhythm-perfect-tap', count: 5 }]
+      }
+    ]
+  },
+  {
     title: 'Scales',
     levels: [
       {
@@ -188,20 +202,6 @@ export const JOURNEY: JourneyChapter[] = [
         tab: 'physics',
         buttonText: 'Sound Physics',
         requirements: [{ event: 'physics-circle-completed', count: 1 }]
-      }
-    ]
-  },
-  {
-    title: 'Rhythm',
-    levels: [
-      {
-        id: 'steady-hands',
-        title: 'Lock into the beat',
-        idea: 'Timing matters as much as the notes.',
-        task: 'Land 5 taps within 45 ms of the beat.',
-        tab: 'rhythm',
-        buttonText: 'Rhythm',
-        requirements: [{ event: 'rhythm-perfect-tap', count: 5 }]
       }
     ]
   }

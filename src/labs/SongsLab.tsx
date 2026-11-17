@@ -1,3 +1,4 @@
+import { SessionCard } from '../components/SessionCard';
 import React, { useEffect, useMemo, useState } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
@@ -151,6 +152,12 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
           </button>
         </div>
       </header>
+
+      {songs.length > 0 && !draft && (
+        <div className="songs-session">
+          <SessionCard onOpenSong={id => onOpenSong(id)} onAddSong={() => setDraft(blankDraft())} />
+        </div>
+      )}
 
       {draft && (
         <form className="song-draft" onSubmit={e => void submitDraft(e)}>

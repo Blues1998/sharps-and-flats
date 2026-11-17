@@ -64,8 +64,8 @@ export const JourneyBar: React.FC = () => {
         <small>{done ? level.title : `${met} of ${needed}`}</small>
       </span>
       {done ? (
-        <button type="button" className="btn btn-primary journeybar-back" onClick={() => { followStep(null); go({ tab: 'journey', songId: null }); }}>
-          Back to Journey
+        <button type="button" className="btn btn-primary journeybar-back" onClick={() => { followStep(null); go({ tab: 'dashboard', songId: null }); }}>
+          Back to the neck
         </button>
       ) : (
         <button type="button" className="journeybar-x" onClick={() => followStep(null)} aria-label="Hide this step">

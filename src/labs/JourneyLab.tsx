@@ -1,17 +1,16 @@
 import React from 'react';
 import type { ActiveTab } from '../components/Sidebar';
 import { LabIcon } from '../components/LabIcon';
-import { Journey } from '../components/Journey';
+import { NeckPath } from '../components/NeckPath';
 
-// The curriculum used to sit under the dashboard hero, which made the landing
-// page a wall of levels before you had chosen to look at any. It is a place
-// you go to, so it gets a page.
+// The whole neck, nut to the second octave. Today shows the few frets around
+// where you are; this is the full map.
 export const JourneyLab: React.FC<{ setActiveTab: (tab: ActiveTab) => void }> = ({ setActiveTab }) => (
-  <div>
+  <div className="journey-neck">
     <div className="lab-header">
       <h2 className="lab-title"><LabIcon tab="journey" />Journey</h2>
     </div>
-    <Journey setActiveTab={setActiveTab} />
+    <NeckPath mode="full" setActiveTab={setActiveTab} />
   </div>
 );
 export default JourneyLab;

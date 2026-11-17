@@ -5,6 +5,10 @@
 //   success    two rising clicks. A right answer, a string in tune, a song saved.
 //   error      a low knock. A wrong answer, something that failed.
 //   celebrate  a swell that lands. A milestone: a streak, a finished day.
+//   fret       a tick then a click. A Journey step pressed onto the neck.
+//   strum      six rising ticks and a click. A fret finished.
+//   octave     a strum, a swell, a thud, three clicks. Fret 12.
+//   nudge      a soft knock. Something not open yet.
 //
 // The motor work is native (android/.../FeelPlugin.java), built from Android's
 // tuned primitives. On the web this is silent: a browser can only buzz, and a
@@ -18,7 +22,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { useSyncExternalStore } from 'react';
 
-export type Feel = 'select' | 'tap' | 'success' | 'error' | 'celebrate';
+export type Feel = 'select' | 'tap' | 'success' | 'error' | 'celebrate' | 'fret' | 'strum' | 'octave' | 'nudge';
 
 interface FeelPlugin {
   play(options: { kind: Feel }): Promise<void>;

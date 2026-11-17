@@ -2,6 +2,9 @@ import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { LabIcon } from '../components/LabIcon';
 import { Segmented } from '../components/Segmented';
 import { TrophyShelf } from '../components/TrophyShelf';
+import { StreakStrip } from '../components/StreakStrip';
+import { WeekPanel } from '../components/WeekPanel';
+import { weekRecap } from '../utils/weekly';
 import { useLibrary } from '../hooks/useLibrary';
 import { exportLibrary, getSongs, importLibrary, isoDate, practiceStats } from '../utils/library';
 import { saveTextFile } from '../utils/saveFile';
@@ -200,6 +203,12 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
     <div className="lab-narrow me">
       <div className="lab-header">
         <h2 className="lab-title"><LabIcon tab="me" />Me</h2>
+      </div>
+
+      {/* Your streak and week: the top bar on Today opens here. */}
+      <div className="me-progress" id="me-streak">
+        <StreakStrip />
+        <WeekPanel recap={weekRecap()} />
       </div>
 
       {ACCOUNTS_ENABLED && <section className="glass-panel me-card">

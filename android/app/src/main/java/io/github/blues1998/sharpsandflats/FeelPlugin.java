@@ -91,6 +91,10 @@ public class FeelPlugin extends Plugin {
             case "success": return VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK);
             case "error": return VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK);
             case "celebrate": return VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK);
+            case "fret": return VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK);
+            case "strum": return VibrationEffect.createWaveform(new long[] { 0, 8, 14, 8, 14, 8, 14, 8, 14, 8, 14, 12 }, -1);
+            case "octave": return VibrationEffect.createWaveform(new long[] { 0, 8, 12, 8, 12, 8, 12, 8, 120, 40, 90, 12, 60, 14, 60, 18 }, -1);
+            case "nudge": return VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK);
             default: return null;
         }
     }
@@ -135,6 +139,29 @@ public class FeelPlugin extends Plugin {
                     c.addPrimitive(CLICK, 0.7f, 70);
                     c.addPrimitive(CLICK, 1.0f, 70);
                 }
+                break;
+            // A finger landing on a fret: the string touches, then the fret.
+            case "fret":
+                c.addPrimitive(TICK, 0.35f);
+                c.addPrimitive(CLICK, 0.8f, 30);
+                break;
+            // A downstroke: six strings, each a little firmer, then the chord.
+            case "strum":
+                for (int i = 0; i < 6; i++) c.addPrimitive(TICK, 0.3f + i * 0.1f, i == 0 ? 0 : 22);
+                c.addPrimitive(CLICK, 0.9f, 30);
+                break;
+            // The octave: a strum, a swell, a low landing, then three rising clicks.
+            case "octave":
+                for (int i = 0; i < 6; i++) c.addPrimitive(TICK, 0.3f + i * 0.1f, i == 0 ? 0 : 22);
+                if (supported(RISE)) c.addPrimitive(RISE, 0.7f, 60);
+                if (supported(THUD)) c.addPrimitive(THUD, 0.7f, 40); else c.addPrimitive(CLICK, 1.0f, 40);
+                c.addPrimitive(CLICK, 0.5f, 260);
+                c.addPrimitive(CLICK, 0.75f, 80);
+                c.addPrimitive(CLICK, 1.0f, 80);
+                break;
+            // Not yet: a soft knock, too light to feel like a mistake.
+            case "nudge":
+                if (supported(THUD)) c.addPrimitive(THUD, 0.3f); else c.addPrimitive(TICK, 0.6f);
                 break;
             default:
                 return null;

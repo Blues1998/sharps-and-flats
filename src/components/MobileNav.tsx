@@ -5,6 +5,7 @@ import type { ActiveTab } from './navGroups';
 import { PRIMARY, navItem, parentTab } from './navGroups';
 import { IconJump } from './Icons';
 import { preloadLab } from '../labs/chunks';
+import { TodayStatus } from './TodayStatus';
 
 // The phone's navigation, replacing the sidebar below the shell breakpoint.
 //
@@ -32,6 +33,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, o
 
   return (
     <>
+      {activeTab === 'dashboard' && !nested ? (
+        // Today: no app name, just where you stand. See TodayStatus.
+        <header className="mtop mtop-today"><TodayStatus /></header>
+      ) : (
       <header className="mtop">
         {nested ? (
           <button type="button" className="mtop-icon mtop-back" onClick={() => setActiveTab(parent)} aria-label={`Back to ${navItem(parent).label}`}>
@@ -49,6 +54,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, o
           <IconJump size={18} aria-hidden="true" />
         </button>
       </header>
+      )}
 
       <nav className="mtabs" aria-label="Main">
         {PRIMARY.map(({ id, label, icon }) => {
