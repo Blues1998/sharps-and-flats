@@ -209,8 +209,9 @@ export const JOURNEY: JourneyChapter[] = [
 
 export const ALL_LEVELS: JourneyLevel[] = JOURNEY.flatMap(c => c.levels);
 
+/** A step is done when its lesson is finished, or when the tool reported the work. */
 export function isLevelComplete(level: JourneyLevel): boolean {
-  return level.requirements.every(req => getProgressCount(req.event) >= req.count);
+  return getProgressCount(`lesson:${level.id}`) > 0 || level.requirements.every(req => getProgressCount(req.event) >= req.count);
 }
 
 // Levels unlock strictly in order; the current level is the first incomplete one
@@ -223,6 +224,10 @@ export function getCurrentLevelIndex(): number {
 
 // Requirement progress for a level as [met, needed]
 export function levelProgress(level: JourneyLevel): [number, number] {
+  if (getProgressCount(`lesson:${level.id}`) > 0) {
+    const n = level.requirements.reduce((acc, req) => acc + req.count, 0);
+    return [n, n];
+  }
   const met = level.requirements.reduce(
     (acc, req) => acc + Math.min(getProgressCount(req.event), req.count), 0
   );

@@ -9,6 +9,9 @@ import { useProfile } from '../utils/profile';
 import { feel } from '../utils/haptics';
 import { getSession, subscribeSession } from '../utils/session';
 import { useHoldUnlocks } from '../utils/feats';
+import { lessonOpen, startLesson, subscribeLesson } from '../lesson/store';
+import { lessonFor } from '../lesson/lessons';
+import { useBackToClose } from '../utils/nativeShell';
 import { AHEAD, FRETS, OCTAVE, CHECKS_READY, UNITS, doneSteps, fretHeight, levelOf, markSeen, seenSteps, unitOf } from '../utils/neck';
 import type { FretDef } from '../utils/neck';
 
@@ -35,6 +38,7 @@ const FIRST = 112;           // height of fret 1, px; each fret after is 2^(-1/1
 const NUT = 12;
 const XP_STEP = 20;
 const STARS = 3;
+const INTRO_KEY = 'cadenza-neck-intro';
 
 const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -54,6 +58,16 @@ const fretDoneIn = (f: FretDef, done: Set<string>): boolean =>
 const currentIn = (done: Set<string>): number => {
   for (const f of FRETS) if (!fretDoneIn(f, done)) return f.n;
   return OCTAVE + 1;
+};
+
+/** "Lesson · 6 exercises · about 3 min", for a step with a lesson. */
+const lessonSummary = (id: string): string | null => {
+  const l = lessonFor(id);
+  if (!l) return null;
+  const xs = l.build();
+  const mins = Math.max(2, Math.round(xs.reduce((a, x) => a + (x.type === 'play' || x.type === 'tap' ? 50 : 20), 0) / 60));
+  const mic = xs.some(x => x.type === 'play');
+  return `Lesson · ${xs.length} exercises · about ${mins} min${mic ? ' · uses the mic' : ''}`;
 };
 
 const Check = () => (
@@ -95,10 +109,21 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const [octave, setOctave] = useState(false);
   const [focus, setFocus] = useState<number | null>(null);
   const [shake, setShake] = useState<{ id: string; k: number } | null>(null);
-  const [hint, setHint] = useState<{ fret: number; k: number } | null>(null);
   const [viewUnit, setViewUnit] = useState<number | null>(null);
+  const [guide, setGuide] = useState<number | null>(null);
+  const [flash, setFlash] = useState<{ unit: number; k: number } | null>(null);
+  const [intro, setIntro] = useState(() => { try { return !localStorage.getItem(INTRO_KEY); } catch { return false; } });
+  const [narrow, setNarrow] = useState(() => typeof matchMedia === 'function' && matchMedia('(max-width: 379px)').matches);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const mq = matchMedia('(max-width: 379px)');
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
   const [away, setAway] = useState<'up' | 'down' | null>(null);
   const playing = useRef(false);
+  const lastUnder = useRef(0);
   const bannerRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
@@ -123,8 +148,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     }
     return { tops, heights, length: y };
   }, [lastFret]);
-  const width = strings === 4 ? 148 : 190;
-  const edge = strings === 4 ? 22 : 17;
+  const width = strings === 4 ? (narrow ? 132 : 148) : (narrow ? 166 : 190);
+  const edge = strings === 4 ? 20 : narrow ? 15 : 17;
   const strX = (s: number) => edge + (strings - s) * ((width - 2 * edge) / (strings - 1));
   const midY = (n: number) => geo.tops[n] + geo.heights[n] / 2;
   const noteY = (n: number) => midY(n) + (geo.heights[n] > 90 ? 6 : 3);
@@ -137,7 +162,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   // ---- Moments ------------------------------------------------------------------
   const play = useCallback(async () => {
     if (playing.current) return;
-    if (getSession()) return; // the summary first; we run again when it closes
+    if (getSession() || lessonOpen()) return; // the summary or lesson first; we run again when it closes
     const done = doneSteps();
     const fresh = ALL_LEVELS.map(l => l.id).filter(id => done.has(id) && !shown.has(id));
     if (fresh.length === 0) return;
@@ -177,8 +202,9 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           setOctave(true);
         } else {
           setCheer(m.n);
+          setFlash({ unit: unitOf(m.n), k: Date.now() });
           feel('celebrate');
-          await wait(t(1100));
+          await wait(t(1300));
         }
         setCheer(null);
       }
@@ -194,7 +220,9 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
 
   useEffect(() => {
     void play();
-    return subscribeSession(() => { if (!getSession()) void play(); });
+    const offSession = subscribeSession(() => { if (!getSession()) void play(); });
+    const offLesson = subscribeLesson(() => { if (!lessonOpen()) void play(); });
+    return () => { offSession(); offLesson(); };
   });
   useEffect(() => () => { markSeen(doneSteps()); }, []);
 
@@ -219,6 +247,13 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
         if (r && r.top <= line) unit = unitOf(n);
       }
       setViewUnit(unit);
+      let under = 0;
+      for (let n = 1; n <= lastFret; n++) {
+        const r = rowRefs.current[n]?.getBoundingClientRect();
+        if (r && r.top <= line) under = n;
+      }
+      if (lastUnder.current !== 0 && under !== lastUnder.current) feel('select');
+      lastUnder.current = under;
       const mine = rowRefs.current[curFret]?.getBoundingClientRect();
       if (!mine) return;
       const bottom = window.innerHeight - 80;
@@ -233,11 +268,20 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [curFret]);
+  }, [curFret, lastFret]);
+
+  // The phone's Back closes a popover or the guide before leaving the page.
+  const closeFocus = useCallback(() => setFocus(null), []);
+  const closeGuide = useCallback(() => setGuide(null), []);
+  useBackToClose(focus !== null, closeFocus);
+  useBackToClose(guide !== null, closeGuide);
 
   // ---- Actions ------------------------------------------------------------------
+  // A step with a lesson opens it; the rest (setup) go to their screen.
   const open = (level: JourneyLevel) => {
     feel('tap');
+    setFocus(null);
+    if (lessonFor(level.id)) { startLesson(level.id); return; }
     followStep(isLevelComplete(level) ? null : level.id);
     setActiveTab(level.tab);
   };
@@ -247,27 +291,21 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     if (n > cur) {
       feel('nudge');
       if (stepId) setShake({ id: stepId, k: Date.now() });
-      setHint({ fret: n, k: Date.now() });
-      return;
+    } else {
+      feel('select');
     }
-    feel('select');
     setFocus(focus === n ? null : n);
   };
 
   useEffect(() => {
     if (focus === null) return;
     const close = (e: PointerEvent) => {
-      if (!(e.target as HTMLElement).closest('.np-pop, .np-dot, .np-label-btn, .np-num, .np-bubble, .np-guide, .np-medal')) setFocus(null);
+      if (!(e.target as HTMLElement).closest('.np-pop, .np-dot, .np-label-btn, .np-num, .np-bubble, .np-guide, .np-medal, .np-octave')) setFocus(null);
     };
     document.addEventListener('pointerdown', close);
     return () => document.removeEventListener('pointerdown', close);
   }, [focus]);
 
-  useEffect(() => {
-    if (!hint) return;
-    const id = setTimeout(() => setHint(null), 1800);
-    return () => clearTimeout(id);
-  }, [hint]);
 
   // ---- Banner -------------------------------------------------------------------
   const myUnit = unitOf(curFret);
@@ -276,7 +314,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const unitState = cur > OCTAVE || shownUnit < myUnit ? 'is-done' : shownUnit > myUnit ? 'is-ahead' : 'is-now';
   const banner = (
     <div className="np-banner-wrap" ref={bannerRef}>
-      <header className={`np-banner ${unitState}`}>
+      <header key={flash?.unit === shownUnit ? flash.k : 'b'} className={`np-banner ${unitState}${flash?.unit === shownUnit ? ' is-flash' : ''}`}>
         <div className="np-banner-text">
           <span className="np-banner-kicker">
             Unit {shownUnit + 1} of {UNITS.length}
@@ -289,8 +327,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           type="button"
           className="np-guide"
           data-feel="off"
-          onClick={() => { feel('select'); scrollToFret(cur); setFocus(curFret); }}
-          aria-label="Your next step"
+          onClick={() => { feel('select'); setFocus(null); setGuide(shownUnit); }}
+          aria-label={`What ${unit.name} teaches`}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" /><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" /><path d="M9 8h7M9 11.5h5" />
@@ -301,17 +339,31 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   );
 
   // ---- Cards ----------------------------------------------------------------------
+  const Lock = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" rx="2.5" /><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" />
+    </svg>
+  );
+  const Chevron = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+  );
+
   const card = (f: FretDef) => {
+    const locked = f.n > cur;
+    const unlock = <span className="np-unlock"><Lock />Finish fret {curFret} to unlock</span>;
     if (f.check) {
       const passed = fretDoneIn(f, shown);
       return (
-        <div className="np-card is-check">
+        <div className={`np-card is-check${locked ? ' is-locked' : ''}`}>
           <small>{f.n === OCTAVE ? 'The octave' : 'Milestone'}</small>
           <b>{f.check.title}</b>
           <p>{f.check.task}</p>
-          <span className="np-soon">
-            {passed ? 'Reached. Stars arrive with the skill checks in the next update.' : 'The skill check arrives in the next update.'}
-          </span>
+          <span className="np-card-stars" aria-label={`${STARS} stars to earn`}>{Array.from({ length: STARS }, (_, i) => <Star key={i} />)}</span>
+          {locked ? unlock : (
+            <span className="np-soon">
+              {passed ? 'Reached. Stars arrive with the skill checks in the next update.' : 'The skill check arrives in the next update.'}
+            </span>
+          )}
         </div>
       );
     }
@@ -321,33 +373,45 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       const [met, needed] = levelProgress(next);
       return (
         <div className="np-card is-now">
-          <small>Fret {f.n} · Step {levels.indexOf(next) + 1} of {levels.length}{needed > 1 && <em>{met} of {needed} done</em>}</small>
+          <small>Fret {f.n} · Step {levels.indexOf(next) + 1} of {levels.length}{needed > 1 && !lessonFor(next.id) && <em>{met} of {needed} done</em>}</small>
           <b>{next.title}</b>
-          <p>{next.task}</p>
+          <p className="np-idea">{next.idea}</p>
+          <p>{lessonSummary(next.id) ?? next.task}</p>
           <button type="button" className="np-start" data-feel="off" onClick={() => open(next)}>Start</button>
         </div>
       );
     }
     return (
-      <div className="np-card">
+      <div className={`np-card${locked ? ' is-locked' : ''}`}>
         <small>Fret {f.n} · {f.title}</small>
         <ul className="np-steps">
-          {levels.map(l => (
-            <li key={l.id}>
-              <button type="button" data-feel="off" onClick={() => open(l)}>
-                <span className={`np-steps-dot${shown.has(l.id) ? ' is-done' : ''}`} aria-hidden="true">{shown.has(l.id) && <Check />}</span>
-                <span>{l.title}</span>
-              </button>
-            </li>
-          ))}
+          {levels.map(l => {
+            const done = shown.has(l.id);
+            return (
+              <li key={l.id}>
+                {locked ? (
+                  <div className="np-steps-row">
+                    <span className={`np-steps-dot${done ? ' is-done' : ' is-locked'}`} aria-hidden="true">{done ? <Check /> : <Lock />}</span>
+                    <span className="np-steps-text"><b>{l.title}</b><span>{l.idea}</span></span>
+                  </div>
+                ) : (
+                  <button type="button" className="np-steps-row" data-feel="off" onClick={() => open(l)}>
+                    <span className={`np-steps-dot${done ? ' is-done' : ''}`} aria-hidden="true">{done && <Check />}</span>
+                    <span className="np-steps-text"><b>{l.title}</b><span>{done ? 'Practise again' : l.idea}</span></span>
+                    <Chevron />
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ul>
+        {locked && unlock}
       </div>
     );
   };
 
   // ---- Labels: a name, and only your fret says more ----------------------------
   const label = (f: FretDef) => {
-    if (hint?.fret === f.n) return <span className="np-label is-hint">Finish fret {curFret} first</span>;
     const done = fretDoneIn(f, shown);
     if (f.check) {
       return (
@@ -381,7 +445,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     const i = curDef.steps.findIndex(id => !shown.has(id));
     const level = levelOf(curDef.steps[i]);
     if (!level) return null;
-    const [met, needed] = levelProgress(level);
+    // A lesson is all or nothing, so its ring stays empty until it is done.
+    const [met, needed] = lessonFor(level.id) ? [0, 1] : levelProgress(level);
     return { x: strX(shapeFor(curDef.steps.length, strings)[i] ?? 3), y: noteY(cur), pct: needed ? met / needed : 0 };
   })();
 
@@ -475,9 +540,9 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       {curNote && focus === null && (
         <button
           type="button"
-          className="np-bubble"
+          className={`np-bubble${cur === 1 ? ' is-below' : ''}`}
           data-feel="off"
-          style={{ left: curNote.x, top: curNote.y - 30 }}
+          style={{ left: curNote.x, top: cur === 1 ? curNote.y + 30 : curNote.y - 30 }}
           onClick={() => { feel('select'); setFocus(cur); }}
         >
           Start
@@ -527,6 +592,12 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   return (
     <section className={`neckpath is-${mode}${strings === 4 ? ' is-uke' : ''}`} aria-label="Your progress up the neck">
       {banner}
+      {intro && (
+        <div className="np-intro" role="note">
+          <p><b>Each note is a step.</b> Finish a fret's notes to move up the neck. Milestones sit on the pearl inlays, and fret 12 is the octave.</p>
+          <button type="button" onClick={() => { setIntro(false); try { localStorage.setItem(INTRO_KEY, '1'); } catch { /* shows again */ } }}>Got it</button>
+        </div>
+      )}
       <div className="np-view" style={{ height: geo.length + 16 }}>
         <div className="np-grid" style={{ ['--neck-w' as string]: `${width}px` } as React.CSSProperties}>
           {board}
@@ -548,6 +619,34 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
             <path d="M12 19V5M6 11l6-6 6 6" />
           </svg>
         </button>
+      )}
+      {guide !== null && createPortal(
+        <div className="np-octave np-guide-sheet" role="dialog" aria-modal="true" aria-label={`${UNITS[guide].name}, what it teaches`}>
+          <div className="np-octave-scrim" onClick={() => setGuide(null)} />
+          <div className="np-octave-sheet">
+            <span className="np-eyebrow">Unit {guide + 1} of {UNITS.length} · Frets {UNITS[guide].from} to {UNITS[guide].to}</span>
+            <h3>{UNITS[guide].name}</h3>
+            <ol className="np-guide-list">
+              {FRETS.filter(f => f.n >= UNITS[guide].from && f.n <= UNITS[guide].to).map(f => (
+                <li key={f.n} className={f.check ? 'is-check' : ''}>
+                  <span className="np-guide-fret">{f.n}</span>
+                  <div>
+                    {f.check ? (
+                      <><b>{f.check.title}</b><p>{f.check.task}</p></>
+                    ) : f.steps.map(id => {
+                      const l = levelOf(id);
+                      return l ? <div key={id} className={`np-guide-step${shown.has(id) ? ' is-done' : ''}`}><b>{shown.has(id) && <Check />}{l.title}</b><p>{l.idea}</p></div> : null;
+                    })}
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <button type="button" className="np-start" onClick={() => { setGuide(null); scrollToFret(cur); }}>
+              {guide === myUnit ? 'Go to my step' : 'Close'}
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
       {octave && createPortal(
         <div className="np-octave" role="dialog" aria-modal="true" aria-label="Octave reached">

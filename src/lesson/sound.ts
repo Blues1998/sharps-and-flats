@@ -1,0 +1,98 @@
+// The sounds a lesson plays: guitar notes and chords from the app's engine,
+// pure tones for showing what a note is made of, and metronome clicks.
+
+import { audio } from '../utils/audio';
+import { midiToFreq } from '../utils/musicTheory';
+
+export type Sound =
+  | { kind: 'note'; midi: number }
+  | { kind: 'notes'; midis: number[]; gap?: number }
+  | { kind: 'chord'; midis: number[] }
+  | { kind: 'chords'; chords: number[][]; gap?: number }
+  | { kind: 'sine'; midi: number }
+  | { kind: 'pair'; a: number; b: number; detune?: number }
+  | { kind: 'clicks'; bpm: number; count: number; wobble?: boolean }
+  | { kind: 'seq'; parts: Sound[]; gap: number };
+
+const now = () => {
+  audio.init();
+  return audio.getCurrentTime() + 0.05;
+};
+
+/** A pure tone: one frequency, no overtones. */
+function sine(freq: number, at: number, dur: number, gain = 0.16): void {
+  const bus = audio.getMasterBus();
+  if (!bus) return;
+  const { ctx, input } = bus;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.linearRampToValueAtTime(gain, at + 0.03);
+  g.gain.setValueAtTime(gain, at + dur - 0.15);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  osc.connect(g).connect(input);
+  osc.start(at);
+  osc.stop(at + dur + 0.05);
+}
+
+/** Seconds the sound lasts, so a lesson knows when it has finished. */
+export function soundLength(s: Sound): number {
+  switch (s.kind) {
+    case 'note': case 'chord': case 'sine': return 1.6;
+    case 'pair': return 2.4;
+    case 'notes': return s.midis.length * (s.gap ?? 0.45) + 1;
+    case 'chords': return s.chords.length * (s.gap ?? 1.1) + 1;
+    case 'clicks': return s.count * (60 / s.bpm) + 0.3;
+    case 'seq': return (s.parts.length - 1) * s.gap + Math.max(...s.parts.map(soundLength));
+  }
+}
+
+// When the lesson itself is making sound. The mic must not count the phone's
+// own speaker as the player, so listening pauses until this time has passed,
+// with room for the note to ring out and the room to go quiet.
+const TAIL_MS = 700;
+let soundingUntil = 0;
+/** Mark the app as sounding for the next `ms` milliseconds. */
+export function hush(ms: number): void {
+  soundingUntil = Math.max(soundingUntil, performance.now() + ms + TAIL_MS);
+}
+/** True while a sound the app played could still reach the mic. */
+export const appSounding = (): boolean => performance.now() < soundingUntil;
+
+export function playSound(s: Sound, offset = 0): void {
+  if (offset === 0) hush(soundLength(s) * 1000);
+  const t = now() + offset;
+  switch (s.kind) {
+    case 'note': audio.playMidi(s.midi, 2, t); break;
+    case 'chord': audio.playStrum(s.midis, 2.4, 0.04, t); break;
+    case 'notes': s.midis.forEach((m, i) => audio.playMidi(m, 1.2, t + i * (s.gap ?? 0.45))); break;
+    case 'chords': s.chords.forEach((c, i) => audio.playStrum(c, 1.4, 0.035, t + i * (s.gap ?? 1.1))); break;
+    case 'sine': sine(midiToFreq(s.midi), t, 1.6); break;
+    case 'pair': {
+      sine(midiToFreq(s.a), t, 2.4, 0.12);
+      sine(midiToFreq(s.b) * Math.pow(2, (s.detune ?? 0) / 1200), t, 2.4, 0.12);
+      break;
+    }
+    case 'seq': s.parts.forEach((p, i) => playSound(p, offset + i * s.gap)); break;
+    case 'clicks': {
+      const beat = 60 / s.bpm;
+      // A wobbly beat drifts early and late, the way a rushed hand does.
+      const drift = [0, 0.07, -0.05, 0.09, -0.08, 0.04, -0.07, 0.06];
+      for (let i = 0; i < s.count; i++) audio.playClick(t + i * beat + (s.wobble ? drift[i % drift.length] : 0), i % 4 === 0);
+      break;
+    }
+  }
+}
+
+/** Start a click track; returns the time of the first beat (audio clock). */
+export function startClicks(bpm: number, count: number): number {
+  const t = now() + 0.4;
+  const beat = 60 / bpm;
+  hush((0.4 + count * beat) * 1000);
+  for (let i = 0; i < count; i++) audio.playClick(t + i * beat, i % 4 === 0);
+  return t;
+}
+
+export const audioNow = (): number => audio.getCurrentTime() - audio.getOutputLatency();

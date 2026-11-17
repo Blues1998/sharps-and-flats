@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { KeySheet } from './components/KeySheet';
 import { JumpTo } from './components/JumpTo';
+import { LessonPlayer } from './lesson/LessonPlayer';
 import { RunBar, useRunning } from './components/RunBar';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
@@ -242,6 +243,9 @@ function App() {
         </QuietBoundary>
         <QuietBoundary where="the shortcuts sheet">
           {overlay === 'keys' && <KeySheet onClose={() => setOverlay(null)} />}
+        </QuietBoundary>
+        <QuietBoundary where="the lesson">
+          <LessonPlayer />
         </QuietBoundary>
         <QuietBoundary where="sign-in">
           <AuthModal />

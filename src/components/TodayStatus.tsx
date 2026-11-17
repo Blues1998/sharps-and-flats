@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer } from 'react';
+import React, { useEffect, useReducer, useState } from 'react';
 import { minutesPractisedToday, streakState, today } from '../utils/library';
 import { CLOCK_EVENT, getGoal } from '../utils/practiceClock';
 import { STORE_CHANGE_EVENT } from '../utils/db';
@@ -8,6 +8,8 @@ import { go } from '../hooks/useRoute';
 // The top bar on Today, where the app name used to be: you, what you are
 // learning, your streak, and how much of today's goal is done. Each opens Me,
 // where the detail lives.
+
+const GOAL_SEEN = 'cadenza-goal-seen-today';
 
 const openMe = () => {
   go({ tab: 'me', songId: null });
@@ -51,6 +53,21 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
   const c = 2 * Math.PI * r;
   const instrument = profile.instrument === 'ukulele' ? 'Ukulele' : 'Guitar';
 
+  // The goal met since you last looked at Today: the ring closes with a pulse,
+  // once a day. The lab and the summary have already celebrated it; this ties
+  // the minutes back to the page you return to.
+  const [pulse, setPulse] = useState(false);
+  useEffect(() => {
+    if (!met) return;
+    try {
+      if (localStorage.getItem(GOAL_SEEN) === today()) return;
+      localStorage.setItem(GOAL_SEEN, today());
+    } catch { return; }
+    setPulse(true);
+    const id = window.setTimeout(() => setPulse(false), 1600);
+    return () => window.clearTimeout(id);
+  }, [met]);
+
   return (
     <div className={`tstat ${className}`}>
       <button type="button" className="tstat-me" onClick={() => go({ tab: 'me', songId: null })} aria-label="Me">
@@ -64,7 +81,7 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
       <button type="button" className={`tstat-item tstat-streak${playedToday ? ' is-lit' : ''}`} onClick={openMe} aria-label={`${s.current} day streak`}>
         <Flame lit={playedToday} /><span className="readout">{s.current}</span>
       </button>
-      <button type="button" className={`tstat-item tstat-goal${met ? ' is-met' : ''}`} onClick={openMe} aria-label={`${Math.min(mins, goal)} of ${goal} minutes today`}>
+      <button type="button" className={`tstat-item tstat-goal${met ? ' is-met' : ''}${pulse ? ' is-pulse' : ''}`} onClick={openMe} aria-label={`${Math.min(mins, goal)} of ${goal} minutes today`}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r={r} className="tstat-ring-track" />
           <circle cx="12" cy="12" r={r} className="tstat-ring-fill" strokeDasharray={`${(c * Math.min(1, mins / goal)).toFixed(1)} ${c.toFixed(1)}`} transform="rotate(-90 12 12)" />
