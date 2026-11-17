@@ -569,7 +569,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
         const passed = fretDoneIn(f, shown);
         if (!CHECKS_READY || (passed ? st === 0 : f.n !== nextMilestone)) return null;
         return (
-          <span key={`st${f.n}`} className="np-stars" style={{ top: midY(f.n) + (f.n === OCTAVE ? 20 : 24), left: width / 2 }} aria-hidden="true">
+          <span key={`st${f.n}`} className="np-stars" style={{ top: f.n === OCTAVE ? midY(f.n) - 6 : midY(f.n) + 24, left: width / 2 }} aria-hidden="true">
             {Array.from({ length: STARS }, (_, i) => <span key={i} className={i < st ? 'is-on' : ''}><Star /></span>)}
           </span>
         );

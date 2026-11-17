@@ -168,7 +168,7 @@ const Choose: React.FC<ExProps<'choose'>> = ({ ex, verdict, onVerdict, setFoot }
   );
 };
 
-const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict, onVerdict, onSkip, setFoot }) => {
+const Play: React.FC<ExProps<'play'> & { onSkip: () => void; check?: boolean }> = ({ ex, verdict, onVerdict, onSkip, setFoot, check }) => {
   const mic = useMicPitch('instrument');
   const [at, setAt] = useState(0);
   const [tick, nudge] = useState(0);
@@ -180,8 +180,8 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
   useEffect(() => { void start(); return () => stop(); }, [start, stop]);
   useEffect(() => {
     if (verdict) return;
-    setFoot(<button type="button" className="lp-btn is-quiet" onClick={() => { stop(); onSkip(); }} data-feel="off">No guitar right now? Skip for now</button>);
-  }, [setFoot, onSkip, stop, verdict]);
+    setFoot(<button type="button" className="lp-btn is-quiet" onClick={() => { stop(); onSkip(); }} data-feel="off">{check ? 'No guitar? Skip, but the check won\'t pass' : 'No guitar right now? Skip for now'}</button>);
+  }, [setFoot, onSkip, stop, verdict, check]);
 
   // While the app is playing (the example, the chime), the mic hears the
   // phone's own speaker. None of that counts; only what you play does.
@@ -219,7 +219,7 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
     setAt(next);
     if (next >= ex.notes.length) {
       stop();
-      onVerdict({ ok: true });
+      onVerdict({ ok: true, explain: ex.found });
     }
   }, [p, at, hit, verdict, tick, hold, ex.notes.length, onVerdict, stop]);
 
@@ -237,10 +237,10 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
           </span>
         ))}
       </div>
-      <div className={`lp-ear${mic.isActive && !quiet ? ' is-on' : ''}`}>
+      <div className={`lp-ear${mic.isActive && !quiet && !verdict ? ' is-on' : ''}`}>
         <div className="lp-ear-note">
-          <small>{mic.error ? 'Mic off' : !mic.isActive ? 'Starting the mic' : quiet ? 'Paused' : 'Hearing'}</small>
-          <b>{heard ?? '·'}</b>
+          <small>{verdict ? 'Found it' : mic.error ? 'Mic off' : !mic.isActive ? 'Starting the mic' : quiet ? 'Paused' : 'Hearing'}</small>
+          <b>{verdict ? '' : heard ?? ''}</b>
         </div>
         <div className="lp-meter" aria-hidden="true">
           <i className="lp-meter-zone" style={{ width: `${tol}%`, left: `${50 - tol / 2}%` }} />
@@ -248,7 +248,8 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
           <span>flat</span><span>sharp</span>
         </div>
         <p className="lp-ear-say">
-          {mic.error ? 'Allow the mic in your phone\'s settings, or skip for now.'
+          {verdict ? (ex.notes.length > 1 ? 'All the notes, in order.' : 'That is the one.')
+            : mic.error ? 'Allow the mic in your phone\'s settings, or skip for now.'
             : quiet ? 'Listening again once the sound stops.'
             : !p ? 'Play when you are ready.'
             : hit ? 'Hold it…'
@@ -536,7 +537,7 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
           {first.map((x, k) => {
             const o = s.outcomes[k];
             const now = entry.key === k;
-            const cls = now ? (entry.attempt === 2 ? 'is-now is-retry' : 'is-now') : o ? `is-${o}` : '';
+            const cls = now ? `is-now${entry.attempt === 2 ? ' is-retry' : ''}${s.verdict && o ? ` is-${o}` : ''}` : o ? `is-${o}` : '';
             return <li key={k} className={`${cls}${x.type === 'teach' ? ' is-idea' : ''}`} />;
           })}
         </ol>
@@ -549,7 +550,7 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
         </span>
         {ex.type === 'teach' && <Teach ex={ex} {...props} onNext={onSeen} />}
         {ex.type === 'choose' && <Choose ex={ex} {...props} />}
-        {ex.type === 'play' && <Play ex={ex} {...props} onSkip={onSkip} />}
+        {ex.type === 'play' && <Play ex={ex} {...props} onSkip={onSkip} check={!!lesson.check} />}
         {ex.type === 'tap' && <Tap ex={ex} {...props} />}
         {s.verdict && (
           <aside className={`lp-verdict ${s.verdict.ok ? 'is-right' : 'is-wrong'}`} role="status">

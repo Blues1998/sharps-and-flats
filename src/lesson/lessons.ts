@@ -26,7 +26,7 @@ export interface ChooseOption { label: string; sound?: Sound; correct?: boolean 
 export type Exercise =
   | { type: 'teach'; title: string; body: string; sounds?: { label: string; sound: Sound }[]; chips?: { name: string; where?: string }[] }
   | { type: 'choose'; prompt: string; sound?: Sound; options: ChooseOption[]; explain: string }
-  | { type: 'play'; prompt: string; detail: string; notes: number[]; names: { name: string; where?: string; hidden?: boolean }[]; hear?: Sound; auto?: boolean; tolerance?: number; holdMs?: number }
+  | { type: 'play'; prompt: string; detail: string; notes: number[]; names: { name: string; where?: string; hidden?: boolean }[]; hear?: Sound; auto?: boolean; tolerance?: number; holdMs?: number; found?: string }
   | { type: 'tap'; prompt: string; detail: string; bpm: number; taps: number; need: number; windowMs: number };
 
 export interface Lesson {
@@ -413,10 +413,10 @@ const OPEN = [
 ];
 
 /** The app plays one note; you find it. Its name stays hidden until you do. */
-const findIt = (midi: number, prompt: string, detail: string): Exercise => ({
+const findIt = (midi: number, prompt: string, detail: string, found?: string): Exercise => ({
   type: 'play', prompt, detail, notes: [pc(midi)],
   names: [{ name: NAMES[pc(midi)], hidden: true }],
-  hear: { kind: 'note', midi }, auto: true,
+  hear: { kind: 'note', midi }, auto: true, found,
 });
 
 export const CHECKS: Lesson[] = [
@@ -437,7 +437,8 @@ export const CHECKS: Lesson[] = [
           explain: 'In tune, the two notes melt into one. Out of tune, they wobble.' },
         ...strings.map((o, i) => findIt(o.midi,
           i === 0 ? 'Which open string is this?' : 'And this one?',
-          'Listen, then pluck the open string you think it is. Play it again as often as you like.')),
+          'Listen, then pluck the open string you think it is. Play it again as often as you like.',
+          `That was ${o.name}, the ${o.where === 'thickest' || o.where === 'thinnest' ? `${o.where} string` : o.where}.`)),
         { type: 'choose', prompt: 'Which string is the G?',
           options: shuffle<ChooseOption>([{ label: '3rd from the thin side', correct: true }, { label: '2nd from the thin side' }, { label: '4th from the thin side' }]),
           explain: 'E A D G B E, thickest to thinnest: G is the 3rd string from the thin side.' },
@@ -463,7 +464,7 @@ export const CHECKS: Lesson[] = [
   },
   {
     id: 'check-7',
-    title: 'Scales from memory',
+    title: 'Scales by heart',
     check: true,
     recap: 'You know the major scale and the minor pentatonic by heart, and you can hear which mood a scale has.',
     build: () => {
@@ -505,6 +506,7 @@ export const CHECKS: Lesson[] = [
           notes: [pc(root), pc(root + INTERVAL[k].semis)],
           names: [{ name: NAMES[pc(root)], where }, { name: NAMES[pc(root + INTERVAL[k].semis)], hidden: true }],
           hear: { kind: 'notes', midis: [root, root + INTERVAL[k].semis], gap: 0.7 }, auto: true,
+          found: `${NAMES[pc(root)]} up to ${NAMES[pc(root + INTERVAL[k].semis)]}: a ${INTERVAL[k].name.toLowerCase()}, ${INTERVAL[k].semis} frets.`,
         })),
         intervalRound(['M3', 'P4', 'P5', 'P8']),
         { type: 'choose', prompt: 'How many frets up is a perfect 5th?',
