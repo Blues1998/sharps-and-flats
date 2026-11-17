@@ -222,8 +222,8 @@ export const Stage: React.FC<{
   if (import.meta.env.DEV) Object.assign(window, { __stage: { t0, beat, starts, now: audioNow, midis: notes.map(riffMidi), res: resRef.current } });
 
   // ---- Drawing ----
-  const rowY = (st: number) => 14 + (st - 1) * 20;
-  const H = 14 * 2 + 20 * 5;
+  const rowY = (st: number) => 12 + (st - 1) * 17;
+  const H = 12 * 2 + 17 * 5;
   const W = Math.ceil(total * PPB + LINE + 200);
   const next = (() => { for (let i = 0; i < notes.length; i++) if (resRef.current[i] === undefined && hitAt.current[i] === undefined) return i; return -1; })();
   const nowNote = next >= 0 ? notes[next] : undefined;
@@ -279,7 +279,7 @@ export const Stage: React.FC<{
       <div className="stg-play">
         {screen ? (
           <Board strings={[1, 2, 3, 4, 5, 6]} from={from} to={to} dots={dots} onTap={tap} onRelease={release} flash={flash}
-            width={720} row={24} tint={st => STRING_TINT[st]} />
+            width={720} row={30} tint={st => STRING_TINT[st]} />
         ) : (
           <div className="stg-ear">
             {nowNote ? <>

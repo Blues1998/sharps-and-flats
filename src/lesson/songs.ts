@@ -110,7 +110,7 @@ function build(d: SongDef): Exercise[] {
     })),
     {
       type: 'riff', prompt: 'The whole song, in time', time: true, need: 0.6, notes: whole, bpm: d.bpm,
-      detail: 'Four clicks to count in, then play along with the click. Stars come from the notes that land.',
+      detail: 'Sideways and in time. It starts when you play the first note. Stars come from the notes that land.',
     },
   ];
 }

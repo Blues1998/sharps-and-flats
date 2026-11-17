@@ -300,7 +300,7 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
         </div>
       </div>
       {ex.time && !verdict && (
-        <p className="lp-screen-say">Turn your phone sideways. The music starts when you play the first note, and long bars mean let the note ring.</p>
+        <p className="lp-screen-say">Long bars mean let the note ring.</p>
       )}
       {staged && <Stage notes={notes} bpm={ex.bpm} title={ex.prompt} screen={screen} onDone={onStage} />}
       {screen && !ex.time && !verdict && (() => {

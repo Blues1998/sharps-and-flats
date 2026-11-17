@@ -282,7 +282,7 @@ export const LESSONS: Lesson[] = [
         notes: BOX.slice(0, 6).map(([st, f]): RiffNote => [st, f, 1]), bpm: 60 },
       { type: 'riff', prompt: 'The whole box', detail: 'All twelve notes, low to high, at your own pace.',
         notes: BOX.map(([st, f]): RiffNote => [st, f, 1]), bpm: 60 },
-      { type: 'riff', prompt: 'Now in time', detail: 'Four clicks to count in, then one note on each click. Land most of them.',
+      { type: 'riff', prompt: 'Now in time', detail: 'Sideways and in time, one note on each click. It starts when you play the first one.',
         notes: BOX.map(([st, f]): RiffNote => [st, f, 1]), bpm: 60, time: true },
       { type: 'riff', prompt: 'Your first lick', detail: 'Down the top of the box. Quick notes first, then let the last one ring.',
         notes: [[1, 8, 0.5], [1, 5, 0.5], [2, 8, 0.5], [2, 5, 0.5], [3, 7, 1], [3, 5, 1], [4, 7, 2]], bpm: 66, time: true },
