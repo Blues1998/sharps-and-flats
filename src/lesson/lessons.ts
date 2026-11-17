@@ -14,6 +14,10 @@
 //   tap     tap along with a click; taps within the window count
 //
 // Lessons are built fresh each time, so rounds are shuffled.
+//
+// Milestone checks sit on the inlay frets. They teach nothing new: they ask
+// for what the frets below taught, in a fresh order, once each. Stars come
+// from how much was right first time.
 
 import type { Sound } from './sound';
 
@@ -22,10 +26,17 @@ export interface ChooseOption { label: string; sound?: Sound; correct?: boolean 
 export type Exercise =
   | { type: 'teach'; title: string; body: string; sounds?: { label: string; sound: Sound }[]; chips?: { name: string; where?: string }[] }
   | { type: 'choose'; prompt: string; sound?: Sound; options: ChooseOption[]; explain: string }
-  | { type: 'play'; prompt: string; detail: string; notes: number[]; names: { name: string; where?: string }[]; hear?: Sound; tolerance?: number; holdMs?: number }
+  | { type: 'play'; prompt: string; detail: string; notes: number[]; names: { name: string; where?: string; hidden?: boolean }[]; hear?: Sound; auto?: boolean; tolerance?: number; holdMs?: number }
   | { type: 'tap'; prompt: string; detail: string; bpm: number; taps: number; need: number; windowMs: number };
 
-export interface Lesson { id: string; title: string; recap: string; build: () => Exercise[] }
+export interface Lesson {
+  id: string;
+  title: string;
+  recap: string;
+  build: () => Exercise[];
+  /** A milestone check: no teaching, no second tries, scored in stars. */
+  check?: boolean;
+}
 
 // ---- Helpers ---------------------------------------------------------------------
 
@@ -389,4 +400,141 @@ export const LESSONS: Lesson[] = [
   },
 ];
 
-export const lessonFor = (id: string): Lesson | undefined => LESSONS.find(l => l.id === id);
+
+// ---- Milestone checks -------------------------------------------------------------
+
+const OPEN = [
+  { midi: 40, name: 'E', where: 'thickest' },
+  { midi: 45, name: 'A', where: '5th string' },
+  { midi: 50, name: 'D', where: '4th string' },
+  { midi: 55, name: 'G', where: '3rd string' },
+  { midi: 59, name: 'B', where: '2nd string' },
+  { midi: 64, name: 'E', where: 'thinnest' },
+];
+
+/** The app plays one note; you find it. Its name stays hidden until you do. */
+const findIt = (midi: number, prompt: string, detail: string): Exercise => ({
+  type: 'play', prompt, detail, notes: [pc(midi)],
+  names: [{ name: NAMES[pc(midi)], hidden: true }],
+  hear: { kind: 'note', midi }, auto: true,
+});
+
+export const CHECKS: Lesson[] = [
+  {
+    id: 'check-3',
+    title: 'Find it by ear',
+    check: true,
+    recap: 'You can tell high from low, hear when two notes agree, and find a string by its sound.',
+    build: () => {
+      const strings = shuffle(OPEN).slice(0, 4);
+      const lo = pick([45, 47, 50]);
+      return [
+        { type: 'choose', prompt: 'Tap both. Which note is higher?',
+          options: pair('Note', { kind: 'note', midi: lo + pick([3, 5, 7]) }, { kind: 'note', midi: lo }),
+          explain: 'Higher means faster vibration. Listen for which one sits up top.' },
+        { type: 'choose', prompt: 'Tap both. Which pair is in tune?',
+          options: pair('Pair', { kind: 'pair', a: 57, b: 69 }, { kind: 'pair', a: 57, b: 69, detune: pick([20, -20, 30]) }),
+          explain: 'In tune, the two notes melt into one. Out of tune, they wobble.' },
+        ...strings.map((o, i) => findIt(o.midi,
+          i === 0 ? 'Which open string is this?' : 'And this one?',
+          'Listen, then pluck the open string you think it is. Play it again as often as you like.')),
+        { type: 'choose', prompt: 'Which string is the G?',
+          options: shuffle<ChooseOption>([{ label: '3rd from the thin side', correct: true }, { label: '2nd from the thin side' }, { label: '4th from the thin side' }]),
+          explain: 'E A D G B E, thickest to thinnest: G is the 3rd string from the thin side.' },
+      ];
+    },
+  },
+  {
+    id: 'check-5',
+    title: 'Hold the tempo',
+    check: true,
+    recap: 'Your beat holds at slow, middle and quick tempos, and you can hear one that drifts.',
+    build: () => [
+      { type: 'choose', prompt: 'Tap both. Which beat is steady?',
+        options: pair('Beat', { kind: 'clicks', bpm: 90, count: 8 }, { kind: 'clicks', bpm: 90, count: 8, wobble: true }),
+        explain: 'A steady beat leaves the same gap every time. The other one rushes and drags.' },
+      { type: 'tap', prompt: 'Hold 80', detail: 'Four clicks to count in, then tap on each one.', bpm: 80, taps: 12, need: 9, windowMs: 65 },
+      { type: 'tap', prompt: 'Now slow: 60', detail: 'Slow is harder than it sounds. Count the gap, do not rush it.', bpm: 60, taps: 8, need: 6, windowMs: 75 },
+      { type: 'choose', prompt: 'Tap both. Which is faster?',
+        options: pair('Tempo', { kind: 'clicks', bpm: 112, count: 6 }, { kind: 'clicks', bpm: 96, count: 6 }),
+        explain: 'More beats per minute means less space between clicks.' },
+      { type: 'tap', prompt: 'And quick: 104', detail: 'Keep your hand loose and let the click lead.', bpm: 104, taps: 12, need: 9, windowMs: 55 },
+    ],
+  },
+  {
+    id: 'check-7',
+    title: 'Scales from memory',
+    check: true,
+    recap: 'You know the major scale and the minor pentatonic by heart, and you can hear which mood a scale has.',
+    build: () => {
+      const root = pick([55, 57, 60]);
+      const major = Math.random() < 0.5;
+      return [
+        { type: 'choose', prompt: 'Is this scale major or minor?', sound: run(root, major ? MAJOR : MINOR),
+          options: [{ label: 'Major', correct: major }, { label: 'Minor', correct: !major }],
+          explain: major ? 'Major: the third note sits high, so it sounds bright.' : 'Minor: the third note sits a fret lower, so it sounds darker.' },
+        { type: 'play', prompt: 'C major, from memory', detail: 'The climb from the 3rd fret of the A string, all eight notes. No fret numbers this time.',
+          notes: [0, 2, 4, 5, 7, 9, 11, 0], names: ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C'].map(name => ({ name })) },
+        { type: 'choose', prompt: 'Which note turns a major scale minor?',
+          options: shuffle<ChooseOption>([{ label: 'The 3rd', correct: true }, { label: 'The 5th' }, { label: 'The root' }]),
+          explain: 'Lower the 3rd by one fret and the whole scale turns minor.' },
+        { type: 'play', prompt: 'A minor pentatonic, from memory', detail: 'The box at the 5th fret, low to high.',
+          notes: [9, 0, 2, 4, 7, 9], names: ['A', 'C', 'D', 'E', 'G', 'A'].map(name => ({ name })) },
+        { type: 'tap', prompt: 'Keep the beat at 84', detail: 'A scale in time needs a steady hand. Count in, then tap.', bpm: 84, taps: 8, need: 6, windowMs: 65 },
+      ];
+    },
+  },
+  {
+    id: 'check-9',
+    title: 'Hear it, play it',
+    check: true,
+    recap: 'You can name an interval by ear and find it on the neck.',
+    build: () => {
+      const back = shuffle<{ root: number; where: string; k: IntervalKey }>([
+        { root: 45, where: 'open 5th', k: 'P5' },
+        { root: 45, where: 'open 5th', k: 'P4' },
+        { root: 50, where: 'open 4th', k: 'P5' },
+        { root: 40, where: 'open 6th', k: 'P4' },
+        { root: 45, where: 'open 5th', k: 'M3' },
+      ]).slice(0, 3);
+      return [
+        intervalRound(['M3', 'P4', 'P5', 'P8']),
+        ...back.map(({ root, where, k }): Exercise => ({
+          type: 'play', prompt: 'Play what you hear',
+          detail: `It starts on ${NAMES[pc(root)]}, ${where}. Find the second note by ear.`,
+          notes: [pc(root), pc(root + INTERVAL[k].semis)],
+          names: [{ name: NAMES[pc(root)], where }, { name: NAMES[pc(root + INTERVAL[k].semis)], hidden: true }],
+          hear: { kind: 'notes', midis: [root, root + INTERVAL[k].semis], gap: 0.7 }, auto: true,
+        })),
+        intervalRound(['M3', 'P4', 'P5', 'P8']),
+        { type: 'choose', prompt: 'How many frets up is a perfect 5th?',
+          options: shuffle<ChooseOption>([{ label: '7', correct: true }, { label: '5' }, { label: '4' }]),
+          explain: 'A perfect 5th is 7 frets. A 4th is 5, a major 3rd is 4.' },
+        intervalRound(['M3', 'P4', 'P5', 'P8']),
+      ];
+    },
+  },
+  {
+    id: 'check-12',
+    title: 'The octave check',
+    check: true,
+    recap: 'Ear, beat, scale, chord and key: the whole first octave, in one go.',
+    build: () => [
+      intervalRound(['M3', 'P4', 'P5', 'P8']),
+      chordRound(['maj', 'min']),
+      { type: 'tap', prompt: 'Hold 92', detail: 'Count in, then tap on each click.', bpm: 92, taps: 8, need: 6, windowMs: 60 },
+      { type: 'play', prompt: 'G major scale, one octave', detail: 'Start on the 3rd fret of the low E string. Seven notes and back to G.',
+        notes: [7, 9, 11, 0, 2, 4, 6, 7], names: ['G', 'A', 'B', 'C', 'D', 'E', 'F♯', 'G'].map(name => ({ name })) },
+      { type: 'play', prompt: 'Build A minor', detail: 'Its three notes, one at a time: root, third, fifth.',
+        notes: [9, 0, 4], names: [{ name: 'A', hidden: true }, { name: 'C', hidden: true }, { name: 'E', hidden: true }] },
+      { type: 'choose', prompt: 'Which chord belongs in the key of D?',
+        options: shuffle<ChooseOption>([{ label: 'G major', correct: true }, { label: 'F major' }, { label: 'C major' }]),
+        explain: 'D major has F♯ and C♯. G major (G B D) fits; F and C do not.' },
+      { type: 'choose', prompt: 'On the circle of fifths, what comes after G?',
+        options: shuffle<ChooseOption>([{ label: 'D', correct: true }, { label: 'C' }, { label: 'A' }]),
+        explain: 'Each step is a 5th up: C, G, D, A, E and on round.' },
+    ],
+  },
+];
+
+export const lessonFor = (id: string): Lesson | undefined => LESSONS.find(l => l.id === id) ?? CHECKS.find(l => l.id === id);

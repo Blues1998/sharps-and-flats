@@ -12,7 +12,7 @@ import { useHoldUnlocks } from '../utils/feats';
 import { lessonOpen, startLesson, subscribeLesson } from '../lesson/store';
 import { lessonFor } from '../lesson/lessons';
 import { useBackToClose } from '../utils/nativeShell';
-import { AHEAD, FRETS, OCTAVE, CHECKS_READY, UNITS, doneSteps, fretHeight, levelOf, markSeen, seenSteps, unitOf } from '../utils/neck';
+import { AHEAD, FRETS, NECK_ORDER, OCTAVE, CHECKS_READY, UNITS, checkId, checkStars, doneSteps, fretHeight, levelOf, markSeen, seenSteps, unitOf } from '../utils/neck';
 import type { FretDef } from '../utils/neck';
 
 // Up the Neck. The Journey drawn as a real fretboard you scroll like a path.
@@ -51,9 +51,7 @@ const shapeFor = (count: number, strings: number): number[] => {
 };
 
 const fretDoneIn = (f: FretDef, done: Set<string>): boolean =>
-  f.check
-    ? !CHECKS_READY && FRETS.filter(g => g.n < f.n).every(g => g.check || g.steps.every(id => done.has(id)))
-    : f.steps.every(id => done.has(id));
+  f.check ? done.has(checkId(f.n)) : f.steps.every(id => done.has(id));
 
 const currentIn = (done: Set<string>): number => {
   for (const f of FRETS) if (!fretDoneIn(f, done)) return f.n;
@@ -67,7 +65,7 @@ const lessonSummary = (id: string): string | null => {
   const xs = l.build();
   const mins = Math.max(2, Math.round(xs.reduce((a, x) => a + (x.type === 'play' || x.type === 'tap' ? 50 : 20), 0) / 60));
   const mic = xs.some(x => x.type === 'play');
-  return `Lesson · ${xs.length} exercises · about ${mins} min${mic ? ' · uses the mic' : ''}`;
+  return `${l.check ? 'Check' : 'Lesson'} · ${xs.length} ${l.check ? 'questions' : 'exercises'} · about ${mins} min${mic ? ' · uses the mic' : ''}`;
 };
 
 const Check = () => (
@@ -95,8 +93,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
 
   // What the neck shows as done. It trails real progress while a moment plays.
   const [shown, setShown] = useState<Set<string>>(() => {
+    const done = doneSteps(); // first: it settles which milestones were already behind you
     const seen = seenSteps();
-    const done = doneSteps();
     if (!seen) { markSeen(done); return done; }
     return new Set([...done].filter(id => seen.has(id)));
   });
@@ -132,7 +130,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const total = ALL_LEVELS.length;
 
   // One moment at a time: badges wait while the neck has progress to show.
-  const pending = ALL_LEVELS.some(l => !shown.has(l.id) && isLevelComplete(l));
+  const pending = (() => { const d = doneSteps(); return NECK_ORDER.some(id => d.has(id) && !shown.has(id)); })();
   useHoldUnlocks('neck', pending || octave);
 
   // ---- Geometry ---------------------------------------------------------------
@@ -164,32 +162,37 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     if (playing.current) return;
     if (getSession() || lessonOpen()) return; // the summary or lesson first; we run again when it closes
     const done = doneSteps();
-    const fresh = ALL_LEVELS.map(l => l.id).filter(id => done.has(id) && !shown.has(id));
+    const fresh = NECK_ORDER.filter(id => done.has(id) && !shown.has(id));
     if (fresh.length === 0) return;
     playing.current = true;
     let have = new Set(shown);
     await wait(t(450));
     for (const id of fresh) {
-      const fret = FRETS.find(f => f.steps.includes(id));
+      const isCheck = id.startsWith('check-');
+      const fret = isCheck ? FRETS.find(f => f.check && checkId(f.n) === id) : FRETS.find(f => f.steps.includes(id));
       if (!fret) { have.add(id); continue; }
-      const s = shapeFor(fret.steps.length, strings)[fret.steps.indexOf(id)] ?? 3;
       const before = currentIn(have);
       have = new Set(have).add(id);
-      setPress(id);
       setShown(have);
-      await wait(t(220));
-      feel('fret');
-      setRinging({ strings: [s], k: Date.now() });
-      setFloat({ x: strX(s), y: noteY(fret.n), k: Date.now() });
-      await wait(t(800));
+      if (!isCheck) {
+        const s = shapeFor(fret.steps.length, strings)[fret.steps.indexOf(id)] ?? 3;
+        setPress(id);
+        await wait(t(220));
+        feel('fret');
+        setRinging({ strings: [s], k: Date.now() });
+        setFloat({ x: strX(s), y: noteY(fret.n), k: Date.now() });
+        await wait(t(800));
+      }
       const after = currentIn(have);
       if (after === before) { setPress(null); continue; }
-      // The fret is finished: the wire lights like a downstroke, the neck rings.
-      setSweep(fret.n);
-      setRinging({ strings: 'all', k: Date.now() });
-      feel('strum');
-      await wait(t(800));
-      setSweep(null);
+      if (!isCheck) {
+        // The fret is finished: the wire lights like a downstroke, the neck rings.
+        setSweep(fret.n);
+        setRinging({ strings: 'all', k: Date.now() });
+        feel('strum');
+        await wait(t(800));
+        setSweep(null);
+      }
       // Any milestone passed on the way gets its own moment.
       for (const m of FRETS.filter(f => f.check && f.n >= before && f.n < after)) {
         scrollToFret(m.n);
@@ -380,17 +383,25 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     const locked = f.n > cur;
     const unlock = <span className="np-unlock"><Lock />Finish fret {curFret} to unlock</span>;
     if (f.check) {
+      const id = checkId(f.n);
       const passed = fretDoneIn(f, shown);
+      const st = checkStars(id);
       return (
         <div className={`np-card is-check${locked ? ' is-locked' : ''}`}>
-          <small>{f.n === OCTAVE ? 'The octave' : 'Milestone'}</small>
+          <small>{f.n === OCTAVE ? 'The octave' : 'Milestone'}{passed ? ' · passed' : ''}</small>
           <b>{f.check.title}</b>
           <p>{f.check.task}</p>
-          {!passed && <span className="np-card-stars" aria-label={`${STARS} stars to earn`}>{Array.from({ length: STARS }, (_, i) => <Star key={i} />)}</span>}
+          <span className="np-card-stars" aria-label={`${st} of ${STARS} stars`}>
+            {Array.from({ length: STARS }, (_, i) => <span key={i} className={i < st ? 'is-on' : ''}><Star /></span>)}
+          </span>
           {locked ? unlock : (
-            <span className="np-soon">
-              {passed ? 'Reached. A skill check for this milestone is coming in a later update.' : 'The skill check is coming in a later update. For now it opens when the frets below it are done.'}
-            </span>
+            <>
+              <p className="np-card-meta">{lessonSummary(id)}</p>
+              {passed && st === 0 && <span className="np-soon">Passed before the checks arrived. Take it any time to earn its stars.</span>}
+              <button type="button" className="np-start" data-feel="off" onClick={() => { feel('tap'); setFocus(null); startLesson(id); }}>
+                {!passed ? 'Start the check' : st === STARS ? 'Take it again' : st > 0 ? 'Go for more stars' : 'Earn the stars'}
+              </button>
+            </>
           )}
         </div>
       );
@@ -445,6 +456,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       return (
         <span className={`np-label is-check${done ? ' is-done' : ''}`}>
           <small>{f.n === OCTAVE ? 'Octave' : 'Milestone'}</small>{f.check.title}
+          {f.n === cur && tag?.place === 'label' && focus === null && <small className="np-label-gorow"><span className="np-label-go">Start<Chevron /></span></small>}
         </span>
       );
     }
@@ -471,13 +483,14 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const playedTo = cur > OCTAVE ? geo.tops[OCTAVE] + geo.heights[OCTAVE] : noteY(cur);
 
   const curNote = (() => {
-    if (!curDef || curDef.check) return null;
+    if (!curDef) return null;
+    if (curDef.check) return { x: width / 2, y: midY(cur), pct: 0, check: true };
     const i = curDef.steps.findIndex(id => !shown.has(id));
     const level = levelOf(curDef.steps[i]);
     if (!level) return null;
     // A lesson is all or nothing, so its ring stays empty until it is done.
     const [met, needed] = lessonFor(level.id) ? [0, 1] : levelProgress(level);
-    return { x: strX(shapeFor(curDef.steps.length, strings)[i] ?? 3), y: noteY(cur), pct: needed ? met / needed : 0 };
+    return { x: strX(shapeFor(curDef.steps.length, strings)[i] ?? 3), y: noteY(cur), pct: needed ? met / needed : 0, check: false };
   })();
 
   const tag = (() => {
@@ -485,7 +498,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     // The tag sits above your note: full size where there is room, smaller
     // where a neighbour is close. With no clean gap above or below (frets get
     // short up the neck), it moves into the step's label beside the neck.
-    const ring = 26;
+    const ring = curNote.check ? 20 : 26;
     const half = 42; // half the tag's width
     const things = (n: number) => {
       const f = FRETS.find(g => g.n === n);
@@ -552,10 +565,12 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
         ));
       })}
       {FRETS.filter(f => f.check).map(f => {
-        if (!CHECKS_READY || (!fretDoneIn(f, shown) && f.n !== nextMilestone)) return null;
+        const st = checkStars(checkId(f.n));
+        const passed = fretDoneIn(f, shown);
+        if (!CHECKS_READY || (passed ? st === 0 : f.n !== nextMilestone)) return null;
         return (
           <span key={`st${f.n}`} className="np-stars" style={{ top: midY(f.n) + (f.n === OCTAVE ? 20 : 24), left: width / 2 }} aria-hidden="true">
-            {Array.from({ length: STARS }, (_, i) => <Star key={i} />)}
+            {Array.from({ length: STARS }, (_, i) => <span key={i} className={i < st ? 'is-on' : ''}><Star /></span>)}
           </span>
         );
       })}
@@ -583,7 +598,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           );
         });
       })}
-      {curNote && (
+      {curNote && !curNote.check && (
         <svg className="np-ring" style={{ left: curNote.x, top: curNote.y }} viewBox="0 0 52 52" aria-hidden="true">
           <circle cx="26" cy="26" r="23" className="np-ring-track" />
           {curNote.pct > 0 && (

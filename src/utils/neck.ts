@@ -10,6 +10,7 @@
 // report the work); this file only says where each step sits on the neck.
 
 import { ALL_LEVELS, isLevelComplete } from './journey';
+import { getProgressCount } from './progress';
 import type { JourneyLevel } from './journey';
 
 export type Strand = 'ear' | 'rhythm' | 'neck' | 'theory' | 'voice';
@@ -38,33 +39,71 @@ export const FRETS: FretDef[] = [
   { n: 1, title: 'Your instrument', steps: ['set-up', 'hear-a-note'], strands: ['theory'] },
   { n: 2, title: 'Pitch', steps: ['wake-the-tuner', 'first-match'], strands: ['ear'] },
   { n: 3, title: 'Find it by ear', steps: [], strands: ['ear', 'neck'],
-    check: { title: 'Find it by ear', task: 'The app plays 5 notes. Find each one on your guitar.' } },
+    check: { title: 'Find it by ear', task: 'The app plays open strings. Find each one by ear.' } },
   { n: 4, title: 'The beat', steps: ['steady-hands'], strands: ['rhythm'] },
   { n: 5, title: 'Hold the tempo', steps: [], strands: ['rhythm'],
-    check: { title: 'Hold the tempo', task: 'Strum at 80 bpm for 30 seconds while the app listens.' } },
+    check: { title: 'Hold the tempo', task: 'Keep a steady beat at slow, middle and quick tempos.' } },
   { n: 6, title: 'Major and minor', steps: ['happy-vs-sad', 'first-climb', 'pentatonic'], strands: ['ear', 'neck', 'theory'] },
-  { n: 7, title: 'Scale in time', steps: [], strands: ['neck', 'rhythm'],
-    check: { title: 'Scale in time', task: 'Play a major scale in time with the click.' } },
+  { n: 7, title: 'Scales from memory', steps: [], strands: ['neck', 'rhythm'],
+    check: { title: 'Scales from memory', task: 'Play the major scale and the pentatonic box without the fret numbers.' } },
   { n: 8, title: 'Note to note', steps: ['interval-songs', 'interval-hunt'], strands: ['ear', 'neck'] },
   { n: 9, title: 'Hear it, play it', steps: [], strands: ['ear', 'neck'],
-    check: { title: 'Hear it, play it', task: 'Hear an interval, then play it back.' } },
+    check: { title: 'Hear it, play it', task: 'Name intervals by ear, then find them on the neck.' } },
   { n: 10, title: 'Chords', steps: ['chord-flavors', 'build-chords', 'why-chords-work'], strands: ['ear', 'neck', 'theory'] },
   { n: 11, title: 'Keys', steps: ['meet-the-circle', 'chords-that-belong', 'walk-the-circle'], strands: ['theory'] },
   { n: 12, title: 'The octave', steps: [], strands: ['ear', 'rhythm', 'neck', 'theory'],
-    check: { title: 'The octave check', task: 'One round each of ear, beat, scale and chord.' } },
+    check: { title: 'The octave check', task: 'Ear, beat, scale, chord and key, in one go.' } },
 ];
 
 const byId = new Map(ALL_LEVELS.map(l => [l.id, l]));
 export const levelOf = (id: string): JourneyLevel | undefined => byId.get(id);
 
-// Skill checks arrive in the next update. Until then an inlay fret is a
-// milestone you pass by finishing the frets before it, so nobody is stuck
-// behind something that is not there yet.
-export const CHECKS_READY = false;
+// Each inlay fret is a skill check: a short test of the frets below it. It
+// passes when its check is passed. Milestones someone had already passed
+// before the checks existed stay passed (nobody is sent back down the neck);
+// their stars wait for them to take the check.
+export const CHECKS_READY = true;
+export const checkId = (n: number): string => `check-${n}`;
+export const CHECK_IDS = FRETS.filter(f => f.check).map(f => checkId(f.n));
+
+const KEPT = 'cadenza-checks-kept';
+const SEEN = 'cadenza-neck-seen';
+let kept: Set<number> | null = null;
+function keptChecks(): Set<number> {
+  if (kept) return kept;
+  try {
+    const raw = localStorage.getItem(KEPT);
+    if (raw) return (kept = new Set(JSON.parse(raw) as number[]));
+  } catch { /* work it out below */ }
+  // First run with checks: keep every milestone whose frets were all done.
+  const stepsDone = (f: FretDef) => f.steps.every(id => isLevelComplete(byId.get(id)!));
+  kept = new Set(FRETS.filter(f => f.check && FRETS.filter(g => g.n < f.n && !g.check).every(stepsDone)).map(f => f.n));
+  try {
+    localStorage.setItem(KEPT, JSON.stringify([...kept]));
+    // Already behind you, so no celebration for them: mark them seen.
+    const raw = localStorage.getItem(SEEN);
+    if (raw) localStorage.setItem(SEEN, JSON.stringify([...new Set([...(JSON.parse(raw) as string[]), ...[...kept].map(checkId)])]));
+  } catch { /* recomputed next time, same answer */ }
+  return kept;
+}
+
+export const checkPassed = (n: number): boolean => getProgressCount(`lesson:${checkId(n)}`) > 0 || keptChecks().has(n);
+
+const STARS_KEY = 'cadenza-check-stars';
+function readStars(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(STARS_KEY) ?? '{}') as Record<string, number>; } catch { return {}; }
+}
+/** Best stars earned on a check, 0 to 3. */
+export const checkStars = (id: string): number => readStars()[id] ?? 0;
+export function saveCheckStars(id: string, stars: number): void {
+  const all = readStars();
+  if ((all[id] ?? 0) >= stars) return;
+  all[id] = stars;
+  try { localStorage.setItem(STARS_KEY, JSON.stringify(all)); } catch { /* this session only */ }
+}
 
 export const fretDone = (f: FretDef): boolean =>
-  f.check ? (CHECKS_READY ? false : FRETS.filter(g => g.n < f.n).every(g => g.check || g.steps.every(id => isLevelComplete(byId.get(id)!))))
-    : f.steps.every(id => isLevelComplete(byId.get(id)!));
+  f.check ? checkPassed(f.n) : f.steps.every(id => isLevelComplete(byId.get(id)!));
 
 /** The fret you are on: the first one not done. OCTAVE + 1 once the octave is passed. */
 export function currentFret(): number {
@@ -87,7 +126,6 @@ export const fretOfStep = (id: string): FretDef | undefined => FRETS.find(f => f
 // The neck plays its moments (a note pressed on, a fret lit) for progress made
 // since you last looked, so a step done in a lab lands when you come back.
 
-const SEEN = 'cadenza-neck-seen';
 
 export function seenSteps(): Set<string> | null {
   try {
@@ -100,7 +138,13 @@ export function markSeen(ids: Iterable<string>): void {
   try { localStorage.setItem(SEEN, JSON.stringify([...ids])); } catch { /* replays next time */ }
 }
 
-export const doneSteps = (): Set<string> => new Set(ALL_LEVELS.filter(isLevelComplete).map(l => l.id));
+export const doneSteps = (): Set<string> => new Set([
+  ...ALL_LEVELS.filter(isLevelComplete).map(l => l.id),
+  ...FRETS.filter(f => f.check && checkPassed(f.n)).map(f => checkId(f.n)),
+]);
+
+/** Every step and check, in the order you meet them on the neck. */
+export const NECK_ORDER: string[] = FRETS.flatMap(f => (f.check ? [checkId(f.n)] : f.steps));
 
 /** Fret heights follow a real neck: each fret is 2^(-1/12) of the one before. */
 export const fretHeight = (n: number, first: number): number => first * Math.pow(2, -(n - 1) / 12);

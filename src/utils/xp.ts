@@ -39,6 +39,7 @@ const RULES: Record<string, { n: number; perDay: number }> = {
   'song-through': { n: 5, perDay: 6 },
   'chord-proven': { n: 10, perDay: Infinity },
   'journey-step': { n: 20, perDay: Infinity },
+  'check-star': { n: 10, perDay: Infinity },
   'pick': { n: 25, perDay: Infinity }
 };
 

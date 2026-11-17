@@ -12,6 +12,8 @@ import { audio } from '../utils/audio';
 import { getProgressCount, reportProgress } from '../utils/progress';
 import { useHoldUnlocks } from '../utils/feats';
 import { useBackToClose } from '../utils/nativeShell';
+import { checkStars, saveCheckStars } from '../utils/neck';
+import { award } from '../utils/xp';
 
 // A lesson, run like a short session with a teacher.
 //
@@ -188,7 +190,10 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
     const id = window.setInterval(() => setQuiet(appSounding()), 100);
     return () => window.clearInterval(id);
   }, []);
-  const p = quiet ? null : mic.pitch;
+  const justHit = useRef<{ pc: number; until: number }>({ pc: -1, until: 0 });
+  const raw = quiet ? null : mic.pitch;
+  const echo = !!raw && ((raw.midi % 12) + 12) % 12 === justHit.current.pc && performance.now() < justHit.current.until;
+  const p = echo ? null : raw;
   const pcOf = (m: number) => ((m % 12) + 12) % 12;
   const target = ex.notes[at];
   const onNote = !!p && (target === -1 || pcOf(p.midi) === target);
@@ -206,7 +211,9 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
     }
     holdFrom.current = null;
     hitChime('great', p!.midi + 12);
-    hush(1200);
+    // The chime and your still-ringing string are the note just found. Ignore
+    // that note for a moment, not the whole mic, so a scale can keep moving.
+    justHit.current = { pc: pcOf(p!.midi), until: performance.now() + 1100 };
     feel('success');
     const next = at + 1;
     setAt(next);
@@ -220,13 +227,13 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
   const cents = p && onNote && target !== -1 ? Math.max(-50, Math.min(50, p.cents)) : null;
 
   return (
-    <div className="lp-play">
+    <div className="lp-play" data-notes={import.meta.env.DEV ? ex.notes.join(',') : undefined}>
       <h2>{ex.prompt}</h2>
       <p className="lp-detail">{ex.detail}</p>
       <div className="lp-targets">
         {ex.names.map((n, i) => (
-          <span key={i} className={`lp-target${i < at ? ' is-done' : i === at ? ' is-now' : ''}${i === at && hit ? ' is-hit' : ''}`}>
-            <b>{n.name}</b>{n.where && <small>{n.where}</small>}
+          <span key={i} className={`lp-target${i < at ? ' is-done' : i === at ? ' is-now' : ''}${i === at && hit ? ' is-hit' : ''}${n.hidden && i >= at ? ' is-hidden' : ''}`}>
+            <b>{n.hidden && i >= at ? '?' : n.name}</b>{n.where && <small>{n.where}</small>}
           </span>
         ))}
       </div>
@@ -246,10 +253,11 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void }> = ({ ex, verdict,
             : !p ? 'Play when you are ready.'
             : hit ? 'Hold it…'
             : onNote ? (p.cents > 0 ? 'Right note, a touch sharp.' : 'Right note, a touch flat.')
+            : ex.names[at]?.hidden ? `That is ${heard}. Not this one yet.`
             : `That is ${heard}. Looking for ${target === -1 ? 'any note' : NOTE[target]}.`}
         </p>
       </div>
-      {ex.hear && <div className="lp-players"><Player sound={ex.hear} label="Hear how it goes" /></div>}
+      {ex.hear && <div className="lp-players"><Player sound={ex.hear} label={ex.auto ? 'Hear it again' : 'Hear how it goes'} auto={ex.auto} /></div>}
     </div>
   );
 };
@@ -264,7 +272,9 @@ const Tap: React.FC<ExProps<'tap'>> = ({ ex, verdict, onVerdict, setFoot }) => {
   const begin = useCallback(() => {
     feel('tap');
     setTaps([]);
-    setT0(startClicks(ex.bpm, COUNT_IN + ex.taps + 1));
+    const start = startClicks(ex.bpm, COUNT_IN + ex.taps + 1);
+    setT0(start);
+    if (import.meta.env.DEV) Object.assign(window, { __tap: { t0: start, beat: 60 / ex.bpm, countIn: COUNT_IN, now: audioNow } });
   }, [ex.bpm, ex.taps]);
 
   useEffect(() => {
@@ -327,20 +337,41 @@ const Tap: React.FC<ExProps<'tap'>> = ({ ex, verdict, onVerdict, setFoot }) => {
 
 const STAFF_MIDI = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79];
 
-const passes = (outcomes: Outcome[]): boolean => {
+const passes = (outcomes: Outcome[], check = false): boolean => {
   const graded = outcomes.filter(o => o && o !== 'seen');
   if (graded.includes('skipped')) return false;
   if (graded.length === 0) return true;
+  if (check) return starsFor(outcomes) > 0;
   return graded.filter(o => o === 'first' || o === 'second').length / graded.length >= 0.5;
 };
 
-const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: number; complete: boolean }> = ({ lesson, outcomes, secs, take, complete }) => {
+// A milestone check is a test: first time only. 60% passes with one star,
+// 80% earns two, everything right earns three.
+export const CHECK_PASS = 0.6;
+function starsFor(outcomes: Outcome[]): number {
+  const graded = outcomes.filter(o => o && o !== 'seen');
+  if (!graded.length || graded.includes('skipped')) return 0;
+  const acc = graded.filter(o => o === 'first').length / graded.length;
+  return acc >= 1 ? 3 : acc >= 0.8 ? 2 : acc >= CHECK_PASS ? 1 : 0;
+}
+
+const BigStar: React.FC<{ on: boolean; i: number }> = ({ on, i }) => (
+  <svg className={`lp-star${on ? ' is-on' : ''}`} style={{ animationDelay: `${0.5 + i * 0.28}s` }} viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2.8l2.7 5.9 6.4.7-4.8 4.3 1.4 6.3L12 16.8 6.3 20l1.4-6.3L2.9 9.4l6.4-.7z" />
+  </svg>
+);
+
+const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: number; complete: boolean; stars: number; best: number }> = ({ lesson, outcomes, secs, take, complete, stars, best }) => {
   const graded = useMemo(() => outcomes.filter(o => o && o !== 'seen'), [outcomes]);
   const attempted = graded.filter(o => o !== 'skipped');
   const first = graded.filter(o => o === 'first').length;
   const acc = attempted.length ? first / attempted.length : null;
   const skipped = graded.includes('skipped');
-  const grade = skipped ? 'Unfinished take' : !complete ? 'Not there yet' : acc === null || acc >= 0.9 ? 'Clean take' : acc >= 0.6 ? 'Solid take' : 'Rough take';
+  const check = !!lesson.check;
+  const grade = check
+    ? (skipped ? 'Unfinished' : !complete ? 'Not yet' : stars === 3 ? 'Three stars' : stars === 2 ? 'Two stars' : 'Passed')
+    : skipped ? 'Unfinished take' : !complete ? 'Not there yet' : acc === null || acc >= 0.9 ? 'Clean take' : acc >= 0.6 ? 'Solid take' : 'Rough take';
+  const need = Math.ceil(graded.length * CHECK_PASS);
   const [shown, setShown] = useState(0);
 
   // The phrase plays back as the notes appear: right notes ring, misses are muted.
@@ -364,8 +395,14 @@ const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: 
   const used = new Set(graded);
   return (
     <div className="lp-take">
-      <span className="lp-take-kicker">Take {take} · {lesson.title}</span>
+      <span className="lp-take-kicker">{check ? `Fret ${lesson.id.replace('check-', '')} · ${lesson.title}` : `Take ${take} · ${lesson.title}`}</span>
       <h2>{grade}</h2>
+      {check && (
+        <div className="lp-stars" role="img" aria-label={`${stars} of 3 stars`}>
+          {[0, 1, 2].map(i => <BigStar key={i} i={i} on={i < stars} />)}
+          {stars > best && best > 0 && <span className="lp-best">New best</span>}
+        </div>
+      )}
       <svg className="lp-staff" viewBox={`0 0 ${W} 100`} role="img" aria-label={`${first} of ${attempted.length} right first time`}>
         {[0, 1, 2, 3, 4].map(k => <line key={k} x1="0" x2={W} y1={22 + k * 14} y2={22 + k * 14} />)}
         <text x="2" y="72" className="lp-clef">𝄞</text>
@@ -389,24 +426,33 @@ const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: 
       <dl className="lp-facts">
         <div><dt>First time</dt><dd>{attempted.length ? `${first} of ${attempted.length}` : 'None tried'}</dd></div>
         <div><dt>Time</dt><dd>{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</dd></div>
-        <div><dt>XP</dt><dd>{complete && take === 1 ? '+20' : '0'}</dd></div>
+        <div><dt>XP</dt><dd>{check ? (stars > best ? `+${(stars - best) * 10}` : '0') : complete && take === 1 ? '+20' : '0'}</dd></div>
       </dl>
-      {complete ? (
-        <div className="lp-recap"><small>Keep this</small><p>{lesson.recap}</p></div>
+      {check && !complete ? (
+        <div className="lp-recap is-open"><small>{skipped ? 'Every part counts' : 'To pass'}</small><p>{skipped
+          ? 'A check needs the guitar parts too. Play them all to pass.'
+          : `Passing takes ${need} of ${graded.length} right first time. Each try asks a fresh set.`}</p></div>
+      ) : complete ? (
+        <div className="lp-recap"><small>{check ? 'Milestone passed' : 'Keep this'}</small><p>{lesson.recap}</p></div>
       ) : skipped ? (
         <div className="lp-recap is-open"><small>Not finished yet</small><p>The guitar parts you skipped are still open. Play them to finish this step.</p></div>
       ) : (
         <div className="lp-recap is-open"><small>One more take</small><p>Fewer than half came out right, so this step stays open. Go again: the questions change each time.</p></div>
       )}
-      {!complete && <button type="button" className="lp-btn" onClick={() => { feel('tap'); restartLesson(); }} data-feel="off">Try again</button>}
-      <button type="button" className={`lp-btn${complete ? '' : ' is-quiet'}`} onClick={() => { feel('tap'); closeLesson(); }} data-feel="off">Back to the neck</button>
+      {complete && <button type="button" className="lp-btn" onClick={() => { feel('tap'); closeLesson(); }} data-feel="off">Back to the neck</button>}
+      {(!complete || (check && stars < 3)) && (
+        <button type="button" className={`lp-btn${complete ? ' is-quiet' : ''}`} onClick={() => { feel('tap'); restartLesson(); }} data-feel="off">
+          {complete ? 'Go for three stars' : 'Try again'}
+        </button>
+      )}
+      {!complete && <button type="button" className="lp-btn is-quiet" onClick={() => { feel('tap'); closeLesson(); }} data-feel="off">Back to the neck</button>}
     </div>
   );
 };
 
 // ---- The run ---------------------------------------------------------------------
 
-interface RunState { queue: Entry[]; at: number; outcomes: Outcome[]; verdict: Verdict | null; done: boolean }
+interface RunState { queue: Entry[]; at: number; outcomes: Outcome[]; verdict: Verdict | null; done: boolean; check: boolean }
 type Action = { type: 'verdict'; v: Verdict } | { type: 'skip' } | { type: 'seen' } | { type: 'next' };
 
 const advance = (s: RunState): RunState =>
@@ -422,7 +468,7 @@ function reduce(s: RunState, a: Action): RunState {
       if (a.v.ok) outcomes[e.key] = e.attempt === 1 ? 'first' : 'second';
       else {
         outcomes[e.key] = 'missed';
-        if (e.attempt === 1) queue = [...queue, { ...e, attempt: 2 }];
+        if (e.attempt === 1 && !s.check) queue = [...queue, { ...e, attempt: 2 }];
       }
       return { ...s, queue, outcomes, verdict: a.v };
     }
@@ -435,7 +481,7 @@ function reduce(s: RunState, a: Action): RunState {
 const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   const first = useMemo(() => lesson.build(), [lesson]);
   const [s, dispatch] = useReducer(reduce, undefined, (): RunState => ({
-    queue: first.map((ex, key) => ({ key, ex, attempt: 1 })), at: 0, outcomes: [], verdict: null, done: false,
+    queue: first.map((ex, key) => ({ key, ex, attempt: 1 })), at: 0, outcomes: [], verdict: null, done: false, check: !!lesson.check,
   }));
   const [foot, setFoot] = useState<React.ReactNode>(null);
   const [quitting, setQuitting] = useState(false);
@@ -444,12 +490,19 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   const [secs, setSecs] = useState(0);
   useHoldUnlocks('lesson', true);
 
-  const complete = s.done && passes(s.outcomes);
+  const complete = s.done && passes(s.outcomes, !!lesson.check);
+  const stars = lesson.check && s.done ? starsFor(s.outcomes) : 0;
+  const [best] = useState(() => (lesson.check ? checkStars(lesson.id) : 0));
   useEffect(() => {
     if (!s.done) return;
     setSecs(Math.round((performance.now() - startedAt.current) / 1000));
+    if (lesson.check && stars > best) {
+      saveCheckStars(lesson.id, stars);
+      // Each star pays once, ever: a retake only pays for stars not held before.
+      for (let k = best + 1; k <= stars; k++) award('check-star', `${lesson.id}-${k}`);
+    }
     if (complete) reportProgress(`lesson:${lesson.id}`);
-  }, [s.done, complete, lesson.id]);
+  }, [s.done, complete, lesson.id, lesson.check, stars, best]);
 
   const onBack = useCallback(() => { if (s.done) closeLesson(); else setQuitting(q => !q); }, [s.done]);
   useBackToClose(true, onBack);
@@ -468,7 +521,7 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
     setFoot(<button type="button" className="lp-btn" onClick={() => { feel('tap'); dispatch({ type: 'next' }); }} data-feel="off">{s.at + 1 >= s.queue.length ? 'Finish' : 'Next'}</button>);
   }, [s.verdict, s.at, s.queue.length]);
 
-  if (s.done) return <Take lesson={lesson} outcomes={s.outcomes} secs={secs} take={take.current} complete={complete} />;
+  if (s.done) return <Take lesson={lesson} outcomes={s.outcomes} secs={secs} take={take.current} complete={complete} stars={stars} best={best} />;
 
   const entry = s.queue[s.at];
   const ex = entry.ex;
