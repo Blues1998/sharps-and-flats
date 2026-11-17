@@ -12,6 +12,9 @@
 //   choose  hear something (or tap sounds) and pick an answer; explain says why
 //   play    play notes; the mic checks each pitch class, any octave
 //   tap     tap along with a click; taps within the window count
+//   explore a small fretboard to tap and hear, with frets to find in order
+//   riff    play a line from tab: wait mode waits for each note, time mode
+//           runs with a click and counts the notes that land in time
 //
 // Lessons are built fresh each time, so rounds are shuffled.
 //
@@ -20,14 +23,24 @@
 // from how much was right first time.
 
 import type { Sound } from './sound';
+import { SONGS } from './songs';
 
-export interface ChooseOption { label: string; sound?: Sound; correct?: boolean }
+/** `hear` is what this answer would sound like: played next to the right one
+ *  when it was picked wrongly, so the difference is heard, not just told. */
+export interface ChooseOption { label: string; sound?: Sound; correct?: boolean; hear?: Sound }
+
+import type { RiffNote } from './riff';
+export type { RiffNote } from './riff';
 
 export type Exercise =
   | { type: 'teach'; title: string; body: string; sounds?: { label: string; sound: Sound }[]; chips?: { name: string; where?: string }[] }
-  | { type: 'choose'; prompt: string; sound?: Sound; options: ChooseOption[]; explain: string }
+  | { type: 'choose'; prompt: string; sound?: Sound; options: ChooseOption[]; explain: string;
+      /** A fresh, easier round for the retry: just the right answer and the one picked. */
+      remake?: (picked: string) => Exercise }
   | { type: 'play'; prompt: string; detail: string; notes: number[]; names: { name: string; where?: string; hidden?: boolean }[]; hear?: Sound; auto?: boolean; tolerance?: number; holdMs?: number; found?: string }
-  | { type: 'tap'; prompt: string; detail: string; bpm: number; taps: number; need: number; windowMs: number };
+  | { type: 'tap'; prompt: string; detail: string; bpm: number; taps: number; need: number; windowMs: number }
+  | { type: 'explore'; prompt: string; detail: string; strings: number[]; from?: number; to: number; goal: [number, number][]; done: string }
+  | { type: 'riff'; prompt: string; detail: string; notes: RiffNote[]; bpm: number; time?: boolean; need?: number };
 
 export interface Lesson {
   id: string;
@@ -36,6 +49,10 @@ export interface Lesson {
   build: () => Exercise[];
   /** A milestone check: no teaching, no second tries, scored in stars. */
   check?: boolean;
+  /** A unit's song: learnt in parts, then played in time for stars. */
+  song?: { title: string; by: string };
+  /** A practice round (a drill on what tripped you): records nothing. */
+  practice?: boolean;
 }
 
 // ---- Helpers ---------------------------------------------------------------------
@@ -72,19 +89,24 @@ const INTERVAL = {
 };
 type IntervalKey = keyof typeof INTERVAL;
 
-function intervalRound(keys: IntervalKey[]): Exercise {
+export function intervalRound(keys: IntervalKey[]): Exercise {
   const k = pick(keys);
   const root = pick([55, 57, 59, 60, 62]);
+  const gap = (o: IntervalKey): Sound => ({ kind: 'notes', midis: [root, root + INTERVAL[o].semis], gap: 0.65 });
   return {
     type: 'choose',
     prompt: 'Which interval is this?',
-    sound: { kind: 'notes', midis: [root, root + INTERVAL[k].semis], gap: 0.65 },
-    options: keys.map(o => ({ label: INTERVAL[o].name, correct: o === k })),
+    sound: gap(k),
+    options: keys.map(o => ({ label: INTERVAL[o].name, correct: o === k, hear: gap(o) })),
     explain: `That was a ${INTERVAL[k].name.toLowerCase()}, ${INTERVAL[k].semis} frets apart: ${INTERVAL[k].feel}.`,
+    remake: picked => {
+      const p = (Object.keys(INTERVAL) as IntervalKey[]).find(o => INTERVAL[o].name === picked);
+      return intervalRound(p && p !== k ? [k, p].sort((a, b) => INTERVAL[a].semis - INTERVAL[b].semis) : keys);
+    },
   };
 }
 
-function chordRound(qs: ('maj' | 'min' | 'dim')[]): Exercise {
+export function chordRound(qs: ('maj' | 'min' | 'dim')[]): Exercise {
   const q = pick(qs);
   const root = pick([55, 57, 60, 62]);
   const label = { maj: 'Major', min: 'Minor', dim: 'Diminished' };
@@ -92,7 +114,11 @@ function chordRound(qs: ('maj' | 'min' | 'dim')[]): Exercise {
     type: 'choose',
     prompt: 'What kind of chord is this?',
     sound: { kind: 'chord', midis: triad(root, q) },
-    options: qs.map(o => ({ label: label[o], correct: o === q })),
+    options: qs.map(o => ({ label: label[o], correct: o === q, hear: { kind: 'chord', midis: triad(root, o) } })),
+    remake: picked => {
+      const p = qs.find(o => label[o] === picked);
+      return chordRound(p && p !== q ? qs.filter(o => o === q || o === p) : qs);
+    },
     explain: q === 'maj'
       ? 'Major: open and settled. Its third is four frets above the root.'
       : q === 'min'
@@ -100,6 +126,9 @@ function chordRound(qs: ('maj' | 'min' | 'dim')[]): Exercise {
         : 'Diminished: tight and unsettled. Both its intervals are small thirds.',
   };
 }
+
+/** The A minor pentatonic box at the 5th fret, low to high. */
+const BOX: [number, number][] = [[6, 5], [6, 8], [5, 5], [5, 7], [4, 5], [4, 7], [3, 5], [3, 7], [2, 5], [2, 8], [1, 5], [1, 8]];
 
 // ---- The lessons -----------------------------------------------------------------
 
@@ -243,13 +272,23 @@ export const LESSONS: Lesson[] = [
         body: 'Drop the 2nd and 6th notes from the minor scale and you get the minor pentatonic. With nothing in it that clashes, it is the sound of most rock and blues solos.',
         chips: [{ name: 'A' }, { name: 'C' }, { name: 'D' }, { name: 'E' }, { name: 'G' }],
         sounds: [{ label: 'A minor pentatonic', sound: { kind: 'notes', midis: [57, 60, 62, 64, 67, 69], gap: 0.36 } }] },
-      { type: 'choose', prompt: 'How many different notes are in it?',
-        options: shuffle<ChooseOption>([{ label: 'Five', correct: true }, { label: 'Six' }, { label: 'Seven' }]),
-        explain: 'Penta means five. The A at the top is the bottom A again, an octave higher.' },
       { type: 'choose', prompt: 'Tap both. Which is the pentatonic?',
         options: pair('Run', { kind: 'notes', midis: [57, 60, 62, 64, 67, 69], gap: 0.32 }, run(57, MINOR, 0.32)),
         explain: 'The pentatonic has gaps. It skips the notes that make the full minor scale sound fussy.' },
-      { type: 'play', prompt: 'Play A minor pentatonic', detail: 'Start at the 5th fret of the low E string. Two notes per string.', ...playNotes([[45, 'E 5'], [48, 'E 8'], [50, 'A 5'], [52, 'A 7'], [55, 'D 5'], [57, 'D 7']]), hear: { kind: 'notes', midis: [45, 48, 50, 52, 55, 57], gap: 0.5 } },
+      { type: 'explore', prompt: 'Find the box', detail: 'Tap the glowing frets, low to high. This is the shape your hand will learn.',
+        strings: [1, 2, 3, 4, 5, 6], from: 4, to: 9, goal: BOX,
+        done: 'That is the box: frets 5 and 8 on both E strings and the B, frets 5 and 7 on the middle three.' },
+      { type: 'riff', prompt: 'The bottom half', detail: 'The next note waits for you. Index finger on fret 5, ring or little finger for 7 and 8.',
+        notes: BOX.slice(0, 6).map(([st, f]): RiffNote => [st, f, 1]), bpm: 60 },
+      { type: 'riff', prompt: 'The whole box', detail: 'All twelve notes, low to high, at your own pace.',
+        notes: BOX.map(([st, f]): RiffNote => [st, f, 1]), bpm: 60 },
+      { type: 'riff', prompt: 'Now in time', detail: 'Four clicks to count in, then one note on each click. Land most of them.',
+        notes: BOX.map(([st, f]): RiffNote => [st, f, 1]), bpm: 60, time: true },
+      { type: 'riff', prompt: 'Your first lick', detail: 'Down the top of the box. Quick notes first, then let the last one ring.',
+        notes: [[1, 8, 0.5], [1, 5, 0.5], [2, 8, 0.5], [2, 5, 0.5], [3, 7, 1], [3, 5, 1], [4, 7, 2]], bpm: 66, time: true },
+      { type: 'choose', prompt: 'How many different notes are in it?',
+        options: shuffle<ChooseOption>([{ label: 'Five', correct: true }, { label: 'Six' }, { label: 'Seven' }]),
+        explain: 'Penta means five. The box has twelve frets, but the A, C, D, E and G repeat higher up.' },
     ],
   },
   {
@@ -264,6 +303,9 @@ export const LESSONS: Lesson[] = [
           { label: 'Perfect 5th', sound: { kind: 'notes', midis: [60, 67], gap: 0.6 } },
           { label: 'Octave', sound: { kind: 'notes', midis: [60, 72], gap: 0.6 } },
         ] },
+      { type: 'explore', prompt: 'Measure three gaps', detail: 'The A string is a ruler. Tap the glowing frets in order and listen to each gap.',
+        strings: [5], from: 0, to: 12, goal: [[5, 0], [5, 4], [5, 0], [5, 7], [5, 0], [5, 12]],
+        done: 'Four frets is a major 3rd. Seven is a perfect 5th. Twelve is the octave: the same note, higher.' },
       { type: 'teach', title: 'Now hear them together',
         body: 'Played at once, each gap has a colour. The major 3rd is close and bright. The 5th is wide and hollow. The octave blends into one note.',
         sounds: [
@@ -271,10 +313,16 @@ export const LESSONS: Lesson[] = [
           { label: 'Perfect 5th', sound: { kind: 'chord', midis: [60, 67] } },
           { label: 'Octave', sound: { kind: 'chord', midis: [60, 72] } },
         ] },
-      { type: 'choose', prompt: 'Which gap is bigger?',
-        options: pair('Gap', { kind: 'notes', midis: [60, 67], gap: 0.6 }, { kind: 'notes', midis: [60, 64], gap: 0.6 }),
-        explain: 'The 5th is seven frets wide. The 3rd is four.' },
-      intervalRound(['M3', 'P5', 'P8']), intervalRound(['M3', 'P5', 'P8']), intervalRound(['M3', 'P5', 'P8']), intervalRound(['M3', 'P5', 'P8']),
+      intervalRound(['M3', 'P5', 'P8']), intervalRound(['M3', 'P5', 'P8']),
+      ...shuffle<IntervalKey>(['M3', 'P5', 'P8']).slice(0, 2).map((k): Exercise => ({
+        type: 'play', prompt: 'Play back what you hear',
+        detail: 'It starts on A, the open 5th string. The second note is 4, 7 or 12 frets up.',
+        notes: [pc(45), pc(45 + INTERVAL[k].semis)],
+        names: [{ name: 'A', where: 'open 5th' }, { name: NAMES[pc(45 + INTERVAL[k].semis)], hidden: true }],
+        hear: { kind: 'notes', midis: [45, 45 + INTERVAL[k].semis], gap: 0.7 }, auto: true,
+        found: `A up to ${NAMES[pc(45 + INTERVAL[k].semis)]}: a ${INTERVAL[k].name.toLowerCase()}, ${INTERVAL[k].semis} frets.`,
+      })),
+      intervalRound(['M3', 'P5', 'P8']), intervalRound(['M3', 'P5', 'P8']),
     ],
   },
   {
@@ -544,4 +592,9 @@ export const CHECKS: Lesson[] = [
   },
 ];
 
-export const lessonFor = (id: string): Lesson | undefined => LESSONS.find(l => l.id === id) ?? CHECKS.find(l => l.id === id);
+// A drill made on the spot from what tripped someone up. It records nothing.
+let drill: Lesson | null = null;
+export const setDrill = (l: Lesson): void => { drill = l; };
+
+export const lessonFor = (id: string): Lesson | undefined =>
+  id === 'drill' ? drill ?? undefined : LESSONS.find(l => l.id === id) ?? CHECKS.find(l => l.id === id) ?? SONGS.find(l => l.id === id);

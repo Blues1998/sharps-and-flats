@@ -12,6 +12,9 @@ export interface MicPitch {
   error: string | null;
   start: () => Promise<void>;
   stop: () => void;
+  /** performance.now() of the last pluck heard: a jump in loudness. Lets a
+   *  caller tell a fresh pluck of the same note from one still ringing. */
+  lastPluck: () => number;
 }
 
 /**
@@ -31,11 +34,20 @@ export function useMicPitch(mode: PitchMode = 'instrument'): MicPitch {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const bufferRef = useRef<Float32Array | null>(null);
+  const pluckAt = useRef(0);
+  const envRef = useRef(0);
+  const candRef = useRef<{ at: number; rms: number } | null>(null);
+  const lastPluck = useCallback(() => pluckAt.current, []);
   const stabilizerRef = useRef<PitchStabilizer | VoiceSmoother>(
     mode === 'voice' ? new VoiceSmoother() : new PitchStabilizer()
   );
 
+  // Each start or stop bumps this, so a start still waiting on the mic
+  // permission knows it was cancelled and gives the mic straight back.
+  const gen = useRef(0);
+
   const stop = useCallback(() => {
+    gen.current++;
     setIsActive(false);
 
     if (animationFrameId.current !== null) {
@@ -57,6 +69,7 @@ export function useMicPitch(mode: PitchMode = 'instrument'): MicPitch {
   }, []);
 
   const start = useCallback(async () => {
+    const mine = ++gen.current;
     try {
       setError(null);
       // Raw signal: processing like echo cancellation distorts pitched input
@@ -67,6 +80,7 @@ export function useMicPitch(mode: PitchMode = 'instrument'): MicPitch {
           autoGainControl: false
         }
       });
+      if (mine !== gen.current) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -90,6 +104,20 @@ export function useMicPitch(mode: PitchMode = 'instrument'): MicPitch {
       const updatePitch = () => {
         if (!due()) { animationFrameId.current = requestAnimationFrame(updatePitch); return; }
         analyser.getFloatTimeDomainData(buffer as any);
+        let sum = 0;
+        for (let i = 0; i < buffer.length; i++) sum += buffer[i] * buffer[i];
+        const rms = Math.sqrt(sum / buffer.length);
+        const now = performance.now();
+        // A pluck keeps sounding; a click (the metronome, a tap on the phone)
+        // is gone a moment later. A jump in loudness only counts as a pluck
+        // if most of it is still there about 70 ms on.
+        const cand = candRef.current;
+        if (cand && now - cand.at >= 70) {
+          if (rms >= cand.rms * 0.5) pluckAt.current = cand.at;
+          candRef.current = null;
+        }
+        if (!candRef.current && rms > 0.01 && rms > envRef.current * 1.25 && now - pluckAt.current > 90) candRef.current = { at: now, rms };
+        envRef.current = envRef.current * 0.85 + rms * 0.15;
         const raw = detectPitch(buffer, sampleRate);
         // Stabilize: hysteresis on note changes + smoothing, so the reading
         // doesn't flicker on every animation frame
@@ -109,5 +137,5 @@ export function useMicPitch(mode: PitchMode = 'instrument'): MicPitch {
   // Release the mic and audio context when the owning component unmounts
   useEffect(() => stop, [stop]);
 
-  return { pitch, isActive, error, start, stop };
+  return { pitch, isActive, error, start, stop, lastPluck };
 }

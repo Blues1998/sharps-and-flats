@@ -17011,3 +17011,70 @@ a.btn {
 .tstat-pop-rests i.is-on { opacity: 1; color: var(--primary); }
 @keyframes tstat-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .tstat > .tstat-item { position: relative; z-index: 42; }
+
+/* ===== Lessons: hearing a mix-up, and what tripped you ===== */
+.lp-compare { margin: 16px 0 0; padding: 12px 14px; border-radius: 16px; background: var(--surface-1); border: 1px dashed var(--panel-border); }
+.lp-compare small, .lp-slips small { display: block; margin-bottom: 8px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.lp-slips { width: 100%; box-sizing: border-box; margin: 0 0 16px; padding: 14px 16px; border-radius: 16px; text-align: left; background: var(--surface-1); border: 1px solid var(--panel-border); }
+.lp-slips ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 0.92rem; color: var(--text-secondary); }
+.lp-slips b { color: var(--text-primary); font-weight: 600; }
+.lp-slips em { font-style: normal; color: var(--danger); font-weight: 700; }
+.lp-slips .lp-btn { margin-top: 12px; width: 100%; }
+
+/* ===== Lessons: a fretboard to explore ===== */
+.lp-board { display: block; width: 100%; height: auto; margin: 0 0 14px; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.lp-board-wood { fill: #3a2417; }
+.lp-board-nut { fill: #e9dcc0; }
+.lp-board-wire { stroke: #b9b2a6; stroke-width: 2; }
+.lp-board-string { stroke: #d8cdb8; }
+.lp-board-num { font-size: 9px; fill: var(--text-muted); text-anchor: middle; font-family: var(--font-ui); }
+.lp-board-sname { font-size: 10px; fill: var(--text-muted); text-anchor: end; font-weight: 700; font-family: var(--font-ui); }
+.lp-board-cell { cursor: pointer; }
+.lp-board-dot { fill: rgba(255, 255, 255, 0.14); stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.2; stroke-dasharray: 2 2; }
+.lp-board-dot.is-found { fill: var(--primary); stroke: none; stroke-dasharray: none; opacity: 0.9; }
+.lp-board-next { fill: color-mix(in srgb, var(--primary) 30%, transparent); stroke: var(--primary); stroke-width: 2.5; animation: lp-board-glow 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes lp-board-glow { 50% { transform: scale(1.18); opacity: 0.7; } }
+.lp-board-lit circle { fill: #ffd8a8; animation: lp-board-lit 0.9s ease-out forwards; transform-box: fill-box; transform-origin: center; }
+.lp-board-lit text { font-size: 10px; font-weight: 800; text-anchor: middle; fill: #3a1a08; animation: lp-board-lit 0.9s ease-out forwards; }
+@keyframes lp-board-lit { 0% { opacity: 1; transform: scale(0.7); } 30% { transform: scale(1.1); } 100% { opacity: 0; } }
+.lp-explore-done { margin: 0 0 12px; padding: 12px 14px; border-radius: 14px; font-size: 0.95rem; line-height: 1.45; color: var(--text-primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface-1)); border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--panel-border)); animation: lp-pop 0.4s ease-out; }
+
+/* ===== Lessons: a strip of tab to play from ===== */
+.lp-tab { position: relative; margin: 0 0 14px; padding: 8px 0 8px 22px; border-radius: 16px; background: var(--surface-1); border: 1px solid var(--panel-border); }
+.lp-tab-names { position: absolute; left: 0; top: 8px; width: 20px; }
+.lp-tab-names span { position: absolute; left: 8px; font-size: 10px; line-height: 14px; font-weight: 700; color: var(--text-muted); font-family: var(--font-mono); }
+.lp-tab-window { position: relative; overflow: hidden; height: 99px; }
+.lp-tab-strip { position: absolute; left: 0; top: 0; will-change: transform; }
+.lp-tab-strip.is-step { transition: transform 0.35s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.lp-tab-line { stroke: var(--panel-border-hover, var(--panel-border)); stroke-width: 1; }
+.lp-tab-beat { stroke: var(--panel-border); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.6; }
+.lp-tab-beat.is-bar { stroke-dasharray: none; opacity: 0.9; }
+.lp-tab-note circle { fill: var(--surface-2); stroke: var(--text-muted); stroke-width: 1.3; transition: fill 0.2s, stroke 0.2s; }
+.lp-tab-note text { font-size: 10.5px; font-weight: 800; text-anchor: middle; fill: var(--text-primary); font-family: var(--font-ui); }
+.lp-tab-tail { fill: var(--panel-border); }
+.lp-tab-note.is-now circle { fill: color-mix(in srgb, var(--primary) 22%, var(--surface-2)); stroke: var(--primary); stroke-width: 2; }
+.lp-tab-note.is-hit circle { fill: var(--primary); stroke: none; }
+.lp-tab-note.is-hit text { fill: #fff; }
+.lp-tab-note.is-hit .lp-tab-tail { fill: color-mix(in srgb, var(--primary) 50%, transparent); }
+.lp-tab-note.is-miss circle { fill: transparent; stroke: var(--danger); stroke-dasharray: 2 2; }
+.lp-tab-note.is-miss text { fill: var(--text-muted); }
+.lp-tab-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--primary); box-shadow: 0 0 10px var(--primary); border-radius: 1px; opacity: 0.85; }
+.lp-riff .lp-ear-say b { color: var(--text-primary); font-weight: 600; }
+.lp-riff .lp-ear-say { margin-top: 10px; }
+.lp-foot .lp-btn + .lp-btn { margin-top: 8px; }
+
+/* ===== The neck: a unit's song ===== */
+.np-label-song { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; color: #1b1408; background: linear-gradient(180deg, #f0d48e, var(--warning)); box-shadow: 0 2px 0 #8a6a1e; max-width: 100%; }
+.np-label-song span { font-size: 0.9rem; }
+.np-label-song.is-earned { color: var(--warning); background: transparent; box-shadow: none; border: 1.5px solid color-mix(in srgb, var(--warning) 60%, transparent); }
+.np-label-song:active { transform: translateY(2px); box-shadow: none; }
+.np-card-song { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
+.np-card-song-mark { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; font-size: 1.3rem; color: #1b1408; background: linear-gradient(180deg, #f0d48e, var(--warning)); }
+.np-card-song.is-locked .np-card-song-mark { color: var(--text-muted); background: var(--surface-2); }
+.np-card-song-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.np-card-song-text small { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.np-card-song-text b { font-size: 0.98rem; }
+.np-card-song-lock { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--text-muted); }
+.np-card-song-lock svg { width: 12px; height: 12px; }
+.np-card-song .np-start { width: auto; flex: none; margin: 0; padding: 0 16px; }
+.np-card-stars.is-small svg { width: 13px; height: 13px; }

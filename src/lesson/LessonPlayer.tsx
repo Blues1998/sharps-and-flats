@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { closeLesson, restartLesson, useOpenLesson } from './store';
-import { lessonFor } from './lessons';
+import { closeLesson, restartLesson, startLesson, useOpenLesson } from './store';
+import { lessonFor, setDrill } from './lessons';
 import type { ChooseOption, Exercise, Lesson } from './lessons';
+import { Explore, Riff } from './LessonTab';
+import { Player } from './Player';
+import { noteMiss } from './hints';
 import { appSounding, audioNow, hush, playSound, soundLength, startClicks } from './sound';
-import type { Sound } from './sound';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { feel } from '../utils/haptics';
 import { hitChime, missChime } from '../utils/chime';
@@ -35,12 +37,12 @@ import { award } from '../utils/xp';
 // must end right, first time or on the retry. Rewards follow real skill.
 
 type Outcome = 'first' | 'second' | 'missed' | 'skipped' | 'seen';
-type Verdict = { ok: boolean; answer?: string; explain?: string };
+export type Verdict = { ok: boolean; answer?: string; explain?: string; picked?: string; score?: number };
 interface Entry { key: number; ex: Exercise; attempt: 1 | 2 }
 
 const NOTE = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
 const PRAISE = ['Right.', 'Yes, that is it.', 'Spot on.', 'Exactly.', 'Well heard.'];
-const KIND: Record<Exercise['type'], string> = { teach: 'New idea', choose: 'Listen', play: 'Play', tap: 'Rhythm' };
+const KIND: Record<Exercise['type'], string> = { teach: 'New idea', choose: 'Listen', play: 'Play', tap: 'Rhythm', explore: 'Explore', riff: 'Play' };
 
 // ---- Small pieces ----------------------------------------------------------------
 
@@ -54,36 +56,7 @@ const Icon = {
   guitar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true"><path d="M17.2 6.8l-5.6 5.6M19.5 2.5l2 2-3.2 3.2-2-2z" /><path d="M10.6 9.2c-1.3-.6-2.9-.4-3.9.6-.8.8-.9 1.8-1.7 2.5-.9.8-2.6.6-3.3 1.9-.9 1.7.2 4.4 2.1 6.1 1.7 1.9 4.4 3 6.1 2.1 1.3-.7 1.1-2.4 1.9-3.3.7-.8 1.7-.9 2.5-1.7 1-1 1.2-2.6.6-3.9" /><circle cx="9.3" cy="14.7" r="1.6" /></svg>,
   beat: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 21h8l-2.5-17h-3z" /><path d="M12 14l5-7" /></svg>,
 };
-const KIND_ICON: Record<Exercise['type'], React.ReactNode> = { teach: Icon.idea, choose: Icon.ear, play: Icon.guitar, tap: Icon.beat };
-
-/** Plays a sound, and shows it playing with a ring that runs for its length. */
-const Player: React.FC<{ sound: Sound; size?: 'big' | 'small'; label?: string; auto?: boolean }> = ({ sound, size = 'small', label, auto }) => {
-  const [run, setRun] = useState(0);
-  const [on, setOn] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  const len = soundLength(sound);
-  const go = useCallback(() => {
-    playSound(sound);
-    setOn(true);
-    setRun(r => r + 1);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setOn(false), len * 1000);
-  }, [sound, len]);
-  useEffect(() => {
-    if (!auto) return;
-    const id = window.setTimeout(go, 380);
-    return () => window.clearTimeout(id);
-  }, [auto, go]);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  return (
-    <button type="button" className={`lp-player is-${size}${on ? ' is-on' : ''}`} onClick={e => { e.stopPropagation(); feel('tap'); go(); }} data-feel="off" aria-label={label ? `Play ${label}` : 'Play the sound'}>
-      <span className="lp-player-disc" style={{ ['--len' as string]: `${len}s` } as React.CSSProperties} key={run}>
-        {on ? <span className="lp-eq" aria-hidden="true"><i /><i /><i /><i /></span> : Icon.play}
-      </span>
-      {label && <span className="lp-player-label">{label}</span>}
-    </button>
-  );
-};
+const KIND_ICON: Record<Exercise['type'], React.ReactNode> = { teach: Icon.idea, choose: Icon.ear, play: Icon.guitar, tap: Icon.beat, explore: Icon.guitar, riff: Icon.guitar };
 
 /** A fret dot: the radio for an answer, filled like a note on the neck. */
 const Dot: React.FC<{ state: 'idle' | 'sel' | 'right' | 'wrong' }> = ({ state }) => (
@@ -92,7 +65,7 @@ const Dot: React.FC<{ state: 'idle' | 'sel' | 'right' | 'wrong' }> = ({ state })
 
 // ---- Exercises -------------------------------------------------------------------
 
-interface ExProps<E extends Exercise['type']> {
+export interface ExProps<E extends Exercise['type']> {
   ex: Extract<Exercise, { type: E }>;
   verdict: Verdict | null;
   onVerdict: (v: Verdict) => void;
@@ -122,7 +95,7 @@ const Choose: React.FC<ExProps<'choose'>> = ({ ex, verdict, onVerdict, setFoot }
   const right = ex.options.findIndex(o => o.correct);
   const check = useCallback(() => {
     if (sel === null) return;
-    onVerdict({ ok: sel === right, answer: ex.options[right]?.label, explain: ex.explain });
+    onVerdict({ ok: sel === right, answer: ex.options[right]?.label, explain: ex.explain, picked: ex.options[sel]?.label });
   }, [sel, right, ex, onVerdict]);
   useEffect(() => {
     if (verdict) return;
@@ -138,6 +111,18 @@ const Choose: React.FC<ExProps<'choose'>> = ({ ex, verdict, onVerdict, setFoot }
     if (o.sound) playSound(o.sound);
   };
   const dev = import.meta.env.DEV;
+
+  // Wrong, and both answers can be heard: play yours, then the right one, so
+  // the difference is in the ear and not only in the explanation.
+  const yours = verdict && !verdict.ok && sel !== null ? ex.options[sel] : null;
+  const answer = ex.options[right];
+  const compare = yours?.hear && answer?.hear ? { yours: yours.hear, answer: answer.hear } : null;
+  useEffect(() => {
+    if (!compare) return;
+    const id = window.setTimeout(() => playSound({ kind: 'seq', parts: [compare.yours, compare.answer], gap: soundLength(compare.yours) + 0.3 }), 700);
+    return () => window.clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!compare]);
 
   return (
     <div className="lp-choose">
@@ -162,6 +147,15 @@ const Choose: React.FC<ExProps<'choose'>> = ({ ex, verdict, onVerdict, setFoot }
               <Dot state={stateOf(i)} /><span>{o.label}</span>
             </button>
           ))}
+        </div>
+      )}
+      {compare && yours && (
+        <div className="lp-compare">
+          <small>Hear the difference</small>
+          <div className="lp-players">
+            <Player sound={compare.yours} label={`Yours: ${yours.label}`} />
+            <Player sound={compare.answer} label={`Answer: ${answer.label}`} />
+          </div>
         </div>
       )}
     </div>
@@ -255,7 +249,7 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void; check?: boolean }> 
             : hit ? 'Hold it…'
             : onNote ? (p.cents > 0 ? 'Right note, a touch sharp.' : 'Right note, a touch flat.')
             : ex.names[at]?.hidden ? `That is ${heard}. Not this one yet.`
-            : `That is ${heard}. Looking for ${target === -1 ? 'any note' : NOTE[target]}.`}
+            : target === -1 ? `That is ${heard}.` : noteMiss(pcOf(p.midi), target)}
         </p>
       </div>
       {ex.hear && <div className="lp-players"><Player sound={ex.hear} label={ex.auto ? 'Hear it again' : 'Hear how it goes'} auto={ex.auto} /></div>}
@@ -362,16 +356,66 @@ const BigStar: React.FC<{ on: boolean; i: number }> = ({ on, i }) => (
   </svg>
 );
 
-const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: number; complete: boolean; stars: number; best: number }> = ({ lesson, outcomes, secs, take, complete, stars, best }) => {
+// ---- Songs, slips and drills -----------------------------------------------------
+
+/** A song's take: its best in-time score, or null if it was never played in time. */
+function songTake(exs: Exercise[], scores: number[]): number | null {
+  let best: number | null = null;
+  exs.forEach((ex, k) => { if (ex.type === 'riff' && ex.time && scores[k] !== undefined) best = Math.max(best ?? 0, scores[k]); });
+  return best;
+}
+const songStars = (score: number): number => (score >= 0.95 ? 3 : score >= 0.8 ? 2 : score >= 0.6 ? 1 : 0);
+
+/** Mix-ups, grouped: "Major 3rd, heard as Perfect 5th" twice. */
+function groupSlips(slips: Slip[]): { answer: string; picked: string; heard: boolean; n: number; again?: () => Exercise }[] {
+  const out = new Map<string, { answer: string; picked: string; heard: boolean; n: number; again?: () => Exercise }>();
+  for (const x of slips) {
+    const k = `${x.answer}|${x.picked}`;
+    const g = out.get(k);
+    if (g) g.n++; else out.set(k, { answer: x.answer, picked: x.picked, heard: x.heard, n: 1, again: x.again });
+  }
+  return [...out.values()].sort((a, b) => b.n - a.n);
+}
+
+// Mix-ups are kept across days. Nothing reads them yet; daily practice will.
+const SLIPS_KEY = 'cadenza-slips';
+function rememberSlips(slips: Slip[]): void {
+  if (!slips.length) return;
+  try {
+    const all = JSON.parse(localStorage.getItem(SLIPS_KEY) ?? '{}') as Record<string, { n: number; last: number }>;
+    for (const x of slips) {
+      const k = `${x.answer}|${x.picked}`;
+      all[k] = { n: (all[k]?.n ?? 0) + 1, last: Date.now() };
+    }
+    localStorage.setItem(SLIPS_KEY, JSON.stringify(all));
+  } catch { /* kept for this lesson only */ }
+}
+
+/** A short drill on the pairs that got mixed up: fresh rounds of just those. */
+function startDrill(groups: { answer: string; picked: string; again?: () => Exercise }[]): void {
+  const makers = groups.map(g => g.again).filter((f): f is () => Exercise => !!f);
+  if (!makers.length) return;
+  setDrill({
+    id: 'drill', title: 'What tripped you', practice: true,
+    recap: 'The more often you hear the two side by side, the sooner they stop sounding alike.',
+    build: () => Array.from({ length: 6 }, (_, i) => makers[i % makers.length]()),
+  });
+  startLesson('drill');
+}
+
+const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: number; complete: boolean; stars: number; best: number; slips: Slip[]; songScore: number | null }> = ({ lesson, outcomes, secs, take, complete, stars, best, slips, songScore }) => {
   const graded = useMemo(() => outcomes.filter(o => o && o !== 'seen'), [outcomes]);
   const attempted = graded.filter(o => o !== 'skipped');
   const first = graded.filter(o => o === 'first').length;
   const acc = attempted.length ? first / attempted.length : null;
   const skipped = graded.includes('skipped');
-  const check = !!lesson.check;
-  const grade = check
+  const check = !!lesson.check || !!lesson.song;
+  const grade = lesson.practice
+    ? (acc !== null && acc >= 0.8 ? 'Sorted' : 'Getting there')
+    : check
     ? (skipped ? 'Unfinished' : !complete ? 'Not yet' : stars === 3 ? 'Three stars' : stars === 2 ? 'Two stars' : 'Passed')
     : skipped ? 'Unfinished take' : !complete ? 'Not there yet' : acc === null || acc >= 0.9 ? 'Clean take' : acc >= 0.6 ? 'Solid take' : 'Rough take';
+  const mixups = groupSlips(slips);
   const need = Math.ceil(graded.length * CHECK_PASS);
   const [shown, setShown] = useState(0);
 
@@ -396,7 +440,7 @@ const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: 
   const used = new Set(graded);
   return (
     <div className="lp-take">
-      <span className="lp-take-kicker">{check ? `Fret ${lesson.id.replace('check-', '')} · ${lesson.title}` : `Take ${take} · ${lesson.title}`}</span>
+      <span className="lp-take-kicker">{lesson.song ? `Song · ${lesson.song.by}` : lesson.practice ? 'Practice round' : check ? `Fret ${lesson.id.replace('check-', '')} · ${lesson.title}` : `Take ${take} · ${lesson.title}`}</span>
       <h2>{grade}</h2>
       {check && (
         <div className="lp-stars" role="img" aria-label={`${stars} of 3 stars`}>
@@ -425,35 +469,54 @@ const Take: React.FC<{ lesson: Lesson; outcomes: Outcome[]; secs: number; take: 
         {used.has('skipped') && <span className="is-skipped">Skipped</span>}
       </div>
       <dl className="lp-facts">
-        <div><dt>First time</dt><dd>{attempted.length ? `${first} of ${attempted.length}` : 'None tried'}</dd></div>
+        {songScore !== null
+          ? <div><dt>In time</dt><dd>{Math.round(songScore * 100)}%</dd></div>
+          : <div><dt>First time</dt><dd>{attempted.length ? `${first} of ${attempted.length}` : 'None tried'}</dd></div>}
         <div><dt>Time</dt><dd>{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</dd></div>
-        <div><dt>XP</dt><dd>{check ? (stars > best ? `+${(stars - best) * 10}` : '0') : complete && take === 1 ? '+20' : '0'}</dd></div>
+        <div><dt>XP</dt><dd>{lesson.practice ? '0' : check ? (stars > best ? `+${(stars - best) * 10}` : '0') : complete && take === 1 ? '+20' : '0'}</dd></div>
       </dl>
-      {check && !complete ? (
+      {mixups.length > 0 && (
+        <div className="lp-slips">
+          <small>What tripped you</small>
+          <ul>{mixups.slice(0, 3).map(g => <li key={`${g.answer}|${g.picked}`}>{g.heard ? <><b>{g.answer}</b> heard as <b>{g.picked}</b></> : <>Picked <b>{g.picked}</b> instead of <b>{g.answer}</b></>}{g.n > 1 && <em> ×{g.n}</em>}</li>)}</ul>
+          {mixups.some(g => g.again) && (
+            <button type="button" className="lp-btn is-quiet" onClick={() => { feel('tap'); startDrill(mixups); }} data-feel="off">Practise just these</button>
+          )}
+        </div>
+      )}
+      {lesson.practice ? (
+        <div className="lp-recap"><small>Keep this</small><p>{lesson.recap}</p></div>
+      ) : lesson.song && !complete ? (
+        <div className="lp-recap is-open"><small>{skipped ? 'Every part counts' : 'To pass'}</small><p>{skipped
+          ? 'Play every part on the guitar to earn the song.'
+          : 'Land 60% of the notes in time for the first star. Go again: the click helps more each time.'}</p></div>
+      ) : check && !complete ? (
         <div className="lp-recap is-open"><small>{skipped ? 'Every part counts' : 'To pass'}</small><p>{skipped
           ? 'A check needs the guitar parts too. Play them all to pass.'
           : `Passing takes ${need} of ${graded.length} right first time. Each try asks a fresh set.`}</p></div>
       ) : complete ? (
-        <div className="lp-recap"><small>{check ? 'Milestone passed' : 'Keep this'}</small><p>{lesson.recap}</p></div>
+        <div className="lp-recap"><small>{lesson.song ? 'Song learnt' : check ? 'Milestone passed' : 'Keep this'}</small><p>{lesson.recap}</p></div>
       ) : skipped ? (
         <div className="lp-recap is-open"><small>Not finished yet</small><p>The guitar parts you skipped are still open. Play them to finish this step.</p></div>
       ) : (
         <div className="lp-recap is-open"><small>One more take</small><p>Fewer than half came out right, so this step stays open. Go again: the questions change each time.</p></div>
       )}
-      {complete && <button type="button" className="lp-btn" onClick={() => { feel('tap'); closeLesson(); }} data-feel="off">Back to the neck</button>}
-      {(!complete || (check && stars < 3)) && (
+      {(complete || lesson.practice) && <button type="button" className="lp-btn" onClick={() => { feel('tap'); closeLesson(); }} data-feel="off">Back to the neck</button>}
+      {!lesson.practice && (!complete || (check && stars < 3)) && (
         <button type="button" className={`lp-btn${complete ? ' is-quiet' : ''}`} onClick={() => { feel('tap'); restartLesson(); }} data-feel="off">
           {complete ? 'Go for three stars' : 'Try again'}
         </button>
       )}
-      {!complete && <button type="button" className="lp-btn is-quiet" onClick={() => { feel('tap'); closeLesson(); }} data-feel="off">Back to the neck</button>}
+      {!complete && !lesson.practice && <button type="button" className="lp-btn is-quiet" onClick={() => { feel('tap'); closeLesson(); }} data-feel="off">Back to the neck</button>}
     </div>
   );
 };
 
 // ---- The run ---------------------------------------------------------------------
 
-interface RunState { queue: Entry[]; at: number; outcomes: Outcome[]; verdict: Verdict | null; done: boolean; check: boolean }
+/** A wrong answer: what it was, what was picked, and how to ask that pair again. */
+interface Slip { answer: string; picked: string; heard: boolean; again?: () => Exercise }
+interface RunState { queue: Entry[]; at: number; outcomes: Outcome[]; scores: number[]; slips: Slip[]; verdict: Verdict | null; done: boolean; check: boolean }
 type Action = { type: 'verdict'; v: Verdict } | { type: 'skip' } | { type: 'seen' } | { type: 'next' };
 
 const advance = (s: RunState): RunState =>
@@ -466,12 +529,19 @@ function reduce(s: RunState, a: Action): RunState {
     case 'verdict': {
       if (s.verdict) return s;
       let queue = s.queue;
+      let slips = s.slips;
+      const scores = [...s.scores];
+      if (a.v.score !== undefined) scores[e.key] = Math.max(scores[e.key] ?? 0, a.v.score);
       if (a.v.ok) outcomes[e.key] = e.attempt === 1 ? 'first' : 'second';
       else {
         outcomes[e.key] = 'missed';
-        if (e.attempt === 1 && !s.check) queue = [...queue, { ...e, attempt: 2 }];
+        const ex = e.ex;
+        const remake = ex.type === 'choose' && ex.remake && a.v.picked ? ex.remake : null;
+        if (a.v.picked && a.v.answer) slips = [...slips, { answer: a.v.answer, picked: a.v.picked, heard: ex.type === 'choose' && !!ex.sound, again: remake ? () => remake(a.v.picked!) : undefined }];
+        // The retry is a fresh round, narrowed to the two that got mixed up.
+        if (e.attempt === 1 && !s.check) queue = [...queue, { ...e, ex: remake ? remake(a.v.picked!) : e.ex, attempt: 2 }];
       }
-      return { ...s, queue, outcomes, verdict: a.v };
+      return { ...s, queue, outcomes, scores, slips, verdict: a.v };
     }
     case 'skip': outcomes[e.key] = 'skipped'; return advance({ ...s, outcomes });
     case 'seen': outcomes[e.key] = 'seen'; return advance({ ...s, outcomes });
@@ -482,7 +552,7 @@ function reduce(s: RunState, a: Action): RunState {
 const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   const first = useMemo(() => lesson.build(), [lesson]);
   const [s, dispatch] = useReducer(reduce, undefined, (): RunState => ({
-    queue: first.map((ex, key) => ({ key, ex, attempt: 1 })), at: 0, outcomes: [], verdict: null, done: false, check: !!lesson.check,
+    queue: first.map((ex, key) => ({ key, ex, attempt: 1 })), at: 0, outcomes: [], scores: [], slips: [], verdict: null, done: false, check: !!lesson.check,
   }));
   const [foot, setFoot] = useState<React.ReactNode>(null);
   const [quitting, setQuitting] = useState(false);
@@ -491,19 +561,25 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   const [secs, setSecs] = useState(0);
   useHoldUnlocks('lesson', true);
 
-  const complete = s.done && passes(s.outcomes, !!lesson.check);
-  const stars = lesson.check && s.done ? starsFor(s.outcomes) : 0;
-  const [best] = useState(() => (lesson.check ? checkStars(lesson.id) : 0));
+  const starred = !!lesson.check || !!lesson.song;
+  const songScore = lesson.song ? songTake(first, s.scores) : null;
+  const skippedAny = s.outcomes.includes('skipped');
+  const stars = !s.done ? 0 : lesson.check ? starsFor(s.outcomes) : songScore !== null && !skippedAny ? songStars(songScore) : 0;
+  const complete = s.done && (lesson.song ? stars > 0 : passes(s.outcomes, !!lesson.check));
+  const [best] = useState(() => (starred ? checkStars(lesson.id) : 0));
   useEffect(() => {
     if (!s.done) return;
     setSecs(Math.round((performance.now() - startedAt.current) / 1000));
-    if (lesson.check && stars > best) {
+    if (lesson.practice) return;
+    if (starred && stars > best) {
       saveCheckStars(lesson.id, stars);
       // Each star pays once, ever: a retake only pays for stars not held before.
-      for (let k = best + 1; k <= stars; k++) award('check-star', `${lesson.id}-${k}`);
+      for (let k = best + 1; k <= stars; k++) award(lesson.song ? 'song-star' : 'check-star', `${lesson.id}-${k}`);
     }
     if (complete) reportProgress(`lesson:${lesson.id}`);
-  }, [s.done, complete, lesson.id, lesson.check, stars, best]);
+    rememberSlips(s.slips);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.done]);
 
   const onBack = useCallback(() => { if (s.done) closeLesson(); else setQuitting(q => !q); }, [s.done]);
   useBackToClose(true, onBack);
@@ -522,7 +598,7 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
     setFoot(<button type="button" className="lp-btn" onClick={() => { feel('tap'); dispatch({ type: 'next' }); }} data-feel="off">{s.at + 1 >= s.queue.length ? 'Finish' : 'Next'}</button>);
   }, [s.verdict, s.at, s.queue.length]);
 
-  if (s.done) return <Take lesson={lesson} outcomes={s.outcomes} secs={secs} take={take.current} complete={complete} stars={stars} best={best} />;
+  if (s.done) return <Take lesson={lesson} outcomes={s.outcomes} secs={secs} take={take.current} complete={complete} stars={stars} best={best} slips={s.slips} songScore={songScore} />;
 
   const entry = s.queue[s.at];
   const ex = entry.ex;
@@ -552,6 +628,8 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
         {ex.type === 'choose' && <Choose ex={ex} {...props} />}
         {ex.type === 'play' && <Play ex={ex} {...props} onSkip={onSkip} check={!!lesson.check} />}
         {ex.type === 'tap' && <Tap ex={ex} {...props} />}
+        {ex.type === 'explore' && <Explore ex={ex} {...props} onNext={onSeen} />}
+        {ex.type === 'riff' && <Riff ex={ex} {...props} onSkip={onSkip} />}
         {s.verdict && (
           <aside className={`lp-verdict ${s.verdict.ok ? 'is-right' : 'is-wrong'}`} role="status">
             <span className="lp-verdict-mark" aria-hidden="true">{s.verdict.ok ? Icon.check : Icon.cross}</span>
@@ -559,7 +637,7 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
               <b>{s.verdict.ok ? PRAISE[s.at % PRAISE.length] : 'Not this time.'}</b>
               {!s.verdict.ok && s.verdict.answer && <span>{ex.type === 'tap' ? s.verdict.answer : `It was ${s.verdict.answer}.`}</span>}
               {s.verdict.explain && <p>{s.verdict.explain}</p>}
-              {!s.verdict.ok && entry.attempt === 1 && <em>It will come round again at the end.</em>}
+              {!s.verdict.ok && entry.attempt === 1 && !lesson.check && <em>{ex.type === 'choose' && ex.remake ? 'It comes back at the end, with just these two.' : 'It will come round again at the end.'}</em>}
             </div>
           </aside>
         )}

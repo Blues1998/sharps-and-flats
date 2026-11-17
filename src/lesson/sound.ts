@@ -12,7 +12,9 @@ export type Sound =
   | { kind: 'sine'; midi: number }
   | { kind: 'pair'; a: number; b: number; detune?: number }
   | { kind: 'clicks'; bpm: number; count: number; wobble?: boolean }
-  | { kind: 'seq'; parts: Sound[]; gap: number };
+  | { kind: 'seq'; parts: Sound[]; gap: number }
+  /** A tune with its rhythm: [midi, beats] pairs at a tempo. */
+  | { kind: 'melody'; notes: [number, number][]; bpm: number };
 
 const now = () => {
   audio.init();
@@ -46,6 +48,7 @@ export function soundLength(s: Sound): number {
     case 'chords': return s.chords.length * (s.gap ?? 1.1) + 1;
     case 'clicks': return s.count * (60 / s.bpm) + 0.3;
     case 'seq': return (s.parts.length - 1) * s.gap + Math.max(...s.parts.map(soundLength));
+    case 'melody': return s.notes.reduce((t, [, b]) => t + b, 0) * (60 / s.bpm) + 1;
   }
 }
 
@@ -76,6 +79,12 @@ export function playSound(s: Sound, offset = 0): void {
       break;
     }
     case 'seq': s.parts.forEach((p, i) => playSound(p, offset + i * s.gap)); break;
+    case 'melody': {
+      const beat = 60 / s.bpm;
+      let at = t;
+      for (const [m, b] of s.notes) { audio.playMidi(m, Math.min(2, b * beat + 0.3), at); at += b * beat; }
+      break;
+    }
     case 'clicks': {
       const beat = 60 / s.bpm;
       // A wobbly beat drifts early and late, the way a rushed hand does.
@@ -86,11 +95,13 @@ export function playSound(s: Sound, offset = 0): void {
   }
 }
 
-/** Start a click track; returns the time of the first beat (audio clock). */
-export function startClicks(bpm: number, count: number): number {
+/** Start a click track; returns the time of the first beat (audio clock).
+ *  `hushFor` beats keep the mic deaf (the count-in); after that the clicks
+ *  play on quietly while the mic listens to you. */
+export function startClicks(bpm: number, count: number, hushFor = count): number {
   const t = now() + 0.4;
   const beat = 60 / bpm;
-  hush((0.4 + count * beat) * 1000);
+  hush((0.4 + Math.min(count, hushFor) * beat) * 1000 - (hushFor < count ? 850 : 0));
   for (let i = 0; i < count; i++) audio.playClick(t + i * beat, i % 4 === 0);
   return t;
 }

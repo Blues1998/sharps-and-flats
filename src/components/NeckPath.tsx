@@ -10,6 +10,7 @@ import { feel } from '../utils/haptics';
 import { getSession, subscribeSession } from '../utils/session';
 import { useHoldUnlocks } from '../utils/feats';
 import { lessonOpen, startLesson, subscribeLesson } from '../lesson/store';
+import { UNIT_SONGS } from '../lesson/songs';
 import { lessonFor } from '../lesson/lessons';
 import { useBackToClose } from '../utils/nativeShell';
 import { AHEAD, FRETS, NECK_ORDER, OCTAVE, CHECKS_READY, UNITS, checkId, checkStars, doneSteps, fretHeight, levelOf, markSeen, seenSteps, unitOf } from '../utils/neck';
@@ -354,6 +355,41 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
   );
 
+  // Each unit's song opens on its milestone: the reward for passing it.
+  const songOf = (f: FretDef) => {
+    const id = UNIT_SONGS[unitOf(f.n)];
+    const l = id ? lessonFor(id) : undefined;
+    return l?.song ? { id, title: l.song.title, by: l.song.by, stars: checkStars(id) } : null;
+  };
+  const songCard = (f: FretDef, passed: boolean) => {
+    const sg = songOf(f);
+    if (!sg) return null;
+    return (
+      <div className={`np-card-song${passed ? '' : ' is-locked'}`}>
+        <span className="np-card-song-mark" aria-hidden="true">♪</span>
+        <span className="np-card-song-text">
+          <small>Unit song</small>
+          <b>{sg.title}</b>
+          {passed
+            ? <span className="np-card-stars is-small" aria-label={`${sg.stars} of ${STARS} stars`}>{Array.from({ length: STARS }, (_, i) => <span key={i} className={i < sg.stars ? 'is-on' : ''}><Star /></span>)}</span>
+            : <span className="np-card-song-lock"><Lock />Pass the milestone to open it</span>}
+        </span>
+        {passed && <button type="button" className="np-start is-quiet" data-feel="off" onClick={() => { feel('tap'); setFocus(null); startLesson(sg.id); }}>{sg.stars ? 'Play' : 'Learn it'}</button>}
+      </div>
+    );
+  };
+
+  /** Under a passed milestone's name: its unit's song, one tap away. */
+  const songPill = (f: FretDef) => {
+    const sg = f.check && fretDoneIn(f, shown) ? songOf(f) : null;
+    if (!sg) return null;
+    return (
+      <button type="button" className={`np-label-song${sg.stars ? ' is-earned' : ''}`} data-feel="off" onClick={() => { feel('tap'); startLesson(sg.id); }}>
+        <span aria-hidden="true">♪</span>{sg.title}
+      </button>
+    );
+  };
+
   const card = (f: FretDef) => {
     const locked = f.n > cur;
     const unlock = <span className="np-unlock"><Lock />Finish fret {curFret} to unlock</span>;
@@ -376,6 +412,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
               <button type="button" className="np-start" data-feel="off" onClick={() => { feel('tap'); setFocus(null); startLesson(id); }}>
                 {!passed ? 'Start the check' : st === STARS ? 'Take it again' : st > 0 ? 'Go for more stars' : 'Earn the stars'}
               </button>
+              {songCard(f, passed)}
             </>
           )}
         </div>
@@ -656,7 +693,10 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
         <button type="button" className="np-num" data-feel="off" onClick={() => tapFret(n)} aria-label={`Fret ${n}`} tabIndex={n > OCTAVE ? -1 : 0}>{n}</button>
         <div className="np-side">
           {ahead ? null : f ? (
-            <button type="button" className="np-label-btn" data-feel="off" onClick={() => tapFret(n)} aria-pressed={focus === n}>{label(f)}</button>
+            <>
+              <button type="button" className="np-label-btn" data-feel="off" onClick={() => tapFret(n)} aria-pressed={focus === n}>{label(f)}</button>
+              {songPill(f)}
+            </>
           ) : null}
         </div>
       </div>
