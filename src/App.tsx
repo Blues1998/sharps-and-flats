@@ -14,6 +14,8 @@ import { SessionSummary } from './components/SessionSummary';
 import { initXp } from './utils/xp';
 import { initReminders } from './utils/reminders';
 import { initRepair } from './utils/session';
+import { wireUsage } from './utils/usage';
+import { track } from './utils/telemetry';
 import { SunburstReveal } from './components/Sunburst';
 import { useBackToClose } from './utils/nativeShell';
 import { AuthProvider } from './context/AuthContext';
@@ -77,7 +79,10 @@ function App() {
   }, [activeTab, songId]);
 
   // XP, streak repair and reminders each watch the stores they read.
-  useEffect(() => { initXp(); initRepair(); initReminders(); }, []);
+  useEffect(() => { initXp(); initRepair(); initReminders(); wireUsage(); }, []);
+
+  // Which screen, never which song: a song's address carries its title.
+  useEffect(() => { track('screen_viewed', { screen: activeTab }); }, [activeTab]);
 
   const openSong = (id: string) => go({ tab: 'library', songId: id });
 

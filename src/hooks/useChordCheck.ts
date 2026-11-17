@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { micAnswered } from '../utils/telemetry';
 
 // "Prove it": strum a chord and the mic checks it, the way Simply Guitar and
 // Fender Play listen for a chord before they count it.
@@ -37,7 +38,9 @@ export function useChordCheck() {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
       });
-    } catch {
+      micAnswered();
+    } catch (err) {
+      micAnswered(err);
       setState('error');
       return;
     }

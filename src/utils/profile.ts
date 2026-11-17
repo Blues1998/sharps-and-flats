@@ -6,6 +6,7 @@
 
 import { getProgressCount, reportProgress } from './progress';
 import { useSyncExternalStore } from 'react';
+import { setTelemetryContext, track } from './telemetry';
 
 export type Level = 'new' | 'some' | 'regular';
 export type ProfileInstrument = 'guitar' | 'ukulele';
@@ -42,6 +43,10 @@ markSetUp();
 const listeners = new Set<() => void>();
 
 export function setProfile(patch: Partial<Profile>): void {
+  if (patch.instrument && patch.instrument !== profile.instrument) {
+    track('instrument_set', { instrument: patch.instrument });
+    setTelemetryContext({ instrument: patch.instrument });
+  }
   profile = { ...profile, ...patch };
   try {
     localStorage.setItem(KEY, JSON.stringify(profile));

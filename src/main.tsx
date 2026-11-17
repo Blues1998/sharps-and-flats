@@ -6,6 +6,7 @@ import App from './App.tsx'
 import { initNativeShell } from './utils/nativeShell'
 import { wireHaptics } from './utils/haptics'
 import { installTroubleHandlers, record } from './utils/trouble'
+import { initTelemetry } from './utils/telemetry'
 import { watchSunburst } from './utils/sunburst'
 import { AppTrouble, TroubleBoundary } from './components/Trouble'
 
@@ -19,6 +20,8 @@ declare global {
 }
 
 installTroubleHandlers()
+// Android only, with keys and the switch on in Me; nothing at all otherwise.
+void initTelemetry()
 watchSunburst()
 void initNativeShell().catch(e => record(e, 'starting the Android shell'))
 wireHaptics()

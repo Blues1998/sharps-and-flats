@@ -6,6 +6,7 @@ import { createSong, getSongs } from '../utils/library';
 import { setProfile, useProfile, type Level, type ProfileInstrument } from '../utils/profile';
 import { useBackToClose } from '../utils/nativeShell';
 import { BrandMark } from './Brand';
+import { track } from '../utils/telemetry';
 
 // The first three minutes.
 //
@@ -38,6 +39,7 @@ export const Onboarding: React.FC = () => {
   useBackToClose(!profile.onboarded && index > 0, back);
   // Run again from Me, it starts from the welcome, not wherever it ended.
   useEffect(() => { if (!profile.onboarded) setStep('welcome'); }, [profile.onboarded]);
+  useEffect(() => { if (!profile.onboarded) track('onboarding_step', { step }); }, [step, profile.onboarded]);
 
   if (profile.onboarded || !ready) return null;
 
@@ -45,6 +47,8 @@ export const Onboarding: React.FC = () => {
   const instrumentName = profile.instrument === 'ukulele' ? 'ukulele' : 'guitar';
 
   const finish = (then: 'tuner' | 'today') => {
+    // Counts only: the song titles typed in stay on the phone.
+    track('onboarding_done', { then, at: step, instrument: profile.instrument, sings: profile.sings, level: profile.level, songs_added: getSongs().length - existing });
     setProfile({ onboarded: true });
     if (then === 'tuner') {
       try { localStorage.setItem('cadenza-tuner-mode', 'instrument'); } catch { /* fine */ }

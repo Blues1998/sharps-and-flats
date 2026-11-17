@@ -32,6 +32,8 @@ import { audio } from '../utils/audio';
 import { feel } from '../utils/haptics';
 import { BACK_EVENT } from '../utils/nativeShell';
 import { noteName } from './hints';
+import { openLesson } from './store';
+import { track } from '../utils/telemetry';
 
 const pcOf = (m: number) => ((m % 12) + 12) % 12;
 
@@ -71,6 +73,8 @@ export const Stage: React.FC<{
   const stopClicks = useRef<() => void>(() => {});
   const doneRef = useRef(false);
   const missRun = useRef(0);
+  const restarts = useRef(0);
+  const stoppedRef = useRef<() => void>(() => {});
   /** Times through: a restart redraws the tab from the top. */
   const [take, setTake] = useState(0);
   /** Audio time of the last restart: the mic needs a fresh pluck after it. */
@@ -114,7 +118,7 @@ export const Stage: React.FC<{
   useEffect(() => () => stopClicks.current(), []);
   // Back closes the stage first, not the whole lesson behind it.
   useEffect(() => {
-    const onBack = (e: Event) => { e.preventDefault(); e.stopImmediatePropagation(); stopClicks.current(); onDone(null); };
+    const onBack = (e: Event) => { e.preventDefault(); e.stopImmediatePropagation(); stopClicks.current(); stoppedRef.current(); onDone(null); };
     window.addEventListener(BACK_EVENT, onBack, true);
     return () => window.removeEventListener(BACK_EVENT, onBack, true);
   }, [onDone]);
@@ -152,7 +156,13 @@ export const Stage: React.FC<{
   };
 
   /** Back to the top: the clock stops and the first note starts it again. */
+  /** Left before the end: how far it got, for usage. */
+  const stopped = () => track('song_take', { lesson: openLesson(), finished: false, reached: resRef.current.filter(Boolean).length, total: notes.length, screen, restarts: restarts.current });
+  stoppedRef.current = stopped;
+
   const restart = () => {
+    track('song_restarted', { lesson: openLesson(), at: resRef.current.length - 1, screen });
+    restarts.current++;
     stopClicks.current();
     stopClicks.current = () => {};
     resRef.current = [];
@@ -274,7 +284,9 @@ export const Stage: React.FC<{
         const hits = r.filter(x => x === 'hit').length;
         const short = r.filter(x => x === 'short').length;
         if (import.meta.env.DEV) Object.assign(window, { __stageRes: r.map(x => x[0]).join('') });
-        window.setTimeout(() => onDone({ score: (hits + short * 0.5) / notes.length, hits, short, total: notes.length }), 700);
+        const score = (hits + short * 0.5) / notes.length;
+        track('song_take', { lesson: openLesson(), finished: true, score: Math.round(score * 100) / 100, hits, short, total: notes.length, screen, restarts: restarts.current });
+        window.setTimeout(() => onDone({ score, hits, short, total: notes.length }), 700);
         return;
       }
       raf = requestAnimationFrame(loop);
@@ -311,7 +323,7 @@ export const Stage: React.FC<{
   return createPortal(
     <div className={`stg${rotate ? ' is-rotated' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
       <header className="stg-top">
-        <button type="button" className="lp-stop" onClick={() => { feel('select'); stopClicks.current(); onDone(null); }} aria-label="Stop" data-feel="off">
+        <button type="button" className="lp-stop" onClick={() => { feel('select'); stopClicks.current(); stopped(); onDone(null); }} aria-label="Stop" data-feel="off">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" /></svg>
         </button>
         <p className="stg-say">

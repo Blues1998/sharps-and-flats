@@ -24,6 +24,7 @@
 //   other: each saves only what it counted since its last save.
 
 import { STORE_CHANGE_EVENT } from './db';
+import { track } from './telemetry';
 
 const KEY = 'cadenza-practice-clock-v1';
 const LATEST_KEY = 'cadenza-clock-latest';
@@ -127,6 +128,7 @@ export function getGoal(): number {
   try { const n = Number(localStorage.getItem(GOAL_KEY)); return GOAL_CHOICES.includes(n as 5) ? n : 10; } catch { return 10; }
 }
 export function setGoal(minutes: number): void {
+  if (minutes !== getGoal()) track('goal_set', { minutes });
   try { localStorage.setItem(GOAL_KEY, String(minutes)); } catch { /* this session */ }
   window.dispatchEvent(new Event(CLOCK_EVENT));
 }
@@ -227,8 +229,32 @@ function ensureTimer(): void {
 
 /** Something started or stopped counting. */
 export function setLive(key: string, on: boolean, songId: string = GENERAL, mic = false): void {
-  if (on) live.set(key, { songId, mic }); else live.delete(key);
+  if (on) {
+    if (!began.has(key)) began.set(key, Date.now());
+    live.set(key, { songId, mic });
+  } else {
+    live.delete(key);
+    sessionEnded(key);
+  }
   ensureTimer();
+}
+
+// ---- Usage: one event per stretch of a tool, with how long it was open ----
+
+const began = new Map<string, number>();
+const ending = new Map<string, number>();
+
+/** A tool stopped. Wait a moment: a re-render can stop and start it again straight away. */
+function sessionEnded(key: string): void {
+  window.clearTimeout(ending.get(key));
+  ending.set(key, window.setTimeout(() => {
+    ending.delete(key);
+    if (live.has(key)) return;
+    const from = began.get(key);
+    began.delete(key);
+    const secs = from ? Math.round((Date.now() - from) / 1000) : 0;
+    if (secs >= 5) track('practice_session', { what: key, secs });
+  }, 1500));
 }
 
 /** The mic heard a note just now: proof someone is playing. */

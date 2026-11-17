@@ -24,6 +24,7 @@ import { useMicPitch } from '../hooks/useMicPitch';
 import { audio } from '../utils/audio';
 import { feel } from '../utils/haptics';
 import { noteMiss, noteName } from './hints';
+import { track } from '../utils/telemetry';
 
 const pcOf = (m: number) => ((m % 12) + 12) % 12;
 
@@ -154,7 +155,7 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
   const strip = useRef<SVGSVGElement>(null);
   // No guitar to hand: the notes are tapped on a fretboard on screen instead.
   const [screen, setScreenState] = useState(preferScreen);
-  const setScreen = (on: boolean) => { preferScreen = on; setScreenState(on); };
+  const setScreen = (on: boolean) => { preferScreen = on; setScreenState(on); track('play_mode_set', { screen: on }); };
   const [flash, setFlash] = useState<{ st: number; f: number; k: number } | null>(null);
 
   // The in-time take runs on the stage, which has its own mic.

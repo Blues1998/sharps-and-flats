@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { detectPitch, PitchStabilizer, VoiceSmoother } from '../utils/pitch';
 import type { PitchResult } from '../utils/pitch';
 import { frameGate } from '../utils/frames';
+import { micAnswered } from '../utils/telemetry';
 
 // Shared microphone + pitch detection pipeline (getUserMedia -> AnalyserNode
 // -> YIN detector -> stabilizer), polled once per animation frame.
@@ -80,6 +81,7 @@ export function useMicPitch(mode: PitchMode = 'instrument'): MicPitch {
           autoGainControl: false
         }
       });
+      micAnswered();
       if (mine !== gen.current) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
 
@@ -128,6 +130,7 @@ export function useMicPitch(mode: PitchMode = 'instrument'): MicPitch {
 
       setIsActive(true);
     } catch (err) {
+      micAnswered(err);
       console.error('Microphone initialization failed:', err);
       setError('Microphone blocked. Allow it in settings.');
       stop();

@@ -19,6 +19,7 @@ import { hitChime, missChime } from '../utils/chime';
 import { reportProgress } from '../utils/progress';
 import { useBackToClose } from '../utils/nativeShell';
 import { getGoal, secondsOn, CLOCK_EVENT } from '../utils/practiceClock';
+import { track } from '../utils/telemetry';
 
 // ---- Small pieces ---------------------------------------------------------------------
 
@@ -54,6 +55,7 @@ const Game: React.FC<{ id: GameId }> = ({ id }) => {
 
   usePracticeTime('game', !over);
   useBackToClose(true, closeGame);
+  useEffect(() => { track('game_started', { game: id }); }, [id]);
 
   const next = useCallback((lv: number) => {
     setRound(def.round(lv));
@@ -62,11 +64,13 @@ const Game: React.FC<{ id: GameId }> = ({ id }) => {
   }, [def]);
 
   const finish = useCallback(() => {
-    setSecs(Math.round((performance.now() - startedAt.current) / 1000));
+    const took = Math.round((performance.now() - startedAt.current) / 1000);
+    setSecs(took);
+    track('game_finished', { game: id, score: right, level: levelFor(right), secs: took, best: right > best });
     setNewBest(saveGameBest(id, right));
     setOver(true);
     feel('nudge');
-  }, [id, right]);
+  }, [id, right, best]);
 
   const answer = (label: string) => {
     if (chosen) return;

@@ -13,10 +13,12 @@
 //
 // Everything caught goes through describe(), so the same failure reads the
 // same way wherever it lands, and into a short log kept on the device, so a
-// report written after a reload still carries what happened before it.
+// report written after a reload still carries what happened before it. On
+// Android, record() also sends it to crash reports (telemetry.ts), if allowed.
 
 import { registerPlugin } from '@capacitor/core';
 import { IS_NATIVE } from './nativeShell';
+import { captureCrash } from './telemetry';
 
 export type TroubleKind = 'download' | 'storage' | 'audio' | 'mic' | 'memory' | 'bug';
 
@@ -133,6 +135,7 @@ export function record(error: unknown, where: string, extraStack?: string): void
     const log = [...readLog(), entry].slice(-LOG_SIZE);
     localStorage.setItem(LOG_KEY, JSON.stringify(log));
   } catch { /* storage itself may be what failed */ }
+  try { captureCrash(error, where, describe(error).kind); } catch { /* reporting must never add a failure */ }
   if (import.meta.env.DEV) console.error(`[${where}]`, error);
 }
 

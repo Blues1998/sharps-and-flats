@@ -21,6 +21,7 @@ import { getSongs, shiftIso, streakRepair, streakState, today } from './library'
 import { getChordSkills } from './chordbook';
 import { TIERED, heldTier, nextStep } from './feats';
 import { suggestDrill } from './suggest';
+import { track } from './telemetry';
 
 const KEY = 'cadenza-reminders';
 const LOG_KEY = 'cadenza-reminder-log';
@@ -76,8 +77,10 @@ export async function setReminders(patch: Partial<ReminderSettings>): Promise<bo
   const next = { ...getReminders(), ...patch };
   if (patch.on && IS_NATIVE) {
     const perm = await LocalNotifications.requestPermissions().catch(() => ({ display: 'denied' as const }));
+    track('permission', { what: 'notifications', granted: perm.display === 'granted' });
     if (perm.display !== 'granted') next.on = false;
   }
+  if (patch.on !== undefined) track('reminders_set', { on: next.on });
   write(KEY, next);
   window.dispatchEvent(new Event(CHANGE));
   void schedule();
@@ -174,16 +177,17 @@ async function doSchedule(): Promise<void> {
   const day = today();
   const goalMet = secondsOn(day) >= getGoal() * 60;
   const mins = reminderMinutes(s);
-  const list: { id: number; title: string; body: string; schedule: { at: Date; allowWhileIdle: boolean } }[] = [];
+  // `extra.kind` says which message it was, so an opened reminder can be counted by kind.
+  const list: { id: number; title: string; body: string; extra: { kind: string }; schedule: { at: Date; allowWhileIdle: boolean } }[] = [];
 
   for (const ahead of DAYS_AHEAD) {
     const date = shiftIso(day, ahead);
     const when = at(date, mins);
     if (ahead === 0 && (goalMet || when.getTime() < now + 5 * 60000)) continue;
     const m = ahead === LAST
-      ? { title: 'We will stop reminding you', body: 'Your songs are here whenever you want them.' }
+      ? { id: 'last', title: 'We will stop reminding you', body: 'Your songs are here whenever you want them.' }
       : messageFor(date, log);
-    list.push({ id: 100 + ahead, title: m.title, body: m.body, schedule: { at: when, allowWhileIdle: true } });
+    list.push({ id: 100 + ahead, title: m.title, body: m.body, extra: { kind: m.id }, schedule: { at: when, allowWhileIdle: true } });
   }
 
   // "Ends tonight", only when a streak worth keeping has no rest to cover it.
@@ -193,10 +197,10 @@ async function doSchedule(): Promise<void> {
     if (st.rests === 0) {
       const tonight = at(day, warnAt);
       if (!st.playedToday && st.current >= 3 && tonight.getTime() > now) {
-        list.push({ id: 200, title: `Your ${st.current}-day streak ends at midnight`, body: `${getGoal()} minutes keeps it.`, schedule: { at: tonight, allowWhileIdle: true } });
+        list.push({ id: 200, title: `Your ${st.current}-day streak ends at midnight`, body: `${getGoal()} minutes keeps it.`, extra: { kind: 'warn' }, schedule: { at: tonight, allowWhileIdle: true } });
       }
       if (st.playedToday && st.current >= 3) {
-        list.push({ id: 201, title: `Your ${st.current}-day streak ends at midnight`, body: `${getGoal()} minutes keeps it.`, schedule: { at: at(shiftIso(day, 1), warnAt), allowWhileIdle: true } });
+        list.push({ id: 201, title: `Your ${st.current}-day streak ends at midnight`, body: `${getGoal()} minutes keeps it.`, extra: { kind: 'warn' }, schedule: { at: at(shiftIso(day, 1), warnAt), allowWhileIdle: true } });
       }
     }
   }
@@ -217,7 +221,8 @@ export function initReminders(): void {
   wired = true;
   window.addEventListener(GOAL_MET_EVENT, () => { noteGoalTime(); void schedule(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void schedule(); });
-  void LocalNotifications.addListener('localNotificationActionPerformed', () => {
+  void LocalNotifications.addListener('localNotificationActionPerformed', action => {
+    track('reminder_opened', { kind: (action.notification.extra as { kind?: string } | undefined)?.kind ?? 'unknown' });
     const log = read<Log>(LOG_KEY, { assigned: {}, lastUsed: {}, pending: [], sent: 0, opened: 0 });
     log.opened++;
     write(LOG_KEY, log);

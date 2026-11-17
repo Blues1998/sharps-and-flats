@@ -19,6 +19,7 @@ import { setSunburst, useSunburst } from '../utils/sunburst';
 import { useAuth } from '../context/AuthContext';
 import { ACCOUNTS_ENABLED } from '../utils/nativeShell';
 import { HAS_HAPTICS, setHaptics, useHaptics } from '../utils/haptics';
+import { TELEMETRY_AVAILABLE, setTelemetry, useTelemetrySetting } from '../utils/telemetry';
 import { go } from '../hooks/useRoute';
 import type { Theme } from '../hooks/useTheme';
 import { restartOnboarding, setProfile, useProfile, type ProfileInstrument } from '../utils/profile';
@@ -53,6 +54,7 @@ const YourData: React.FC = () => {
   const ready = useLibrary();
   const [notice, setNotice] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const sharing = useTelemetrySetting();
   const count = ready ? getSongs().length : 0;
 
   const backUp = async () => {
@@ -100,6 +102,20 @@ const YourData: React.FC = () => {
         <span className="me-row-label">Welcome setup</span>
         <button type="button" className="btn" onClick={restartOnboarding}>Run again</button>
       </div>
+      {TELEMETRY_AVAILABLE && (
+        <div className="me-row">
+          <span className="me-row-label">
+            Share usage and crash reports
+            <span className="me-row-sub">Anonymous. Never your songs, name or audio.</span>
+          </span>
+          <Segmented<boolean>
+            value={sharing}
+            onChange={setTelemetry}
+            options={[{ value: true, label: 'On' }, { value: false, label: 'Off' }]}
+            size="sm"
+          />
+        </div>
+      )}
       {notice && <p className="me-notice" role="status">{notice}</p>}
     </section>
   );

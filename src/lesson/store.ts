@@ -21,6 +21,8 @@ export function closeLesson(): void {
 }
 
 export const lessonOpen = (): boolean => open !== null;
+/** The open lesson's id, for usage events sent from inside it. */
+export const openLesson = (): string | null => open;
 
 /** Run the open lesson again from the start, as a fresh take. */
 export function restartLesson(): void {

@@ -13,6 +13,7 @@ import { feel } from '../utils/haptics';
 import { hitChime, missChime } from '../utils/chime';
 import { audio } from '../utils/audio';
 import { getProgressCount, reportProgress } from '../utils/progress';
+import { track } from '../utils/telemetry';
 import { useHoldUnlocks } from '../utils/feats';
 import { useBackToClose } from '../utils/nativeShell';
 import { usePracticeTime } from '../hooks/usePracticeTime';
@@ -558,6 +559,16 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   }));
   const [foot, setFoot] = useState<React.ReactNode>(null);
   const [quitting, setQuitting] = useState(false);
+  // For usage events: which lesson, what sort, and where the run is now.
+  const kind = lesson.song ? 'song' : lesson.check ? 'check' : lesson.id === 'drill' ? 'drill' : lesson.practice ? 'practice' : 'lesson';
+  const sRef = useRef(s);
+  sRef.current = s;
+  useEffect(() => { track('lesson_started', { lesson: lesson.id, kind }); }, [lesson.id, kind]);
+  const quit = () => {
+    const at = sRef.current.queue[sRef.current.at];
+    track('lesson_quit', { lesson: lesson.id, kind, step: at?.key, of: first.length });
+    closeLesson();
+  };
   const startedAt = useRef(performance.now());
   const take = useRef(getProgressCount(`lesson:${lesson.id}`) + 1);
   const [secs, setSecs] = useState(0);
@@ -575,6 +586,7 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   useEffect(() => {
     if (!s.done) return;
     setSecs(Math.round((performance.now() - startedAt.current) / 1000));
+    track('lesson_finished', { lesson: lesson.id, kind, stars, complete, secs: Math.round((performance.now() - startedAt.current) / 1000), wrong: s.outcomes.filter(o => o === 'missed').length });
     if (lesson.practice) return;
     if (starred && stars > best) {
       saveCheckStars(lesson.id, stars);
@@ -589,12 +601,20 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
   const onBack = useCallback(() => { if (s.done) closeLesson(); else setQuitting(q => !q); }, [s.done]);
   useBackToClose(true, onBack);
 
+  const answered = (ok: boolean, skipped = false) => {
+    const e = sRef.current.queue[sRef.current.at];
+    if (e && !sRef.current.verdict) track('exercise_answered', { lesson: lesson.id, step: e.key, type: e.ex.type, ok, attempt: e.attempt, skipped });
+  };
+  const answeredRef = useRef(answered);
+  answeredRef.current = answered;
+
   const onVerdict = useCallback((v: Verdict) => {
+    answeredRef.current(v.ok);
     dispatch({ type: 'verdict', v });
     if (v.ok) { hitChime('great', 72); feel('success'); } else { missChime(64); feel('error'); }
     hush(1200);
   }, []);
-  const onSkip = useCallback(() => { feel('select'); dispatch({ type: 'skip' }); }, []);
+  const onSkip = useCallback(() => { feel('select'); answeredRef.current(false, true); dispatch({ type: 'skip' }); }, []);
   const onSeen = useCallback(() => dispatch({ type: 'seen' }), []);
 
   // While a verdict shows, the footer is one button: Next.
@@ -658,7 +678,7 @@ const Run: React.FC<{ lesson: Lesson }> = ({ lesson }) => {
             <h3>Stop here?</h3>
             <p>This take will not be kept. The step stays where it was.</p>
             <button type="button" className="lp-btn" onClick={() => setQuitting(false)} data-feel="off">Keep going</button>
-            <button type="button" className="lp-btn is-quiet is-danger" onClick={() => { feel('select'); closeLesson(); }} data-feel="off">Stop the lesson</button>
+            <button type="button" className="lp-btn is-quiet is-danger" onClick={() => { feel('select'); quit(); }} data-feel="off">Stop the lesson</button>
           </div>
         </div>
       )}
