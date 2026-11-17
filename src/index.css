@@ -15950,6 +15950,10 @@ a.btn {
 .trophy-empty { margin: 0; font-size: 0.82rem; color: var(--text-muted); }
 
 .voice-holdrow .btn { white-space: nowrap; }
+/* Five controls share one row on a phone: keep them inside the card. */
+.voice-holdrow { gap: 6px; }
+.voice-holdrow .btn:not(.voice-step) { padding-inline: 12px; min-width: 0; }
+.voice-holdrow .voice-target-note { min-width: 0; flex: 1 1 auto; }
 .unlock-go, .unlock-shelf, .hsum-acts .btn { justify-content: center; }
 .unlock-shelf { width: 100%; margin-top: 0.5rem; }
 
@@ -16636,6 +16640,9 @@ a.btn {
 
 /* START below the note on fret 1, clear of the nut. */
 .np-bubble.is-below { transform: translate(-50%, 0); animation-name: np-bob-below; }
+.np-bubble.is-tight { padding: 4px 10px; font-size: 0.68rem; border-radius: 9px; animation-name: np-bob-tight; }
+@keyframes np-bob-tight { 0%,100% { transform: translate(-50%, -100%); } 50% { transform: translate(-50%, calc(-100% - 2px)); } }
+.np-bubble.is-tight::after { width: 7px; height: 7px; margin-left: -3.5px; bottom: -5px; }
 .np-bubble.is-below::after { bottom: auto; top: -7px; transform: rotate(225deg); }
 @keyframes np-bob-below { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 4px); } }
 
@@ -16885,3 +16892,10 @@ a.btn {
   .lp *, .lp *::before, .lp *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 .lp-take .lp-btn + .lp-btn { margin-top: 10px; }
+
+/* Start, in the label, on frets too short to hold the tag beside the note. */
+.np-label-gorow { display: flex; align-items: center; gap: 8px; }
+.np-label-go { display: inline-flex; align-items: center; gap: 1px; padding: 1px 4px 1px 9px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.5; color: var(--primary); background: var(--surface-1); border: 1.5px solid var(--panel-border-hover); box-shadow: 0 2px 0 var(--panel-border); }
+.np-label-go svg { width: 13px; height: 13px; }
+/* A unit divider sits on the fret's top wire; centre the label in what is left below it. */
+.np-row.has-div .np-side { top: 10px; bottom: 0; transform: none; display: flex; align-items: safe center; }

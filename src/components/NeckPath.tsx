@@ -306,6 +306,34 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     return () => document.removeEventListener('pointerdown', close);
   }, [focus]);
 
+  // A card opened near the bottom of the screen would sit under the tab bar.
+  // Bring it into view, without pushing the note you tapped off the top.
+  useEffect(() => {
+    if (focus === null) return;
+    let id = requestAnimationFrame(() => {
+      const pop = document.querySelector<HTMLElement>('.neckpath .np-pop');
+      const view = pop?.closest<HTMLElement>('.np-view');
+      if (!pop || !view) return;
+      // A card low on the neck can hang past the end of the page; make room for it.
+      const hang = pop.getBoundingClientRect().bottom - view.getBoundingClientRect().bottom + 16;
+      view.style.marginBottom = hang > 0 ? `${Math.ceil(hang)}px` : '';
+      id = requestAnimationFrame(() => {
+      const r = pop.getBoundingClientRect();
+      const floor = (document.querySelector('.mtabs')?.getBoundingClientRect().top ?? window.innerHeight) - 12;
+      const ceiling = (document.querySelector('.np-banner-wrap')?.getBoundingClientRect().bottom ?? 0) + 8;
+      const need = r.bottom - floor;
+      if (need <= 0) return;
+      const room = r.top - 90 - ceiling; // keep the tapped fret (just above the card) on screen
+      window.scrollBy({ top: Math.max(0, Math.min(need, room)), behavior: reduced() ? 'auto' : 'smooth' });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(id);
+      const view = document.querySelector<HTMLElement>('.neckpath .np-view');
+      if (view) view.style.marginBottom = '';
+    };
+  }, [focus]);
+
 
   // ---- Banner -------------------------------------------------------------------
   const myUnit = unitOf(curFret);
@@ -358,10 +386,10 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           <small>{f.n === OCTAVE ? 'The octave' : 'Milestone'}</small>
           <b>{f.check.title}</b>
           <p>{f.check.task}</p>
-          <span className="np-card-stars" aria-label={`${STARS} stars to earn`}>{Array.from({ length: STARS }, (_, i) => <Star key={i} />)}</span>
+          {!passed && <span className="np-card-stars" aria-label={`${STARS} stars to earn`}>{Array.from({ length: STARS }, (_, i) => <Star key={i} />)}</span>}
           {locked ? unlock : (
             <span className="np-soon">
-              {passed ? 'Reached. Stars arrive with the skill checks in the next update.' : 'The skill check arrives in the next update.'}
+              {passed ? 'Reached. A skill check for this milestone is coming in a later update.' : 'The skill check is coming in a later update. For now it opens when the frets below it are done.'}
             </span>
           )}
         </div>
@@ -426,7 +454,9 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       return (
         <span className="np-label is-now">
           {next?.title ?? f.title}
-          <small>Fret {f.n} · Step {next ? levels.indexOf(next) + 1 : levels.length} of {levels.length}</small>
+          {tag?.place === 'label' && focus === null
+            ? <small className="np-label-gorow"><span className="np-label-go">Start<Chevron /></span></small>
+            : <small>Fret {f.n} · Step {next ? levels.indexOf(next) + 1 : levels.length} of {levels.length}</small>}
         </span>
       );
     }
@@ -448,6 +478,30 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     // A lesson is all or nothing, so its ring stays empty until it is done.
     const [met, needed] = lessonFor(level.id) ? [0, 1] : levelProgress(level);
     return { x: strX(shapeFor(curDef.steps.length, strings)[i] ?? 3), y: noteY(cur), pct: needed ? met / needed : 0 };
+  })();
+
+  const tag = (() => {
+    if (!curNote) return null;
+    // The tag sits above your note: full size where there is room, smaller
+    // where a neighbour is close. With no clean gap above or below (frets get
+    // short up the neck), it moves into the step's label beside the neck.
+    const ring = 26;
+    const half = 42; // half the tag's width
+    const things = (n: number) => {
+      const f = FRETS.find(g => g.n === n);
+      if (!f) return [] as { x: number; y: number; r: number }[];
+      if (f.check) return (n === OCTAVE ? [width * 0.3, width * 0.7] : [width / 2]).map(x => ({ x, y: midY(n), r: 17 }));
+      const shape = shapeFor(f.steps.length, strings);
+      return f.steps.map((_, i) => ({ x: strX(shape[i] ?? 3), y: noteY(n), r: 14 }));
+    };
+    const near = (n: number) => things(n).filter(o => Math.abs(o.x - curNote.x) < half + o.r);
+    const ceiling = Math.max(cur === 1 ? geo.tops[1] : -Infinity, ...near(cur - 1).map(o => o.y + o.r));
+    const floor = Math.min(Infinity, ...near(cur + 1).map(o => o.y - o.r));
+    const room = curNote.y - ring - ceiling;
+    const roomBelow = floor - (curNote.y + 30);
+    const place = room >= 44 ? 'above' : room >= 33 ? 'tight' : roomBelow >= 36 ? 'below' : 'label';
+    const top = place === 'below' ? curNote.y + 30 : place === 'tight' ? curNote.y - ring - 5 : curNote.y - 30;
+    return { place, x: curNote.x, top };
   })();
 
   const board = (
@@ -498,7 +552,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
         ));
       })}
       {FRETS.filter(f => f.check).map(f => {
-        if (!fretDoneIn(f, shown) && f.n !== nextMilestone) return null;
+        if (!CHECKS_READY || (!fretDoneIn(f, shown) && f.n !== nextMilestone)) return null;
         return (
           <span key={`st${f.n}`} className="np-stars" style={{ top: midY(f.n) + (f.n === OCTAVE ? 20 : 24), left: width / 2 }} aria-hidden="true">
             {Array.from({ length: STARS }, (_, i) => <Star key={i} />)}
@@ -537,12 +591,12 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           )}
         </svg>
       )}
-      {curNote && focus === null && (
+      {tag && focus === null && tag.place !== 'label' && (
         <button
           type="button"
-          className={`np-bubble${cur === 1 ? ' is-below' : ''}`}
+          className={`np-bubble${tag.place === 'below' ? ' is-below' : tag.place === 'tight' ? ' is-tight' : ''}`}
           data-feel="off"
-          style={{ left: curNote.x, top: cur === 1 ? curNote.y + 30 : curNote.y - 30 }}
+          style={{ left: tag.x, top: tag.top }}
           onClick={() => { feel('select'); setFocus(cur); }}
         >
           Start
@@ -573,7 +627,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       <div
         key={n}
         ref={el => { rowRefs.current[n] = el; }}
-        className={`np-row${n === cur ? ' is-now' : ''}${n > OCTAVE ? ' is-far' : ''}`}
+        className={`np-row${n === cur ? ' is-now' : ''}${n > OCTAVE ? ' is-far' : ''}${starts > 0 ? ' has-div' : ''}`}
         style={{ top: geo.tops[n], height: geo.heights[n] }}
       >
         {starts > 0 && <span className="np-divider"><span>{UNITS[starts].name}</span></span>}
@@ -632,7 +686,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
                   <span className="np-guide-fret">{f.n}</span>
                   <div>
                     {f.check ? (
-                      <><b>{f.check.title}</b><p>{f.check.task}</p></>
+                      <><b>{fretDoneIn(f, shown) && <Check />}{f.check.title}</b><p>{f.check.task}</p></>
                     ) : f.steps.map(id => {
                       const l = levelOf(id);
                       return l ? <div key={id} className={`np-guide-step${shown.has(id) ? ' is-done' : ''}`}><b>{shown.has(id) && <Check />}{l.title}</b><p>{l.idea}</p></div> : null;

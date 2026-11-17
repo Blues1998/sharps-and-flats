@@ -146,7 +146,7 @@ export const JOURNEY: JourneyChapter[] = [
     levels: [
       {
         id: 'chord-flavors',
-        title: 'Taste the chord flavors',
+        title: 'Chord flavours',
         idea: 'A chord is notes at once. Move one and the whole mood flips.',
         task: 'Name 3 chords by their feeling.',
         tab: 'ear-training',
@@ -155,7 +155,7 @@ export const JOURNEY: JourneyChapter[] = [
       },
       {
         id: 'build-chords',
-        title: 'Build chords note by note',
+        title: 'Build a chord',
         idea: 'Every triad is a root, a third and a fifth.',
         task: 'In Challenges → Chords, build 2 chords.',
         tab: 'play',
@@ -164,7 +164,7 @@ export const JOURNEY: JourneyChapter[] = [
       },
       {
         id: 'why-chords-work',
-        title: 'See why chords sound good',
+        title: 'Why chords work',
         idea: 'Simple frequency ratios sound smooth. Out-of-tune notes beat.',
         task: 'Drag the two-tone slider until you lock onto a simple ratio.',
         tab: 'physics',
@@ -178,7 +178,7 @@ export const JOURNEY: JourneyChapter[] = [
     levels: [
       {
         id: 'meet-the-circle',
-        title: 'Meet the circle of fifths',
+        title: 'The circle of fifths',
         idea: 'A key is a home note plus its scale. On the circle, neighbours share almost every note.',
         task: 'Hear the home chord of 3 different keys.',
         tab: 'theory',
@@ -187,7 +187,7 @@ export const JOURNEY: JourneyChapter[] = [
       },
       {
         id: 'chords-that-belong',
-        title: 'Chords that belong together',
+        title: 'Chords in a key',
         idea: 'Each key owns seven chords. Most songs you know use only those.',
         task: 'Play 4 of them in a row. That is a progression.',
         tab: 'theory',
@@ -196,7 +196,7 @@ export const JOURNEY: JourneyChapter[] = [
       },
       {
         id: 'walk-the-circle',
-        title: 'Walk the whole circle',
+        title: 'Walk the circle',
         idea: 'Stepping by fifths hits all 12 notes once, because gcd(7, 12) = 1.',
         task: 'Run the +7 walk all the way round.',
         tab: 'physics',

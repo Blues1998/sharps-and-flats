@@ -280,7 +280,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'chord-flavors',
-    title: 'Taste the chord flavors',
+    title: 'Chord flavours',
     recap: 'Major sounds settled, minor darker, diminished tense. The third makes most of the difference.',
     build: () => [
       { type: 'teach', title: 'Three notes, three moods',
@@ -298,7 +298,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'build-chords',
-    title: 'Build chords note by note',
+    title: 'Build a chord',
     recap: 'A triad is root, third and fifth. C major is C E G; A minor is A C E.',
     build: () => [
       { type: 'teach', title: 'Root, third, fifth',
@@ -314,7 +314,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'why-chords-work',
-    title: 'See why chords sound good',
+    title: 'Why chords work',
     recap: 'Notes blend when their frequencies form simple ratios: 2 to 1 for an octave, 3 to 2 for a fifth.',
     build: () => [
       { type: 'teach', title: 'Simple ratios blend',
@@ -332,7 +332,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'meet-the-circle',
-    title: 'Meet the circle of fifths',
+    title: 'The circle of fifths',
     recap: 'Going up a fifth moves one step round the circle and adds one sharp. Neighbours share six of seven notes.',
     build: () => [
       { type: 'teach', title: 'Keys sit on a circle',
@@ -349,7 +349,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'chords-that-belong',
-    title: 'Chords that belong together',
+    title: 'Chords in a key',
     recap: 'A major key owns seven chords: major on I, IV, V; minor on ii, iii, vi; diminished on vii.',
     build: () => [
       { type: 'teach', title: 'A key owns seven chords',
@@ -371,7 +371,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'walk-the-circle',
-    title: 'Walk the whole circle',
+    title: 'Walk the circle',
     recap: 'Up a fifth twelve times visits every note once and lands home. On the neck, a fifth is 7 frets.',
     build: () => [
       { type: 'teach', title: 'Seven frets at a time',
