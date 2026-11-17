@@ -16988,6 +16988,8 @@ a.btn {
 .tday-xp > small { font-size: 0.72rem; color: var(--text-muted); }
 .me-about .btn { margin-left: auto; }
 .me-settings .me-licences { margin: 6px 0 0; }
+.me-settings > .me-row:first-child { border-top: none; }
+.me-licences summary::after { content: none; }
 .me .me-progress { display: flex; flex-direction: column; gap: 12px; }
 .me .me-progress > * { margin: 0; order: 0 !important; }
 .me .me-xp { margin: 4px 0 0; text-align: center; }

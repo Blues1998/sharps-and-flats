@@ -205,7 +205,10 @@ async function doSchedule(): Promise<void> {
   for (const d of Object.keys(log.assigned)) if (d < day) delete log.assigned[d];
   log.pending = list.map(n => n.schedule.at.getTime());
   write(LOG_KEY, log);
-  if (list.length) await LocalNotifications.schedule({ notifications: list });
+  // Inexact on purpose: a reminder a few minutes late is fine, and asking for
+  // exact alarms would open Android's "Alarms and reminders" settings page
+  // every time the app comes to the front (the manifest drops that permission).
+  if (list.length) await LocalNotifications.schedule({ notifications: list.map(n => ({ ...n, isExactNotification: false })) });
 }
 
 let wired = false;
