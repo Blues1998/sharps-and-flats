@@ -16954,3 +16954,29 @@ a.btn {
 @keyframes np-unit-flash { 0% { border-color: #f2c14e; box-shadow: 0 0 0 10px var(--page-bg), 0 0 28px rgba(242,193,78,0.55); } 100% { box-shadow: 0 0 0 10px var(--page-bg); } }
 .np-unit.is-first.is-flash { animation-name: np-unit-flash-first; }
 @keyframes np-unit-flash-first { 0% { border-color: #f2c14e; box-shadow: 0 0 28px rgba(242,193,78,0.55); } 100% { box-shadow: none; } }
+
+/* ===== Units: panels behind one continuous neck ============================ */
+.np-sect { position: absolute; left: 0; right: 0; z-index: 0; border-radius: 16px; background: var(--surface-1); border: 1px solid var(--panel-border); }
+.np-sect.is-now { background: color-mix(in srgb, var(--primary) 7%, var(--surface-1)); border-color: color-mix(in srgb, var(--primary) 35%, var(--panel-border)); }
+.np-sect.is-ahead, .np-sect.is-later { background: color-mix(in srgb, var(--surface-1) 55%, var(--page-bg)); }
+.np-sect.is-flash { animation: np-sect-flash 1.4s ease-out; }
+@keyframes np-sect-flash { 0% { border-color: #f2c14e; box-shadow: 0 0 26px rgba(242,193,78,0.5); } 100% { box-shadow: none; } }
+.np-chip { all: unset; box-sizing: border-box; cursor: pointer; position: absolute; top: 9px; left: calc(var(--np-left) + var(--neck-w) + var(--np-gap)); right: 10px;
+  display: flex; align-items: center; gap: 8px; min-width: 0; z-index: 2; }
+.np-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 6px; }
+.np-chip-mark { flex: none; display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 3px; box-sizing: border-box; border: 2px solid currentColor; border-radius: 5px;
+  font-family: var(--font-display); font-weight: 800; font-size: 0.8rem; line-height: 1; color: var(--text-muted); }
+.np-chip { align-items: flex-start; }
+.np-chip-mark { margin-top: 1px; }
+.np-chip-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.np-chip-text b { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.2; color: var(--text-secondary); white-space: nowrap; }
+.np-chip-text small { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
+.np-chip-text small svg { width: 12px; height: 12px; }
+.np-sect.is-now .np-chip-mark, .np-sect.is-now .np-chip-text small { color: var(--primary); }
+.np-sect.is-now .np-chip-text b { color: var(--text-primary); }
+.np-sect.is-done .np-chip-mark { color: #d9b26a; }
+.np-chip.is-8va { cursor: default; opacity: 0.7; }
+.np-chip.is-8va .np-chip-mark { font-style: italic; font-size: 0.66rem; }
+/* A unit's first fret: its label sits under the chip. */
+.np-row.has-chip .np-side { top: 52px; transform: none; }
+.neckpath .np-board { z-index: 1; }

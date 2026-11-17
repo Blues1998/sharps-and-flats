@@ -36,8 +36,6 @@ interface Props {
 
 const FIRST = 112;           // height of fret 1, px; each fret after is 2^(-1/12) of the last
 const NUT = 12;
-/** The break between two units: the neck stops, a header opens the next section. */
-const GAP = 84;
 const XP_STEP = 20;
 const STARS = 3;
 const INTRO_KEY = 'cadenza-neck-intro';
@@ -139,9 +137,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     const tops: number[] = [];
     const heights: number[] = [];
     let y = NUT;
-    const breaks = new Set([...UNITS.slice(1).map(u => u.from), OCTAVE + 1]);
     for (let n = 1; n <= lastFret; n++) {
-      if (breaks.has(n)) y += GAP;
       tops[n] = y;
       heights[n] = Math.round(fretHeight(n, FIRST));
       y += heights[n];
@@ -447,52 +443,47 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     );
   };
 
-  // ---- Units: each one a section of the neck -----------------------------------
-  // Like a score marks its sections, the neck stops at the end of a unit with a
-  // double bar, and the next unit opens under a numbered header.
-  const unitBand = (i: number, top?: number) => {
+  // ---- Units: sections behind one continuous neck ------------------------------
+  // Each unit is a panel behind the board, with a gap between panels, so the
+  // sides show where one unit ends and the next begins while the neck runs on
+  // unbroken. A chip at the top of each panel names the unit; the last wire of
+  // a unit is a double bar, as a score closes a section.
+  const unitState = (i: number) => {
     const u = UNITS[i];
     const frets = FRETS.filter(f => f.n >= u.from && f.n <= u.to);
     const ids = frets.flatMap(f => (f.check ? [checkId(f.n)] : f.steps));
     const doneCount = ids.filter(id => shown.has(id)).length;
     const state = doneCount === ids.length ? 'is-done' : u.from <= cur ? 'is-now' : 'is-ahead';
     const check = frets.find(f => f.check);
-    const st = check ? checkStars(checkId(check.n)) : 0;
-    return (
-      <button
-        key={`u${i}-${flash?.unit === i ? flash.k : 0}`}
-        type="button"
-        data-feel="off"
-        className={`np-unit ${state}${top === undefined ? ' is-first' : ''}${flash?.unit === i ? ' is-flash' : ''}`}
-        style={top === undefined ? undefined : { top: top + 10, height: GAP - 20 }}
-        onClick={() => { feel('select'); setGuide(i); }}
-        aria-label={`Unit ${i + 1}, ${u.name}: what it teaches`}
-      >
-        <span className="np-unit-mark">{i + 1}</span>
-        <span className="np-unit-text">
-          <b>{u.name}</b>
-          <small>
-            {state === 'is-done' ? 'Done' : state === 'is-now' ? `${doneCount} of ${ids.length} done` : 'Locked'}
-            {` · Frets ${u.from} to ${u.to}`}
-          </small>
-        </span>
-        <span className="np-unit-state" aria-hidden="true">
-          {state === 'is-done' && st > 0
-            ? <span className="np-unit-stars">{Array.from({ length: STARS }, (_, k) => <span key={k} className={k < st ? 'is-on' : ''}><Star /></span>)}</span>
-            : state === 'is-done' ? <Check /> : state === 'is-ahead' ? <Lock /> : <Chevron />}
-        </span>
-      </button>
-    );
+    return { u, ids, doneCount, state, stars: check ? checkStars(checkId(check.n)) : 0 };
   };
-  const bands = (
+  const sectionTop = (n: number) => (n === 1 ? 0 : geo.tops[n]);
+  const sectionEnd = (n: number) => geo.tops[n] + geo.heights[n];
+  const sections = (
     <>
-      {UNITS.slice(1).map((u, k) => unitBand(k + 1, geo.tops[u.from] - GAP))}
-      {/* The end of each unit: a double bar across the neck. */}
-      {UNITS.map(u => <i key={`db${u.to}`} className="np-dbar" style={{ top: geo.tops[u.to] + geo.heights[u.to] - 2, left: 'var(--np-left)', width }} />)}
-      <div className="np-unit is-later" style={{ top: geo.tops[OCTAVE + 1] - GAP + 10, height: GAP - 20 }}>
-        <span className="np-unit-mark is-8va">8va</span>
-        <span className="np-unit-text"><b>Second octave</b><small>Chords, strumming and lead. Coming next.</small></span>
+      {UNITS.map((_, i) => {
+        const { u, ids, doneCount, state, stars } = unitState(i);
+        return (
+          <div key={`sec${i}-${flash?.unit === i ? flash.k : 0}`} className={`np-sect ${state}${flash?.unit === i ? ' is-flash' : ''}`}
+            style={{ top: sectionTop(u.from) + 3, height: sectionEnd(u.to) - sectionTop(u.from) - 6 }}>
+            <button type="button" className="np-chip" data-feel="off" onClick={() => { feel('select'); setGuide(i); }} aria-label={`Unit ${i + 1}, ${u.name}: what it teaches`}>
+              <span className="np-chip-mark">{i + 1}</span>
+              <span className="np-chip-text">
+                <b>{u.name}</b>
+                <small>
+                  {state === 'is-done'
+                    ? (stars > 0 ? <span className="np-unit-stars">{Array.from({ length: STARS }, (_, k) => <span key={k} className={k < stars ? 'is-on' : ''}><Star /></span>)}</span> : 'Done')
+                    : state === 'is-now' ? `${doneCount} of ${ids.length} done` : <><Lock />Locked</>}
+                </small>
+              </span>
+            </button>
+          </div>
+        );
+      })}
+      <div className="np-sect is-later" style={{ top: geo.tops[OCTAVE + 1] + 3, height: sectionEnd(lastFret) - geo.tops[OCTAVE + 1] }}>
+        <span className="np-chip is-8va"><span className="np-chip-mark">8va</span><span className="np-chip-text"><b>Next</b><small>Second octave</small></span></span>
       </div>
+      {UNITS.map(u => <i key={`db${u.to}`} className="np-dbar" style={{ top: geo.tops[u.to] + geo.heights[u.to] - 2, left: 'var(--np-left)', width }} />)}
     </>
   );
 
@@ -527,9 +518,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       return f.steps.map((_, i) => ({ x: strX(shape[i] ?? 3), y: noteY(n), r: 14 }));
     };
     const near = (n: number) => things(n).filter(o => Math.abs(o.x - curNote.x) < half + o.r);
-    // The nut, or a unit header, closes the space above the first fret of a section.
-    const opensSection = cur === 1 || UNITS.some(u => u.from === cur);
-    const ceiling = Math.max(opensSection ? geo.tops[cur] : -Infinity, ...(opensSection ? [] : near(cur - 1).map(o => o.y + o.r)));
+    const ceiling = Math.max(cur === 1 ? geo.tops[1] : -Infinity, ...near(cur - 1).map(o => o.y + o.r));
     const floor = Math.min(Infinity, ...near(cur + 1).map(o => o.y - o.r));
     const room = curNote.y - ring - ceiling;
     const roomBelow = floor - (curNote.y + 30);
@@ -661,7 +650,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       <div
         key={n}
         ref={el => { rowRefs.current[n] = el; }}
-        className={`np-row${n === cur ? ' is-now' : ''}${n > OCTAVE ? ' is-far' : ''}`}
+        className={`np-row${n === cur ? ' is-now' : ''}${n > OCTAVE ? ' is-far' : ''}${UNITS.some(u => u.from === n) ? ' has-chip' : ''}`}
         style={{ top: geo.tops[n], height: geo.heights[n] }}
       >
         <button type="button" className="np-num" data-feel="off" onClick={() => tapFret(n)} aria-label={`Fret ${n}`} tabIndex={n > OCTAVE ? -1 : 0}>{n}</button>
@@ -682,11 +671,10 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           <button type="button" onClick={() => { setIntro(false); try { localStorage.setItem(INTRO_KEY, '1'); } catch { /* shows again */ } }}>Got it</button>
         </div>
       )}
-      {unitBand(0)}
       <div className="np-view" style={{ height: geo.length + 16 }}>
         <div className="np-grid" style={{ ['--neck-w' as string]: `${width}px` } as React.CSSProperties}>
+          {sections}
           {board}
-          {bands}
           {rows}
           {focusedDef && (
             <div
