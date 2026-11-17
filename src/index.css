@@ -17010,3 +17010,4 @@ a.btn {
 .tstat-pop-rests i { font-style: normal; font-size: 1.1rem; opacity: 0.3; margin-right: 2px; }
 .tstat-pop-rests i.is-on { opacity: 1; color: var(--primary); }
 @keyframes tstat-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.tstat > .tstat-item { position: relative; z-index: 42; }
