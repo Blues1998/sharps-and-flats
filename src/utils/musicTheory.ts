@@ -52,23 +52,24 @@ export interface IntervalInfo {
   name: string;
   semitones: number;
   shortName: string;
-  songClue: string;
+  /** What the gap sounds like, as a hint. */
+  feel: string;
 }
 
 export const INTERVALS: IntervalInfo[] = [
-  { name: 'Unison', semitones: 0, shortName: 'P1', songClue: 'Same exact pitch' },
-  { name: 'Minor 2nd', semitones: 1, shortName: 'm2', songClue: 'Jaws Theme ("dum-dum...")' },
-  { name: 'Major 2nd', semitones: 2, shortName: 'M2', songClue: 'Happy Birthday ("Hap-py")' },
-  { name: 'Minor 3rd', semitones: 3, shortName: 'm3', songClue: 'Lullaby / Greensleeves' },
-  { name: 'Major 3rd', semitones: 4, shortName: 'M3', songClue: 'Oh When the Saints ("Oh when...")' },
-  { name: 'Perfect 4th', semitones: 5, shortName: 'P4', songClue: 'Here Comes the Bride ("Here comes...")' },
-  { name: 'Tritone', semitones: 6, shortName: 'd5', songClue: 'The Simpsons Theme ("The Simp-...")' },
-  { name: 'Perfect 5th', semitones: 7, shortName: 'P5', songClue: 'Star Wars Theme ("Star Wars...")' },
-  { name: 'Minor 6th', semitones: 8, shortName: 'm6', songClue: 'The Entertainer / Love Story' },
-  { name: 'Major 6th', semitones: 9, shortName: 'M6', songClue: 'NBC Chimes / Bonnie Lies Over Ocean' },
-  { name: 'Minor 7th', semitones: 10, shortName: 'm7', songClue: 'Star Trek Theme ("Star Trek...")' },
-  { name: 'Major 7th', semitones: 11, shortName: 'M7', songClue: 'Take On Me ("Take on...")' },
-  { name: 'Octave', semitones: 12, shortName: 'P8', songClue: 'Somewhere Over the Rainbow' }
+  { name: 'Unison', semitones: 0, shortName: 'P1', feel: 'The same note twice' },
+  { name: 'Minor 2nd', semitones: 1, shortName: 'm2', feel: 'Tight and tense, almost a rub' },
+  { name: 'Major 2nd', semitones: 2, shortName: 'M2', feel: 'A step, like walking up a scale' },
+  { name: 'Minor 3rd', semitones: 3, shortName: 'm3', feel: 'Close and a little sad' },
+  { name: 'Major 3rd', semitones: 4, shortName: 'M3', feel: 'Close and bright' },
+  { name: 'Perfect 4th', semitones: 5, shortName: 'P4', feel: 'Open, wants to move on' },
+  { name: 'Tritone', semitones: 6, shortName: 'd5', feel: 'Uneasy, hangs in the air' },
+  { name: 'Perfect 5th', semitones: 7, shortName: 'P5', feel: 'Wide, open and hollow' },
+  { name: 'Minor 6th', semitones: 8, shortName: 'm6', feel: 'Wide and bittersweet' },
+  { name: 'Major 6th', semitones: 9, shortName: 'M6', feel: 'Wide and warm' },
+  { name: 'Minor 7th', semitones: 10, shortName: 'm7', feel: 'Wide and bluesy, wants to resolve' },
+  { name: 'Major 7th', semitones: 11, shortName: 'M7', feel: 'Almost an octave, sharp and restless' },
+  { name: 'Octave', semitones: 12, shortName: 'P8', feel: 'The same note, higher' }
 ];
 
 // Scale formulas as semitone offsets from the root

@@ -123,9 +123,9 @@ export const JOURNEY: JourneyChapter[] = [
     levels: [
       {
         id: 'interval-songs',
-        title: 'Every interval has a song',
+        title: 'Hear the gap',
         idea: 'An interval is the gap between two notes.',
-        task: 'Name 3 intervals. Use the song clues.',
+        task: 'Name 3 intervals by ear.',
         tab: 'ear-training',
         buttonText: 'Ear Training',
         requirements: [{ event: 'ear-interval-correct', count: 3 }]

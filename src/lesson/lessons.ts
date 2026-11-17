@@ -65,10 +65,10 @@ const playNotes = (notes: [number, string?][]) => ({
 });
 
 const INTERVAL = {
-  M3: { name: 'Major 3rd', semis: 4, hook: '"Oh when the Saints"' },
-  P4: { name: 'Perfect 4th', semis: 5, hook: '"Here comes the bride"' },
-  P5: { name: 'Perfect 5th', semis: 7, hook: 'the Star Wars theme' },
-  P8: { name: 'Octave', semis: 12, hook: '"Some-where over the rainbow"' },
+  M3: { name: 'Major 3rd', semis: 4, feel: 'close and bright' },
+  P4: { name: 'Perfect 4th', semis: 5, feel: 'open, wanting to move on' },
+  P5: { name: 'Perfect 5th', semis: 7, feel: 'wide and hollow' },
+  P8: { name: 'Octave', semis: 12, feel: 'the same note, higher' },
 };
 type IntervalKey = keyof typeof INTERVAL;
 
@@ -80,7 +80,7 @@ function intervalRound(keys: IntervalKey[]): Exercise {
     prompt: 'Which interval is this?',
     sound: { kind: 'notes', midis: [root, root + INTERVAL[k].semis], gap: 0.65 },
     options: keys.map(o => ({ label: INTERVAL[o].name, correct: o === k })),
-    explain: `That was a ${INTERVAL[k].name.toLowerCase()}, ${INTERVAL[k].semis} frets apart: the opening of ${INTERVAL[k].hook}.`,
+    explain: `That was a ${INTERVAL[k].name.toLowerCase()}, ${INTERVAL[k].semis} frets apart: ${INTERVAL[k].feel}.`,
   };
 }
 
@@ -254,18 +254,23 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'interval-songs',
-    title: 'Every interval has a song',
-    recap: 'Hook intervals to songs: Saints for a major 3rd, Star Wars for a 5th, Over the Rainbow for an octave.',
+    title: 'Hear the gap',
+    recap: 'A major 3rd sounds close and bright, a 5th wide and hollow, an octave like the same note higher.',
     build: () => [
       { type: 'teach', title: 'An interval is the gap between two notes',
-        body: 'Every gap has its own sound. The quickest way to learn them is to hang each one on a song you already know.',
+        body: 'Every gap has its own sound. Small gaps sound close, wide ones sound open. Listen to three, one note after the other.',
         sounds: [
           { label: 'Major 3rd', sound: { kind: 'notes', midis: [60, 64], gap: 0.6 } },
           { label: 'Perfect 5th', sound: { kind: 'notes', midis: [60, 67], gap: 0.6 } },
           { label: 'Octave', sound: { kind: 'notes', midis: [60, 72], gap: 0.6 } },
         ] },
-      { type: 'teach', title: 'Three songs, three gaps',
-        body: 'Sing the first two notes in your head. "Oh when the Saints" is a major 3rd. The Star Wars theme is a perfect 5th. "Some-where over the rainbow" is an octave.' },
+      { type: 'teach', title: 'Now hear them together',
+        body: 'Played at once, each gap has a colour. The major 3rd is close and bright. The 5th is wide and hollow. The octave blends into one note.',
+        sounds: [
+          { label: 'Major 3rd', sound: { kind: 'chord', midis: [60, 64] } },
+          { label: 'Perfect 5th', sound: { kind: 'chord', midis: [60, 67] } },
+          { label: 'Octave', sound: { kind: 'chord', midis: [60, 72] } },
+        ] },
       { type: 'choose', prompt: 'Which gap is bigger?',
         options: pair('Gap', { kind: 'notes', midis: [60, 67], gap: 0.6 }, { kind: 'notes', midis: [60, 64], gap: 0.6 }),
         explain: 'The 5th is seven frets wide. The 3rd is four.' },

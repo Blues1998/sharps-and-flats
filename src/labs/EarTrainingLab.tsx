@@ -172,7 +172,7 @@ export const EarTrainingLab: React.FC = () => {
         return INTERVALS.filter(i => semitones.includes(i.semitones));
       }
       case 'super-beginner':
-        // Very basic leaps: Unison, Perfect 5th (Star Wars), Octave
+        // Very basic leaps: Unison, Perfect 5th, Octave
         return INTERVALS.filter(i => [0, 7, 12].includes(i.semitones));
       case 'easy':
         return INTERVALS.filter(i => [0, 4, 7, 12].includes(i.semitones)); // Unison, Maj3, P5, Octave
@@ -457,7 +457,7 @@ export const EarTrainingLab: React.FC = () => {
 
   const tabEmpty = sourceMode === 'tab' && tabSource.candidates.length === 0;
   const isCorrect = (opt: string) => (quizMode === 'intervals' ? correctInterval?.name === opt : correctChord?.name === opt);
-  const clueFor = (opt: string) => (quizMode === 'intervals' ? INTERVALS.find(iv => iv.name === opt)?.songClue ?? '' : CHORD_FEELINGS[opt] ?? '');
+  const clueFor = (opt: string) => (quizMode === 'intervals' ? INTERVALS.find(iv => iv.name === opt)?.feel ?? '' : CHORD_FEELINGS[opt] ?? '');
   useEffect(() => { if (showCheatSheet && hasStarted && !isAnswered) setUsedClue(true); }, [showCheatSheet, hasStarted, isAnswered]);
   const finished = totalQuestions >= SET;
   usePracticeTime('ear', hasStarted && !setDone);

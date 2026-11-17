@@ -170,7 +170,7 @@ export const PlayLab: React.FC = () => {
       targets: [targetPc],
       chipLabels: ['?'],
       promptTitle: `Play a ${interval.name} above ${rootName}`,
-      promptDetail: `That's ${interval.semitones} semitone${interval.semitones === 1 ? '' : 's'} (frets) up. Hint: it's the gap in “${interval.songClue}”. Any octave counts.`,
+      promptDetail: `That's ${interval.semitones} semitone${interval.semitones === 1 ? '' : 's'} (frets) up. Any octave counts.`,
       contextPcs: [rootMidi % 12],
       referenceMidis: [rootMidi],
       rewardMidis: [rootMidi, rootMidi + interval.semitones],
