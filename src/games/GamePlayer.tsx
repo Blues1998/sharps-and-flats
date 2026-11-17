@@ -11,7 +11,8 @@ import { GAMES, LEVELS, PER_LEVEL, STRIKES, gameBest, gameDef, levelFor, ordered
 import type { GameId, Round } from './games';
 import { closeGame, startGame, useOpenGame } from './store';
 import { Player } from '../lesson/Player';
-import { playSound, soundLength } from '../lesson/sound';
+import { playOne } from '../lesson/nowPlaying';
+import { soundLength } from '../lesson/sound';
 import { usePracticeTime } from '../hooks/usePracticeTime';
 import { feel } from '../utils/haptics';
 import { hitChime, missChime } from '../utils/chime';
@@ -86,7 +87,7 @@ const Game: React.FC<{ id: GameId }> = ({ id }) => {
       setStrikes(s => s + 1);
       const yours = round.options.find(o => o.label === label)?.hear;
       const theirs = round.options.find(o => o.label === round.answer)?.hear;
-      if (yours && theirs) window.setTimeout(() => playSound({ kind: 'seq', parts: [yours, theirs], gap: soundLength(yours) + 0.3 }), 600);
+      if (yours && theirs) window.setTimeout(() => playOne({ kind: 'seq', parts: [yours, theirs], gap: soundLength(yours) + 0.3 }), 600);
     }
   };
 
@@ -115,7 +116,7 @@ const Game: React.FC<{ id: GameId }> = ({ id }) => {
             return (
               <button key={o.label} type="button" className={`gm-opt${st}`} data-feel="off"
                 data-correct={import.meta.env.DEV ? o.label === round.answer : undefined}
-                onClick={() => (chosen ? playSound(o.hear) : answer(o.label))}>
+                onClick={() => (chosen ? playOne(o.hear) : answer(o.label))}>
                 {o.label}
               </button>
             );

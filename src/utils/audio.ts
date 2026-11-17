@@ -95,7 +95,28 @@ class AudioEngine {
   public getMasterBus(): { ctx: AudioContext; input: AudioNode } | null {
     this.init();
     if (!this.ctx || !this.masterGain) return null;
-    return { ctx: this.ctx, input: this.masterGain };
+    return { ctx: this.ctx, input: this.out() };
+  }
+
+  // A playback that can be stopped: everything scheduled inside `fn` goes
+  // through its own gain, so stopping it fades out notes not yet sounded too.
+  private route: GainNode | null = null;
+  private out(): AudioNode { return this.route ?? this.masterGain!; }
+  public playStoppable(fn: () => void): () => void {
+    this.init();
+    const ctx = this.ctx;
+    if (!ctx || !this.masterGain) { fn(); return () => {}; }
+    const bus = ctx.createGain();
+    bus.connect(this.masterGain);
+    this.route = bus;
+    try { fn(); } finally { this.route = null; }
+    return () => {
+      const t = ctx.currentTime;
+      bus.gain.cancelScheduledValues(t);
+      bus.gain.setValueAtTime(bus.gain.value, t);
+      bus.gain.linearRampToValueAtTime(0, t + 0.06);
+      window.setTimeout(() => bus.disconnect(), 250);
+    };
   }
 
   // Play a single note using standard MIDI index number
@@ -236,7 +257,7 @@ class AudioEngine {
 
     source.connect(band);
     band.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.out());
     source.start(at);
     source.stop(at + seconds + 0.02);
   }
@@ -260,7 +281,7 @@ class AudioEngine {
     const finalDuration = Math.max(0.4, Math.min(4.0, duration * pitchScale));
 
     const pluckGain = this.ctx.createGain();
-    pluckGain.connect(this.masterGain);
+    pluckGain.connect(this.out());
 
     // Only notes addressed by MIDI can be held later, which is every note an
     // instrument surface plays. Scheduled-in-advance notes are left alone.
@@ -361,7 +382,7 @@ class AudioEngine {
     const gainNode = this.ctx.createGain();
     
     osc.connect(gainNode);
-    gainNode.connect(this.masterGain);
+    gainNode.connect(this.out());
 
     // Woody block sounds are simulated by sine waves around 800 - 1200Hz
     const freq = subdivision ? 1560 : accented ? 1100 : 750;

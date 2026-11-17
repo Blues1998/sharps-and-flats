@@ -17032,7 +17032,7 @@ a.btn {
 .lp-board-cell { cursor: pointer; }
 .lp-board-dot { fill: rgba(255, 255, 255, 0.14); stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.2; stroke-dasharray: 2 2; }
 .lp-board-dot.is-found { fill: var(--primary); stroke: none; stroke-dasharray: none; opacity: 0.9; }
-.lp-board-next { fill: color-mix(in srgb, var(--primary) 30%, transparent); stroke: var(--primary); stroke-width: 2.5; animation: lp-board-glow 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.lp-board-next { fill: color-mix(in srgb, var(--primary) 70%, transparent); stroke: var(--primary); stroke-width: 2.5; animation: lp-board-glow 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes lp-board-glow { 50% { transform: scale(1.18); opacity: 0.7; } }
 .lp-board-lit circle { fill: #ffd8a8; animation: lp-board-lit 0.9s ease-out forwards; transform-box: fill-box; transform-origin: center; }
 .lp-board-lit text { font-size: 10px; font-weight: 800; text-anchor: middle; fill: #3a1a08; animation: lp-board-lit 0.9s ease-out forwards; }
@@ -17131,3 +17131,6 @@ a.btn {
 .tstat-counts summary::after { content: ' ›'; }
 .tstat-counts[open] summary::after { content: ' ⌄'; }
 .tstat-counts p { margin: 8px 0 0 !important; line-height: 1.45; }
+.lp-board-dot.is-soon { fill: color-mix(in srgb, var(--primary) 22%, transparent); stroke: color-mix(in srgb, var(--primary) 55%, transparent); stroke-dasharray: none; }
+.lp-screen-say { margin: 0 0 12px; text-align: center; font-size: 0.92rem; color: var(--text-secondary); }
+.lp-riff .lp-board { margin-bottom: 8px; }

@@ -5,8 +5,9 @@ import { lessonFor, setDrill } from './lessons';
 import type { ChooseOption, Exercise, Lesson } from './lessons';
 import { Explore, Riff } from './LessonTab';
 import { Player } from './Player';
+import { playOne } from './nowPlaying';
 import { noteMiss } from './hints';
-import { appSounding, audioNow, hush, playSound, soundLength, startClicks } from './sound';
+import { appSounding, audioNow, hush, soundLength, startClicks } from './sound';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { feel } from '../utils/haptics';
 import { hitChime, missChime } from '../utils/chime';
@@ -109,7 +110,7 @@ const Choose: React.FC<ExProps<'choose'>> = ({ ex, verdict, onVerdict, setFoot }
     if (verdict) return;
     feel('select');
     setSel(i);
-    if (o.sound) playSound(o.sound);
+    if (o.sound) playOne(o.sound);
   };
   const dev = import.meta.env.DEV;
 
@@ -120,7 +121,7 @@ const Choose: React.FC<ExProps<'choose'>> = ({ ex, verdict, onVerdict, setFoot }
   const compare = yours?.hear && answer?.hear ? { yours: yours.hear, answer: answer.hear } : null;
   useEffect(() => {
     if (!compare) return;
-    const id = window.setTimeout(() => playSound({ kind: 'seq', parts: [compare.yours, compare.answer], gap: soundLength(compare.yours) + 0.3 }), 700);
+    const id = window.setTimeout(() => playOne({ kind: 'seq', parts: [compare.yours, compare.answer], gap: soundLength(compare.yours) + 0.3 }), 700);
     return () => window.clearTimeout(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!compare]);

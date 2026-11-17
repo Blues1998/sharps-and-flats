@@ -64,8 +64,18 @@ export function hush(ms: number): void {
 /** True while a sound the app played could still reach the mic. */
 export const appSounding = (): boolean => performance.now() < soundingUntil;
 
-export function playSound(s: Sound, offset = 0): void {
-  if (offset === 0) hush(soundLength(s) * 1000);
+/** Play a sound; returns a function that stops it, notes still to come included. */
+export function playSound(s: Sound): () => void {
+  hush(soundLength(s) * 1000);
+  const stop = audio.playStoppable(() => schedule(s, 0));
+  return () => {
+    stop();
+    // The mic may listen again once the room is quiet.
+    soundingUntil = Math.min(soundingUntil, performance.now() + TAIL_MS);
+  };
+}
+
+function schedule(s: Sound, offset: number): void {
   const t = now() + offset;
   switch (s.kind) {
     case 'note': audio.playMidi(s.midi, 2, t); break;
@@ -78,7 +88,7 @@ export function playSound(s: Sound, offset = 0): void {
       sine(midiToFreq(s.b) * Math.pow(2, (s.detune ?? 0) / 1200), t, 2.4, 0.12);
       break;
     }
-    case 'seq': s.parts.forEach((p, i) => playSound(p, offset + i * s.gap)); break;
+    case 'seq': s.parts.forEach((p, i) => schedule(p, offset + i * s.gap)); break;
     case 'melody': {
       const beat = 60 / s.bpm;
       let at = t;
