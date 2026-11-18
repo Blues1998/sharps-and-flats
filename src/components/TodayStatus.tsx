@@ -10,6 +10,7 @@ import { GameShelf } from '../games/GameShelf';
 import { gameOpen } from '../games/store';
 import { lessonOpen } from '../lesson/store';
 import { answerOffer, goalOffer, offerShown, type GoalOffer } from '../utils/goalBump';
+import { flicker } from '../utils/flicker';
 
 // The top bar on Today, where the app name used to be: you, what you are
 // learning, your streak, and how much of today's goal is done. Tapping one
@@ -17,7 +18,7 @@ import { answerOffer, goalOffer, offerShown, type GoalOffer } from '../utils/goa
 // one, its setting. Only the person icon goes to Me.
 //
 // Motion here is small and cheap: the flame flickers only once today's
-// practice has lit it, numbers tick only when they change, and the ring draws
+// practice has lit it (at its own frame rate, see flicker.ts), numbers tick only when they change, and the ring draws
 // in once. All of it is transform and opacity on tiny elements, and the
 // app-wide reduced-motion rule stills it.
 
@@ -48,12 +49,34 @@ const Guitar = () => (
   </svg>
 );
 
-const Flame: React.FC<{ lit: boolean }> = ({ lit }) => (
-  <svg className={`tstat-flame${lit ? ' is-lit' : ''}`} viewBox="0 0 24 28" aria-hidden="true">
-    <path d="M12 1c1 4.5 6.5 7.5 6.5 14.2A6.5 6.5 0 0 1 12 27a6.5 6.5 0 0 1-6.5-6.8c0-3.4 1.9-5.4 3.3-7.2.3 2.2 1.2 3.4 2.4 3.9C10.6 12.5 10.4 6.6 12 1Z" />
-    <path className="tstat-flame-core" d="M12 15.5c.6 2.2 3 3.4 3 6.2a3 3 0 0 1-6 0c0-1.7.9-2.8 1.7-3.6.2 1 .6 1.6 1.1 1.8-.3-1.6-.2-3 .2-4.4Z" />
-  </svg>
-);
+// Three layers, each its own GPU layer, moved only by transform and opacity:
+// the glow (a soft gradient, no filter), the flame, and its hot core. Never
+// put a filter on these or move an SVG child: either repaints every frame.
+const FLAME = 'M12 1c1 4.5 6.5 7.5 6.5 14.2A6.5 6.5 0 0 1 12 27a6.5 6.5 0 0 1-6.5-6.8c0-3.4 1.9-5.4 3.3-7.2.3 2.2 1.2 3.4 2.4 3.9C10.6 12.5 10.4 6.6 12 1Z';
+const CORE = 'M12 15.5c.6 2.2 3 3.4 3 6.2a3 3 0 0 1-6 0c0-1.7.9-2.8 1.7-3.6.2 1 .6 1.6 1.1 1.8-.3-1.6-.2-3 .2-4.4Z';
+const Flame: React.FC<{ lit: boolean }> = ({ lit }) => {
+  const flame = useRef<SVGSVGElement>(null);
+  const hot = useRef<SVGSVGElement>(null);
+  const glow = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!lit || !flame.current || !hot.current || !glow.current) return;
+    return flicker({ flame: flame.current, hot: hot.current, glow: glow.current });
+  }, [lit]);
+  return (
+    <span className={`tstat-flame-wrap${lit ? ' is-lit' : ''}`} aria-hidden="true">
+      {lit && <span ref={glow} className="tstat-flame-glow" />}
+      <svg ref={flame} className={`tstat-flame${lit ? ' is-lit' : ''}`} viewBox="0 0 24 28">
+        <path d={FLAME} />
+        {!lit && <path className="tstat-flame-core" d={CORE} />}
+      </svg>
+      {lit && (
+        <svg ref={hot} className="tstat-flame-hot" viewBox="0 0 24 28">
+          <path d={CORE} />
+        </svg>
+      )}
+    </span>
+  );
+};
 
 export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }) => {
   const [, nudge] = useReducer((n: number) => n + 1, 0);
