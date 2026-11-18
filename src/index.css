@@ -17255,10 +17255,12 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
   background: color-mix(in srgb, var(--page-bg) 88%, transparent); animation: streak-cele-in 0.3s ease-out both; -webkit-tap-highlight-color: transparent; }
 .streak-cele-flame { transition: transform 0.56s cubic-bezier(0.5, 0, 0.2, 1); will-change: transform; }
 .streak-cele-flame .rive-streak { margin: 0; animation: streak-cele-grow 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-.streak-cele-title { margin: 4px 0 0; font-size: 1.7rem; font-weight: 800; color: var(--warning); animation: streak-cele-up 0.4s 0.25s ease-out both; }
+.streak-cele-title { margin: 4px 0 0; font-size: 1.7rem; font-weight: 800; color: var(--primary); animation: streak-cele-up 0.4s 0.25s ease-out both; }
 .streak-cele-sub { margin: 0; font-size: 0.95rem; color: var(--text-secondary); text-align: center; animation: streak-cele-up 0.4s 0.4s ease-out both; }
 .streak-cele.is-fly { background: transparent; transition: background 0.4s ease; pointer-events: none; }
 .streak-cele.is-fly .streak-cele-title, .streak-cele.is-fly .streak-cele-sub { opacity: 0; transition: opacity 0.2s ease; }
 @keyframes streak-cele-in { from { background: transparent; } }
 @keyframes streak-cele-grow { from { transform: scale(0.4); } }
 @keyframes streak-cele-up { from { opacity: 0; transform: translateY(10px); } }
+/* Not practised today: the same flame, unlit. A still canvas, so the filter is drawn once. */
+.tstat-streak:not(.is-lit) .rive-streak { filter: grayscale(1) brightness(0.75); opacity: 0.8; }

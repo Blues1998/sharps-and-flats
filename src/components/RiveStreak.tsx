@@ -1,5 +1,7 @@
-// The streak flame, drawn by Rive (src/assets/rive/streak.riv, with its font
-// cut down to the digits 0-9 by scripts/shrink-riv-font.py).
+// The streak flame, drawn by Rive. src/assets/rive/streak.riv is made from
+// assets/27337-51650-dynamic-streak-fire.riv by scripts/rive/prepare.py: font
+// cut to the digits 0-9, gold swapped for the brand orange:
+//   prepare.py <in> src/assets/rive/streak.riv --color f2af0f=ff6a2a ffe29d=ffc39a
 //
 // Still by default: the header shows one settled frame and draws again only
 // when the number changes, so it costs nothing on an idle screen. `live`

@@ -79,7 +79,8 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
     };
   }, []);
   const profile = useProfile();
-  // The lit flame is Rive's, with the number inside; the drawn one stands in if it cannot load.
+  // The flame is Rive's, with the number inside: grey until today's practice
+  // lights it, orange after. The drawn one stands in if Rive cannot load.
   const [riveOk, setRiveOk] = useState(true);
   const flameRef = useRef<HTMLCanvasElement>(null);
 
@@ -179,7 +180,7 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
         <Guitar /><span>{instrument}</span>
       </button>
       <button type="button" className={`tstat-item tstat-streak${playedToday ? ' is-lit' : ''}${ignite ? ' is-ignite' : ''}${pop === 'streak' ? ' is-open' : ''}`} onClick={toggle('streak')} aria-expanded={pop === 'streak'} aria-label={`${s.current} day streak`}>
-        {playedToday && riveOk
+        {riveOk
           ? <RiveStreak streak={s.current} size={44} canvasRef={flameRef} className={cele !== null ? 'is-away' : ''} onFail={() => setRiveOk(false)} />
           : <><Flame lit={playedToday} /><span className={`readout${streakTick ? ' is-tick' : ''}`}>{s.current}</span></>}
       </button>
