@@ -31,10 +31,11 @@ export const TAB_ICONS: Partial<Record<ActiveTab, React.ReactNode>> = {
     <circle fill={C} cx="12" cy="12" r="1" />
   </>),
   practice: svg(<>
-    <path fill={B} d="M9.2 2h5.6a1.5 1.5 0 0 1 1.45 1.1l4.4 16.6A1.8 1.8 0 0 1 18.9 22H5.1a1.8 1.8 0 0 1-1.75-2.3L7.75 3.1A1.5 1.5 0 0 1 9.2 2Z" />
-    <path fill={C} d="M6.4 17.2h11.2l.8 2.8H5.6Z" />
-    <path stroke={H} strokeWidth="1.8" strokeLinecap="round" d="M12 17.4 16.2 6.2" />
-    <rect fill={H} x="13.2" y="9.2" width="3.4" height="2.4" rx="0.6" transform="rotate(20.5 14.9 10.4)" />
+    <path fill={B} d="M9.1 2h5.8c.7 0 1.3.5 1.5 1.1l4.4 16.7c.3 1.1-.5 2.2-1.7 2.2H4.9c-1.2 0-2-1.1-1.7-2.2L7.6 3.1C7.8 2.5 8.4 2 9.1 2Z" />
+    <path fill={C} d="M10.1 4.6h3.8l3 11.4H7.1Z" />
+    <path stroke={H} strokeWidth="1.7" strokeLinecap="round" d="M12 15.6 15.4 4.4" />
+    <rect fill={H} x="12.9" y="7.6" width="3.4" height="2.6" rx="0.7" transform="rotate(17 14.6 8.9)" />
+    <circle fill={H} cx="12" cy="15.6" r="1.3" />
   </>),
   tuner: svg(<>
     <path fill={B} d="M12 3.5a10 10 0 0 1 10 10v4.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4.5a10 10 0 0 1 10-10Z" />

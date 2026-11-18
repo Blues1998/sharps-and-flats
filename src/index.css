@@ -16459,8 +16459,6 @@ a.btn {
 .tstat > button { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; color: var(--text-primary); }
 .tstat > button:active { background: var(--surface-2); }
 .tstat > button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.tstat-me { width: 40px; padding: 0 !important; justify-content: center; border-radius: 50% !important; background: var(--surface-2) !important; color: var(--text-secondary) !important; }
-.tstat-me svg { width: 21px; height: 21px; }
 .tstat-inst svg { width: 21px; height: 21px; color: var(--text-secondary); }
 .tstat-inst span { font-size: 0.9rem; }
 .tstat-flame { width: 18px; height: 21px; fill: var(--surface-3); }
@@ -16595,8 +16593,6 @@ a.btn {
 @media (min-width: 901px) { .np-back { bottom: 24px; } }
 
 /* Top bar. */
-.tstat .tstat-me { flex: none; width: 40px; height: 40px; justify-content: center; }
-.tstat .tstat-me svg { display: block; flex: none; }
 .tstat-flame { fill: none; stroke: var(--primary); stroke-width: 1.8; }
 .tstat-flame .tstat-flame-core { fill: none; stroke: none; }
 .tstat-flame.is-lit { fill: var(--primary); stroke: none; }
@@ -17240,10 +17236,11 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
    Two-tone icons (TabIcons.tsx) in muted grey; the chosen tab turns orange and
    gold inside an outlined tile that grows in. */
 @media (max-width: 900px) {
-  .mtab { --ic-body: color-mix(in srgb, var(--text-muted) 75%, transparent); --ic-hi: var(--text-secondary); --ic-cut: var(--rail-bg); }
+  .mtab { --ic-body: color-mix(in srgb, var(--text-secondary) 72%, var(--rail-bg)); --ic-hi: var(--text-primary); --ic-cut: var(--rail-bg); }
   .mtab.is-active { --ic-body: var(--primary); --ic-hi: #ffd24a; }
   .mtab .mtab-icon { width: 58px; height: 46px; border-radius: 15px; }
-  .mtab .mtab-icon::before { background: color-mix(in srgb, var(--primary) 12%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 55%, transparent); transform: scale(0.7); }
+  /* One quiet signal for the chosen tab besides its colour: a faint tile with a hairline. */
+  .mtab .mtab-icon::before { background: color-mix(in srgb, var(--primary) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent); transform: scale(0.7); }
   .mtab.is-active .mtab-icon::before { transform: none; }
   .mtab .mtab-icon svg { width: 30px; height: 30px; transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.6, 1); }
   .mtab.is-active .mtab-icon svg { transform: scale(1.06); }
@@ -17262,5 +17259,12 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
 @keyframes streak-cele-in { from { background: transparent; } }
 @keyframes streak-cele-grow { from { transform: scale(0.4); } }
 @keyframes streak-cele-up { from { opacity: 0; transform: translateY(10px); } }
-/* Not practised today: the same flame, unlit. A still canvas, so the filter is drawn once. */
-.tstat-streak:not(.is-lit) .rive-streak { filter: grayscale(1) brightness(0.75); opacity: 0.8; }
+/* Not practised today: the same flame, unlit, light enough that its number reads. A still canvas, so the filter is drawn once. */
+.tstat-streak:not(.is-lit) .rive-streak { filter: grayscale(1) brightness(1.25) contrast(1.15); }
+
+/* Every tab's top bar stays put, as Today's does: scrolling no longer pushes the title under the status bar. */
+@media (max-width: 900px) {
+  .mtop { position: sticky; top: 0; z-index: 40; }
+}
+/* The flame in the bar: the artboard's ground shadow reads as a loose smudge at this size. */
+.tstat-streak .rive-streak { clip-path: inset(0 0 17% 0); }

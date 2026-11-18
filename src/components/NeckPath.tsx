@@ -151,9 +151,31 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const midY = (n: number) => geo.tops[n] + geo.heights[n] / 2;
   const noteY = (n: number) => midY(n) + (geo.heights[n] > 90 ? 6 : 3);
 
+  // Land on a unit's top edge, just under the bar, so no card is cut in half:
+  // the fret's own unit if the page can scroll that far, else the nearest
+  // unit above it that still keeps the fret on screen. Failing both (a unit
+  // taller than the screen), centre the fret.
   const scrollToFret = useCallback((n: number, smooth = true) => {
-    const el = rowRefs.current[Math.min(n, OCTAVE)];
-    el?.scrollIntoView({ block: 'center', behavior: smooth && !reduced() ? 'smooth' : 'auto' });
+    const fret = Math.min(n, OCTAVE);
+    const el = rowRefs.current[fret];
+    if (!el) return;
+    const behavior: ScrollBehavior = smooth && !reduced() ? 'smooth' : 'auto';
+    const page = document.scrollingElement ?? document.documentElement;
+    const room = page.scrollHeight - window.innerHeight - page.scrollTop;
+    const bar = document.querySelector('.mtop')?.getBoundingClientRect().bottom ?? 0;
+    const tabs = document.querySelector('.mtabs')?.getBoundingClientRect().top || window.innerHeight;
+    const fretBottom = el.getBoundingClientRect().bottom;
+    const units = UNITS.filter(u => u.from <= fret).sort((x, y) => y.from - x.from);
+    for (const u of units) {
+      const first = rowRefs.current[u.from];
+      if (!first) continue;
+      const by = first.getBoundingClientRect().top - bar - 12;
+      if (by > room + 1) continue;               // the page cannot scroll that far
+      if (fretBottom - by > tabs - 8) break;      // the fret would drop out of view
+      window.scrollBy({ top: by, behavior });
+      return;
+    }
+    el.scrollIntoView({ block: 'center', behavior });
   }, []);
 
   // ---- Moments ------------------------------------------------------------------

@@ -4,7 +4,6 @@ import { CLOCK_EVENT, GOAL_CHOICES, getGoal, setGoal } from '../utils/practiceCl
 import { STORE_CHANGE_EVENT } from '../utils/db';
 import { setProfile, useProfile, type ProfileInstrument } from '../utils/profile';
 import { MAX_RESTS, REST_EVERY } from '../utils/streak';
-import { go } from '../hooks/useRoute';
 import { Segmented } from './Segmented';
 import { GameShelf } from '../games/GameShelf';
 import { gameOpen } from '../games/store';
@@ -13,10 +12,10 @@ import { answerOffer, goalOffer, offerShown, type GoalOffer } from '../utils/goa
 import { RiveStreak } from './RiveStreak';
 import { StreakCelebration } from './StreakCelebration';
 
-// The top bar on Today, where the app name used to be: you, what you are
+// The top bar on Today, where the app name used to be: what you are
 // learning, your streak, and how much of today's goal is done. Tapping one
 // opens a small panel right under the bar with its detail and, where there is
-// one, its setting. Only the person icon goes to Me.
+// one, its setting. Me lives in the tab bar, not here.
 //
 // Motion here is small and cheap, and nothing loops: the streak going up is
 // shown once, big (StreakCelebration), then the flame sits still here; numbers tick only when they change, and the ring draws
@@ -171,11 +170,6 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
 
   return (
     <div className={`tstat ${className}`} ref={barRef}>
-      <button type="button" className="tstat-me" onClick={() => go({ tab: 'me', songId: null })} aria-label="Me">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
-        </svg>
-      </button>
       <button type="button" className={`tstat-item tstat-inst${pop === 'inst' ? ' is-open' : ''}`} onClick={toggle('inst')} aria-expanded={pop === 'inst'} aria-label={`Learning on ${instrument}`}>
         <Guitar /><span>{instrument}</span>
       </button>
