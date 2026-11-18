@@ -25,6 +25,7 @@
     "@fontsource/geist": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/space-grotesk": "^5.3.0",
+    "@rive-app/canvas-advanced": "2.49.3",
     "@sentry/capacitor": "^4.6.0",
     "@sentry/react": "^10.76.2",
     "@supabase/supabase-js": "^2.118.0",

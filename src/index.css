@@ -17216,3 +17216,6 @@ a.btn {
 .tstat-pop-actions .btn { flex: 1 1 auto; justify-content: center; }
 /* A score that just went up says so. Keyed in the markup, so it plays on change only. */
 .gm-score.is-tick, .stg-count .is-tick { display: inline-block; animation: tstat-tick 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+/* Rive's artboard has room around the flame: let the canvas spill past the bar's row. */
+.rive-streak { display: block; margin: -4px -6px; opacity: 0; transition: opacity 0.25s ease; }
+.rive-streak.is-ready { opacity: 1; }

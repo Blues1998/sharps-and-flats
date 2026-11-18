@@ -11,6 +11,7 @@ import { gameOpen } from '../games/store';
 import { lessonOpen } from '../lesson/store';
 import { answerOffer, goalOffer, offerShown, type GoalOffer } from '../utils/goalBump';
 import { flicker } from '../utils/flicker';
+import { RiveStreak } from './RiveStreak';
 
 // The top bar on Today, where the app name used to be: you, what you are
 // learning, your streak, and how much of today's goal is done. Tapping one
@@ -89,6 +90,8 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
     };
   }, []);
   const profile = useProfile();
+  // The lit flame is Rive's, with the number inside; the drawn one stands in if it cannot load.
+  const [riveOk, setRiveOk] = useState(true);
 
   const s = streakState();
   const goal = getGoal();
@@ -170,7 +173,9 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
         <Guitar /><span>{instrument}</span>
       </button>
       <button type="button" className={`tstat-item tstat-streak${playedToday ? ' is-lit' : ''}${ignite ? ' is-ignite' : ''}${pop === 'streak' ? ' is-open' : ''}`} onClick={toggle('streak')} aria-expanded={pop === 'streak'} aria-label={`${s.current} day streak`}>
-        <Flame lit={playedToday} /><span className={`readout${streakTick ? ' is-tick' : ''}`}>{s.current}</span>
+        {playedToday && riveOk
+          ? <RiveStreak streak={s.current} size={44} onFail={() => setRiveOk(false)} />
+          : <><Flame lit={playedToday} /><span className={`readout${streakTick ? ' is-tick' : ''}`}>{s.current}</span></>}
       </button>
       <button type="button" ref={goalRef} className={`tstat-item tstat-goal${met ? ' is-met' : ''}${pulse ? ' is-pulse' : ''}${pop === 'goal' || pop === 'bump' ? ' is-open' : ''}`} onClick={toggle('goal')} aria-expanded={pop === 'goal'} aria-label={`${mins} of ${goal} minutes today`}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
