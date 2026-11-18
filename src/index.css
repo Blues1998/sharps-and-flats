@@ -14010,7 +14010,7 @@ a.btn {
   inset: 0;
   background: linear-gradient(115deg, transparent 35%, rgba(255, 236, 190, 0.55) 50%, transparent 65%);
   transform: translateX(-120%);
-  animation: sunburst-glint 7s ease-in-out infinite 1.5s;
+  animation: sunburst-glint 7s ease-in-out 2 1.5s;
   pointer-events: none;
 }
 
@@ -14070,7 +14070,7 @@ a.btn {
   background: repeating-conic-gradient(rgba(236, 176, 74, 0.28) 0deg 7deg, transparent 7deg 18deg);
   -webkit-mask-image: radial-gradient(circle, #000 25%, transparent 68%);
   mask-image: radial-gradient(circle, #000 25%, transparent 68%);
-  animation: sunburst-turn 24s linear infinite;
+  animation: sunburst-turn 24s steps(48) infinite;
 }
 
 @keyframes sunburst-turn {
@@ -16335,7 +16335,7 @@ a.btn {
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.22), inset 0 -2px 3px rgba(0,0,0,0.18), 0 1px 1px rgba(0,0,0,0.45);
   transition: box-shadow 0.5s ease; }
 .np-inlay.is-passed { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2), 0 0 0 3px rgba(217,178,106,0.45), 0 0 16px rgba(217,178,106,0.55); }
-.np-inlay.is-ready { animation: np-glint 2s ease-in-out infinite; }
+.np-inlay.is-ready { animation: np-glint 2s ease-in-out 3; }
 .np-inlay.is-far { opacity: 0.4; }
 @keyframes np-glint { 50% { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2), 0 0 0 5px rgba(217,178,106,0.35), 0 0 18px rgba(217,178,106,0.6); } }
 
@@ -16346,7 +16346,7 @@ a.btn {
   background: radial-gradient(circle at 34% 28%, #ffc8ab 0, #ff8448 30%, #f0601f 62%, #b9441a 100%);
   box-shadow: 0 3px 6px rgba(0,0,0,0.55), inset 0 -2px 3px rgba(90,25,0,0.35), inset 0 1px 1px rgba(255,255,255,0.45); }
 .np-dot.is-now { width: 32px; height: 32px; box-shadow: 0 3px 6px rgba(0,0,0,0.55), inset 0 -2px 3px rgba(90,25,0,0.35), inset 0 1px 1px rgba(255,255,255,0.45), 0 0 0 7px var(--primary-glow); }
-.np-dot.is-now::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; border: 2px solid var(--primary); animation: np-ping 2.2s ease-out infinite; }
+.np-dot.is-now::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; border: 2px solid var(--primary); animation: np-ping 2.2s ease-out 3; }
 @keyframes np-ping { from { transform: scale(0.75); opacity: 0.75; } to { transform: scale(1.3); opacity: 0; } }
 .np-dot.is-open, .np-dot.is-ahead { background: rgba(14,10,8,0.55); border: 2px solid rgba(241,236,226,0.6); box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
 .np-dot.is-ahead { border-color: rgba(241,236,226,0.28); }
@@ -16495,7 +16495,7 @@ a.btn {
 
 /* Start, bobbing over the note you are on. */
 .np-bubble { all: unset; cursor: pointer; position: absolute; z-index: 6; transform: translate(-50%, -100%); padding: 7px 13px; border-radius: 11px; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary);
-  background: var(--surface-1); border: 2px solid var(--panel-border-hover); box-shadow: 0 3px 0 var(--panel-border); animation: np-bob 1.8s ease-in-out infinite; }
+  background: var(--surface-1); border: 2px solid var(--panel-border-hover); box-shadow: 0 3px 0 var(--panel-border); animation: np-bob 1.8s ease-in-out 3; }
 .np-bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; margin-left: -5px; background: var(--surface-1); border-right: 2px solid var(--panel-border-hover); border-bottom: 2px solid var(--panel-border-hover); transform: rotate(45deg); }
 .np-bubble:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 @keyframes np-bob { 0%,100% { transform: translate(-50%, -100%); } 50% { transform: translate(-50%, calc(-100% - 5px)); } }
@@ -16544,7 +16544,7 @@ a.btn {
 .np-medal.is-next { color: #8a6a1e;
   background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.95) 0 12%, rgba(255,255,255,0) 45%), conic-gradient(from 30deg, #f1ebf6, #dcefe9, #f6ecdb, #e8ddf2, #dcf0ea, #f5eadf, #f1ebf6);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.5), 0 0 0 4px rgba(217,178,106,0.28), 0 0 18px rgba(217,178,106,0.45);
-  animation: np-glint 2.4s ease-in-out infinite; }
+  animation: np-glint 2.4s ease-in-out 3; }
 .np-medal.is-passed { color: #3a2a08;
   background: radial-gradient(circle at 34% 28%, #fff4d6 0, #f0d391 30%, #d9b26a 60%, #a7802f 100%);
   box-shadow: 0 3px 6px rgba(0,0,0,0.55), inset 0 -2px 3px rgba(80,55,0,0.35), inset 0 1px 1px rgba(255,255,255,0.6); }
@@ -17181,23 +17181,31 @@ a.btn {
 .stg-play .lp-board { width: 100%; height: auto; max-height: 100%; }
 
 /* ---- Header motion: small, cheap, and only when it means something ---------
-   The lit flame sways as a whole (a transform on its own layer, no repaint)
-   while its core flickers slowly; numbers tick only when they change; the
+   Anything that loops forever on an idle screen makes the WebView draw every
+   frame (120 a second on this phone, ~80-130% CPU measured). So looping
+   decoration either stops after a few plays or moves in steps(1): between
+   keyframes nothing changes and Chrome draws nothing. The lit flame flickers
+   that way, about three changes a second (~10% CPU); numbers tick only when they change; the
    flame flares once when today's first practice lights it. */
 .tstat-flame { overflow: visible; }
-.tstat-flame.is-lit { transform-origin: 50% 92%; will-change: transform; animation: tstat-sway 3.6s ease-in-out infinite; }
-.tstat-flame.is-lit .tstat-flame-core { transform-box: fill-box; transform-origin: 50% 100%; animation: tstat-core 2.3s ease-in-out infinite; }
+.tstat-flame.is-lit { transform-origin: 50% 92%; animation: tstat-sway 3.6s steps(1) infinite; }
+.tstat-flame.is-lit .tstat-flame-core { transform-box: fill-box; transform-origin: 50% 100%; animation: tstat-core 2.3s steps(1) infinite; }
 @keyframes tstat-sway {
   0%, 100% { transform: rotate(-2deg) scale(1); }
-  30% { transform: rotate(1.5deg) scale(1.03, 1.05); }
-  60% { transform: rotate(-1deg) scale(0.99, 1.01); }
+  14% { transform: rotate(0deg) scale(1.02, 1.04); }
+  29% { transform: rotate(1.5deg) scale(1.03, 1.05); }
+  43% { transform: rotate(0.5deg) scale(1, 1.02); }
+  57% { transform: rotate(-1deg) scale(0.99, 1.01); }
+  71% { transform: rotate(-2.5deg) scale(1.01, 1.03); }
+  86% { transform: rotate(-1deg) scale(1, 1.01); }
 }
 @keyframes tstat-core {
   0%, 100% { transform: scale(1, 1); opacity: 1; }
+  20% { transform: scale(0.92, 1.05); opacity: 0.9; }
   40% { transform: scale(0.88, 1.08); opacity: 0.85; }
-  70% { transform: scale(1.05, 0.94); opacity: 1; }
+  60% { transform: scale(1.05, 0.94); opacity: 1; }
+  80% { transform: scale(0.97, 1.02); opacity: 0.92; }
 }
-.tstat-streak.is-ignite .tstat-flame { animation: tstat-ignite 0.9s cubic-bezier(0.34, 1.56, 0.64, 1); }
 @keyframes tstat-ignite {
   0% { transform: scale(0.5); opacity: 0.4; }
   55% { transform: scale(1.3); opacity: 1; }
