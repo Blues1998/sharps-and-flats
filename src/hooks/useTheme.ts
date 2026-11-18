@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { IS_NATIVE } from '../utils/nativeShell';
 
 export type Theme = 'dark' | 'light';
 
@@ -20,6 +22,8 @@ export const getInitialTheme = (): Theme => getStoredTheme() ?? getSystemTheme()
 
 export const applyTheme = (theme: Theme): void => {
   document.documentElement.setAttribute('data-theme', theme);
+  // The app draws behind the system bars: their icons follow the theme.
+  if (IS_NATIVE) void SystemBars.setStyle({ style: theme === 'dark' ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});
 };
 
 export function useTheme() {

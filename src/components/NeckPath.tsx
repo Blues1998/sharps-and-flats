@@ -385,7 +385,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     if (!sg) return null;
     return (
       <button type="button" className={`np-label-song${sg.stars ? ' is-earned' : ''}`} data-feel="off" onClick={() => { feel('tap'); startLesson(sg.id); }}>
-        <span aria-hidden="true">♪</span>{sg.title}
+        <span aria-hidden="true">♪</span><span className="np-label-song-t">{sg.title}</span>
       </button>
     );
   };

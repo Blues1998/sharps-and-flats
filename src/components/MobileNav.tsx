@@ -6,10 +6,12 @@ import { PRIMARY, navItem, parentTab } from './navGroups';
 import { IconJump } from './Icons';
 import { preloadLab } from '../labs/chunks';
 import { TodayStatus } from './TodayStatus';
+import { TAB_ICONS } from './TabIcons';
 
 // The phone's navigation, replacing the sidebar below the shell breakpoint.
 //
-// Five tabs where the thumb is, Today, Songs, Practice, Tuner, Me, and a top
+// Five tabs where the thumb is, Today, Songs, Practice, Tuner, Me, shown as
+// icons alone (TabIcons.tsx draws them to read without words), and a top
 // bar that names the page. A page that lives under one of the five (Chords
 // under Practice, the Tab Player under Songs) keeps its tab lit and gets a
 // back arrow to it, so you always know where you are and how to get out.
@@ -67,9 +69,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, o
               onClick={() => setActiveTab(id)}
               onTouchStart={() => preloadLab(id)}
               aria-current={activeTab === id ? 'page' : undefined}
+              aria-label={label}
             >
-              <span className="mtab-icon">{icon}</span>
-              <span className="mtab-label">{label}</span>
+              <span className="mtab-icon">{TAB_ICONS[id] ?? icon}</span>
             </button>
           );
         })}

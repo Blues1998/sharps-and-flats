@@ -8,22 +8,23 @@ import { go } from '../hooks/useRoute';
 import { Segmented } from './Segmented';
 import { GameShelf } from '../games/GameShelf';
 import { gameOpen } from '../games/store';
-import { lessonOpen } from '../lesson/store';
+import { LESSON_CLOSED, lessonOpen } from '../lesson/store';
 import { answerOffer, goalOffer, offerShown, type GoalOffer } from '../utils/goalBump';
-import { flicker } from '../utils/flicker';
 import { RiveStreak } from './RiveStreak';
+import { StreakCelebration } from './StreakCelebration';
 
 // The top bar on Today, where the app name used to be: you, what you are
 // learning, your streak, and how much of today's goal is done. Tapping one
 // opens a small panel right under the bar with its detail and, where there is
 // one, its setting. Only the person icon goes to Me.
 //
-// Motion here is small and cheap: the flame flickers only once today's
-// practice has lit it (at its own frame rate, see flicker.ts), numbers tick only when they change, and the ring draws
+// Motion here is small and cheap, and nothing loops: the streak going up is
+// shown once, big (StreakCelebration), then the flame sits still here; numbers tick only when they change, and the ring draws
 // in once. All of it is transform and opacity on tiny elements, and the
 // app-wide reduced-motion rule stills it.
 
 const GOAL_SEEN = 'cadenza-goal-seen-today';
+const STREAK_SHOWN = 'cadenza-streak-shown-on';
 
 type Pop = 'inst' | 'streak' | 'goal' | 'bump';
 
@@ -50,48 +51,37 @@ const Guitar = () => (
   </svg>
 );
 
-// Three layers, each its own GPU layer, moved only by transform and opacity:
-// the glow (a soft gradient, no filter), the flame, and its hot core. Never
-// put a filter on these or move an SVG child: either repaints every frame.
+// The drawn flame, for the unlit state and for when Rive cannot load: a soft
+// glow, the flame and its hot core. Still, like everything in the top bar.
 const FLAME = 'M12 1c1 4.5 6.5 7.5 6.5 14.2A6.5 6.5 0 0 1 12 27a6.5 6.5 0 0 1-6.5-6.8c0-3.4 1.9-5.4 3.3-7.2.3 2.2 1.2 3.4 2.4 3.9C10.6 12.5 10.4 6.6 12 1Z';
 const CORE = 'M12 15.5c.6 2.2 3 3.4 3 6.2a3 3 0 0 1-6 0c0-1.7.9-2.8 1.7-3.6.2 1 .6 1.6 1.1 1.8-.3-1.6-.2-3 .2-4.4Z';
-const Flame: React.FC<{ lit: boolean }> = ({ lit }) => {
-  const flame = useRef<SVGSVGElement>(null);
-  const hot = useRef<SVGSVGElement>(null);
-  const glow = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!lit || !flame.current || !hot.current || !glow.current) return;
-    return flicker({ flame: flame.current, hot: hot.current, glow: glow.current });
-  }, [lit]);
-  return (
-    <span className={`tstat-flame-wrap${lit ? ' is-lit' : ''}`} aria-hidden="true">
-      {lit && <span ref={glow} className="tstat-flame-glow" />}
-      <svg ref={flame} className={`tstat-flame${lit ? ' is-lit' : ''}`} viewBox="0 0 24 28">
-        <path d={FLAME} />
-        {!lit && <path className="tstat-flame-core" d={CORE} />}
-      </svg>
-      {lit && (
-        <svg ref={hot} className="tstat-flame-hot" viewBox="0 0 24 28">
-          <path d={CORE} />
-        </svg>
-      )}
-    </span>
-  );
-};
+const Flame: React.FC<{ lit: boolean }> = ({ lit }) => (
+  <span className={`tstat-flame-wrap${lit ? ' is-lit' : ''}`} aria-hidden="true">
+    {lit && <span className="tstat-flame-glow" />}
+    <svg className={`tstat-flame${lit ? ' is-lit' : ''}`} viewBox="0 0 24 28">
+      <path d={FLAME} />
+      {!lit && <path className="tstat-flame-core" d={CORE} />}
+    </svg>
+    {lit && <svg className="tstat-flame-hot" viewBox="0 0 24 28"><path d={CORE} /></svg>}
+  </span>
+);
 
 export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }) => {
   const [, nudge] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
     window.addEventListener(CLOCK_EVENT, nudge);
     window.addEventListener(STORE_CHANGE_EVENT, nudge);
+    window.addEventListener(LESSON_CLOSED, nudge);
     return () => {
       window.removeEventListener(CLOCK_EVENT, nudge);
       window.removeEventListener(STORE_CHANGE_EVENT, nudge);
+      window.removeEventListener(LESSON_CLOSED, nudge);
     };
   }, []);
   const profile = useProfile();
   // The lit flame is Rive's, with the number inside; the drawn one stands in if it cannot load.
   const [riveOk, setRiveOk] = useState(true);
+  const flameRef = useRef<HTMLCanvasElement>(null);
 
   const s = streakState();
   const goal = getGoal();
@@ -113,11 +103,27 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
   const barRef = useRef<HTMLDivElement>(null);
   const goalRef = useRef<HTMLButtonElement>(null);
 
+  // The streak went up today: show it once, big, then let it land in the bar.
+  // Waits, like the goal offer, until Today is what you are looking at.
+  const [cele, setCele] = useState<number | null>(null);
+  useEffect(() => {
+    if (cele !== null || mins <= 0 || s.current < 1 || !riveOk) return;
+    if (lessonOpen() || gameOpen() || document.visibilityState !== 'visible') return;
+    // Today renders this bar twice (phone header, wide layout): only the one on screen celebrates.
+    if (!barRef.current?.offsetParent) return;
+    try {
+      if (localStorage.getItem(STREAK_SHOWN) === today()) return;
+      localStorage.setItem(STREAK_SHOWN, today());
+    } catch { return; }
+    setPop(null);
+    setCele(s.current);
+  }, [mins, s.current, riveOk]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // A bigger goal, offered here once it is clearly too easy. Never over a
   // lesson or a game: it waits until Today is what you are looking at.
   const [offer, setOffer] = useState<GoalOffer | null>(null);
   useEffect(() => {
-    if (pop || offer || lessonOpen() || gameOpen() || document.visibilityState !== 'visible') return;
+    if (pop || offer || cele !== null || lessonOpen() || gameOpen() || document.visibilityState !== 'visible') return;
     const o = goalOffer();
     if (!o) return;
     const b = goalRef.current?.getBoundingClientRect();
@@ -126,7 +132,7 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
     offerShown(o);
     setOffer(o);
     setPop('bump');
-  }, [mins, pop, offer]);
+  }, [mins, pop, offer, cele]);
   const answer = (yes: boolean) => {
     if (!offer) return;
     answerOffer(offer, yes);
@@ -174,7 +180,7 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
       </button>
       <button type="button" className={`tstat-item tstat-streak${playedToday ? ' is-lit' : ''}${ignite ? ' is-ignite' : ''}${pop === 'streak' ? ' is-open' : ''}`} onClick={toggle('streak')} aria-expanded={pop === 'streak'} aria-label={`${s.current} day streak`}>
         {playedToday && riveOk
-          ? <RiveStreak streak={s.current} size={44} onFail={() => setRiveOk(false)} />
+          ? <RiveStreak streak={s.current} size={44} canvasRef={flameRef} className={cele !== null ? 'is-away' : ''} onFail={() => setRiveOk(false)} />
           : <><Flame lit={playedToday} /><span className={`readout${streakTick ? ' is-tick' : ''}`}>{s.current}</span></>}
       </button>
       <button type="button" ref={goalRef} className={`tstat-item tstat-goal${met ? ' is-met' : ''}${pulse ? ' is-pulse' : ''}${pop === 'goal' || pop === 'bump' ? ' is-open' : ''}`} onClick={toggle('goal')} aria-expanded={pop === 'goal'} aria-label={`${mins} of ${goal} minutes today`}>
@@ -186,6 +192,7 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
         <span className={`readout${minsTick ? ' is-tick' : ''}`}>{mins}<small> / {goal} min</small></span>
       </button>
 
+      {cele !== null && <StreakCelebration to={cele} target={() => flameRef.current?.getBoundingClientRect() ?? null} onDone={() => setCele(null)} />}
       {pop && <>
         <button type="button" className="tstat-scrim" aria-label="Close" onClick={() => setPop(null)} />
         <div className="tstat-pop" role="dialog" style={{ '--notch': `${notch}px` } as React.CSSProperties}>

@@ -13,6 +13,13 @@ const config: CapacitorConfig = {
     // Audio samples and the soundfont are already compressed; packing them
     // again only slows the build.
     buildOptions: { releaseType: 'AAB' }
+  },
+  plugins: {
+    // Edge to edge: the page draws behind the status bar and the navigation
+    // bar (index.html asks for viewport-fit=cover) and pads itself with
+    // env(safe-area-inset-*), so the app's own black runs to both edges.
+    // useTheme.ts switches the bar icons between light and dark with the theme.
+    SystemBars: { insetsHandling: 'css', style: 'DARK', initialViewportFitValueHint: 'cover' }
   }
 };
 

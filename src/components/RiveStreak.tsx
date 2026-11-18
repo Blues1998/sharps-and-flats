@@ -1,22 +1,23 @@
-// The lit streak flame, drawn by Rive (src/assets/rive/streak.riv, a
-// community file with its font cut down to the digits 0-9).
+// The streak flame, drawn by Rive (src/assets/rive/streak.riv, with its font
+// cut down to the digits 0-9 by scripts/shrink-riv-font.py).
 //
-// Rive's own player draws every screen refresh, 120 times a second here. This
-// uses the low-level runtime and draws at 20 fps through lowRate(), which also
-// stops it in the background and after 30 s untouched. The runtime (a ~2 MB
-// WebAssembly file, local in the app) loads on first use, after first paint.
+// Still by default: the header shows one settled frame and draws again only
+// when the number changes, so it costs nothing on an idle screen. `live`
+// plays it every frame, for the few seconds the streak celebration is up.
+// The runtime (a ~2 MB WebAssembly file, local in the app) loads on first use.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { lowRate, reducedMotion } from '../utils/lowRate';
 import rivUrl from '../assets/rive/streak.riv?url';
 import wasmUrl from '@rive-app/canvas-advanced/rive.wasm?url';
 
 type Rive = Awaited<ReturnType<typeof import('@rive-app/canvas-advanced').default>>;
 type RiveFile = Awaited<ReturnType<Rive['load']>>;
 
-const FPS = 20;
+/** Long enough for the file's entry animations to finish, for a still frame. */
+const SETTLE_S = 2.5;
+
 let loading: Promise<{ rive: Rive; file: RiveFile }> | null = null;
-function loadStreak() {
+export function loadStreakRive() {
   loading ??= (async () => {
     const [{ default: init }, bytes] = await Promise.all([
       import('@rive-app/canvas-advanced'),
@@ -30,16 +31,29 @@ function loadStreak() {
   return loading;
 }
 
-/** The animated flame with `streak` inside, `size` CSS pixels square. Calls onFail if Rive cannot load. */
-export const RiveStreak: React.FC<{ streak: number; size: number; onFail?: () => void }> = ({ streak, size, onFail }) => {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const setStreak = useRef<(n: number) => void>(() => {});
+interface Props {
+  streak: number;
+  /** CSS pixels, square. */
+  size: number;
+  /** Animate every frame (the celebration); otherwise one settled frame. */
+  live?: boolean;
+  onFail?: () => void;
+  /** The first frame is on screen. */
+  onReady?: () => void;
+  className?: string;
+  canvasRef?: React.Ref<HTMLCanvasElement>;
+}
+
+export const RiveStreak: React.FC<Props> = ({ streak, size, live = false, onFail, onReady, className = '', canvasRef }) => {
+  const canvas = useRef<HTMLCanvasElement | null>(null);
+  const show = useRef<(n: number) => void>(() => {});
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    let stop = () => {};
     let dead = false;
-    loadStreak().then(({ rive, file }) => {
+    let raf = 0;
+    let free = () => {};
+    loadStreakRive().then(({ rive, file }) => {
       const el = canvas.current;
       if (dead || !el) return;
       const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -47,17 +61,13 @@ export const RiveStreak: React.FC<{ streak: number; size: number; onFail?: () =>
       const renderer = rive.makeRenderer(el);
       const artboard = file.artboardByIndex(0);
       const sm = new rive.StateMachineInstance(artboard.stateMachineByIndex(0), artboard);
-      const vm = file.defaultArtboardViewModel(artboard);
-      const inst = vm?.defaultInstance();
+      const inst = file.defaultArtboardViewModel(artboard)?.defaultInstance();
       if (inst) { artboard.bindViewModelInstance(inst); sm.bindViewModelInstance(inst); }
       const num = inst?.number('streak');
-      setStreak.current = n => { if (num) num.value = n; };
-      setStreak.current(streak);
       const bounds = { minX: 0, minY: 0, maxX: el.width, maxY: el.height };
 
-      const draw = (dt: number) => {
-        sm.advance(dt);
-        artboard.advance(dt);
+      const advance = (dt: number) => { sm.advance(dt); artboard.advance(dt); };
+      const draw = () => {
         renderer.clear();
         renderer.save();
         renderer.align(rive.Fit.contain, rive.Alignment.center, bounds, artboard.bounds);
@@ -65,18 +75,35 @@ export const RiveStreak: React.FC<{ streak: number; size: number; onFail?: () =>
         renderer.restore();
         rive.resolveAnimationFrame();
       };
-      draw(0);
+      const still = () => { for (let t = 0; t < SETTLE_S; t += 1 / 30) advance(1 / 30); draw(); };
+
+      show.current = n => { if (num) num.value = n; if (!live) still(); };
+      show.current(streak);
+
+      if (live) {
+        let last = performance.now();
+        const tick = (now: number) => {
+          advance(Math.min(0.05, (now - last) / 1000));
+          last = now;
+          draw();
+          raf = requestAnimationFrame(tick);
+        };
+        advance(0); draw();
+        raf = requestAnimationFrame(tick);
+      }
       setReady(true);
-      // Reduced motion: one still frame, settled.
-      if (reducedMotion()) { draw(2); return; }
-      stop = lowRate(FPS, (dt, awake) => { if (awake) draw(dt); });
-      const free = stop;
-      stop = () => { free(); sm.delete(); artboard.delete(); renderer.delete(); inst?.delete?.(); };
+      onReady?.();
+      free = () => { sm.delete(); artboard.delete(); renderer.delete(); };
     }).catch(() => { if (!dead) onFail?.(); });
-    return () => { dead = true; stop(); };
-  }, [size]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { dead = true; cancelAnimationFrame(raf); show.current = () => {}; free(); };
+  }, [size, live]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { setStreak.current(streak); }, [streak]);
+  useEffect(() => { show.current(streak); }, [streak]);
 
-  return <canvas ref={canvas} className={`rive-streak${ready ? ' is-ready' : ''}`} style={{ width: size, height: size }} aria-hidden="true" />;
+  const setRef = (el: HTMLCanvasElement | null) => {
+    canvas.current = el;
+    if (typeof canvasRef === 'function') canvasRef(el);
+    else if (canvasRef) (canvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el;
+  };
+  return <canvas ref={setRef} className={`rive-streak${ready ? ' is-ready' : ''} ${className}`} style={{ width: size, height: size }} aria-hidden="true" />;
 };
