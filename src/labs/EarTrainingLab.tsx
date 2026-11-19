@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Select } from '../components/Select';
 import { Keyboard } from '../components/Keyboard';
 import { LabIcon } from '../components/LabIcon';
 import { Fretboard } from '../components/Fretboard';
@@ -541,20 +542,17 @@ export const EarTrainingLab: React.FC = () => {
                 tabSource.libraryEntries.length === 0 ? (
                   <p className="ear-said">No tabs saved yet. Open a tab file in Tabs first.</p>
                 ) : (
-                  <select
+                  <Select<string>
+                    className="ear-tabpick"
+                    label="Which tab"
+                    placeholder="Choose a piece"
                     value={tabSource.selectedTab?.id ?? ''}
-                    onChange={e => {
-                      const entry = tabSource.libraryEntries.find(t => t.id === e.target.value);
+                    options={tabSource.libraryEntries.map(entry => ({ value: entry.id, label: entry.title || entry.fileName }))}
+                    onChange={v => {
+                      const entry = tabSource.libraryEntries.find(t => t.id === v);
                       if (entry) tabSource.selectTab(entry);
                     }}
-                    className="select-field ear-tabpick"
-                    aria-label="Which tab"
-                  >
-                    <option value="" disabled>Choose a piece…</option>
-                    {tabSource.libraryEntries.map(entry => (
-                      <option key={entry.id} value={entry.id}>{entry.title || entry.fileName}</option>
-                    ))}
-                  </select>
+                  />
                 )
               )}
               {mode === 'tab' && tabSource.selectedTab && !tabSource.isLoading && tabSource.candidates.length === 0 && (

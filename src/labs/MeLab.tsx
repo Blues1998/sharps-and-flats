@@ -1,5 +1,6 @@
 import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { LabIcon } from '../components/LabIcon';
+import { Select } from '../components/Select';
 import { Segmented } from '../components/Segmented';
 import { RecordsCard, TrophyShelf } from '../components/TrophyShelf';
 import { StreakStrip } from '../components/StreakStrip';
@@ -146,14 +147,13 @@ const Reminders: React.FC = () => {
         <>
           <div className="me-row">
             <span className="me-row-label">When</span>
-            <select
-              className="select-field me-select"
+            <Select<string>
+              className="me-select"
+              label="Reminder time"
               value={r.time ?? 'auto'}
-              onChange={e => void setReminders({ time: e.target.value === 'auto' ? null : e.target.value })}
-            >
-              <option value="auto">Auto</option>
-              {SLOTS.map(x => <option key={x.value} value={x.value}>{x.label} ({x.value})</option>)}
-            </select>
+              options={[{ value: 'auto', label: 'Auto', hint: 'When you usually practise' }, ...SLOTS.map(x => ({ value: x.value, label: x.label, hint: x.value }))]}
+              onChange={v => void setReminders({ time: v === 'auto' ? null : v })}
+            />
           </div>
           <div className="me-row">
             <span className="me-row-label">Streak warning</span>

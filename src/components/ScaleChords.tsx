@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChordDiagram } from './ChordDiagram';
+import { Select } from './Select';
 import { Term } from './Term';
 import { SCALE_FORMULAS, NOTE_NAMES, CHORD_QUALITIES, noteNameToMidi } from '../utils/musicTheory';
 import type { ScaleFormula } from '../utils/musicTheory';
@@ -166,13 +167,13 @@ export const ScaleChords: React.FC<ScaleChordsProps> = ({ rootName, scale, onStr
             <span>Build any chord on {prettyNote(rootName)}</span>
             <small className="readout">{builtNotes.join('  ')}</small>
           </span>
-          <label className="theory-select">
-            <select value={quality} onChange={e => setQuality(Number(e.target.value))} aria-label="Chord type">
-              {CHORD_QUALITIES.map((q, i) => (
-                <option key={q.name} value={i}>{q.name}{CHORD_FEELINGS[q.name] ? ` · ${CHORD_FEELINGS[q.name]}` : ''}</option>
-              ))}
-            </select>
-          </label>
+          <Select<number>
+            className="theory-select"
+            label="Chord type"
+            value={quality}
+            options={CHORD_QUALITIES.map((q, i) => ({ value: i, label: q.name, hint: CHORD_FEELINGS[q.name] }))}
+            onChange={setQuality}
+          />
           <button type="button" className="btn" onClick={playBuilt} aria-label={`Play ${prettyNote(rootName)} ${built.name}`}><PlayIcon size={11} /></button>
         </div>
       </div>

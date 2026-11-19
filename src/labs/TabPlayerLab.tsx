@@ -1,5 +1,6 @@
 import { LabIcon } from '../components/LabIcon';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Select } from '../components/Select';
 import { createPortal } from 'react-dom';
 import { AlphaTabApi, synth, model, FileLoadError } from '@coderline/alphatab';
 import { Term } from '../components/Term';
@@ -1054,17 +1055,16 @@ export const TabPlayerLab: React.FC = () => {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Guitar</span>
-              <select
+              <Select<string>
+                label="Guitar sound"
                 value={toneKey(guitarTone.bank, guitarTone.program)}
-                onChange={(e) => {
-                  const [bank, program] = e.target.value.split(':').map(Number);
+                options={GUITAR_TONES.map(t => ({ value: toneKey(t.bank, t.program), label: t.label }))}
+                onChange={v => {
+                  const [bank, program] = v.split(':').map(Number);
                   applyGuitarTone(bank, program);
                 }}
-                className="select-field"
-                style={{ width: 'auto', padding: '0.35rem 1.8rem 0.35rem 0.6rem', fontSize: '0.8rem' }}
-              >
-                {GUITAR_TONES.map(t => <option key={toneKey(t.bank, t.program)} value={toneKey(t.bank, t.program)}>{t.label}</option>)}
-              </select>
+                className="tab-tone-select"
+              />
             </div>
 
             {!isReady && (

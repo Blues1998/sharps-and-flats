@@ -1,5 +1,6 @@
 import { Segmented } from '../components/Segmented';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Select } from '../components/Select';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { Fretboard } from '../components/Fretboard';
 import { LabIcon } from '../components/LabIcon';
@@ -459,17 +460,21 @@ export const PlayLab: React.FC = () => {
             <>
               <label>
                 Key
-                <select value={String(scaleRootPc)} className="select-field"
-                  onChange={e => setScaleRootPc(e.target.value === 'random' ? 'random' : Number(e.target.value))}>
-                  {NOTE_NAMES.map((n, i) => <option key={n} value={i}>{n}</option>)}
-                  <option value="random">Surprise me</option>
-                </select>
+                <Select<string>
+                  label="Key"
+                  value={String(scaleRootPc)}
+                  options={[...NOTE_NAMES.map((n, i) => ({ value: String(i), label: n })), { value: 'random', label: 'Surprise me' }]}
+                  onChange={v => setScaleRootPc(v === 'random' ? 'random' : Number(v))}
+                />
               </label>
               <label>
                 Scale
-                <select value={scaleIdx} className="select-field" onChange={e => setScaleIdx(Number(e.target.value))}>
-                  {SCALE_FORMULAS.map((sc, i) => <option key={sc.name} value={i}>{shortScaleName(sc.name)}</option>)}
-                </select>
+                <Select<number>
+                  label="Scale"
+                  value={scaleIdx}
+                  options={SCALE_FORMULAS.map((sc, i) => ({ value: i, label: shortScaleName(sc.name) }))}
+                  onChange={setScaleIdx}
+                />
               </label>
             </>
           )}

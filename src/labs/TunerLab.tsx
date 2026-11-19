@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Segmented } from '../components/Segmented';
+import { Select } from '../components/Select';
 import { LabIcon } from '../components/LabIcon';
 import { TunerDial } from '../components/TunerDial';
 import { VoiceTuner } from '../components/VoiceTuner';
@@ -296,15 +297,13 @@ const InstrumentTuner: React.FC = () => {
             options={INSTRUMENTS.map(i => ({ value: i.id, label: i.name }))}
             size="sm"
           />
-          <select
-            className="select-field"
+          <Select<string>
+            label="Tuning"
             value={tuningId}
-            onChange={e => pickTuning(e.target.value)}
-            aria-label="Tuning"
             title={tuning.note}
-          >
-            {tuningsFor(instrument).map(t => <option key={t.id} value={t.id}>{t.name} · {t.strings}</option>)}
-          </select>
+            options={tuningsFor(instrument).map(t => ({ value: t.id, label: t.name, hint: t.strings }))}
+            onChange={pickTuning}
+          />
         </div>
       </section>
     </div>

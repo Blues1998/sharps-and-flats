@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Select } from './Select';
 import { ChordDiagram } from './ChordDiagram';
 import { IconBeats, IconMetronome, IconPause, IconPlay, IconStop, IconTap, IconX } from './Icons';
 import { useBackToClose } from '../utils/nativeShell';
@@ -685,16 +686,14 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
             <IconBeats size={14} aria-hidden="true" />
             <span className="sr-only">Beats per bar</span>
           </span>
-          <select
-            className="select-field"
+          <Select<number>
+            label="Beats per bar"
+            title="Beats in a bar"
             value={beatsPerBar}
             disabled={running}
-            aria-label="Beats per bar"
-            title="Beats in a bar"
-            onChange={e => setBeatsPerBar(Number(e.target.value))}
-          >
-            {BEATS_PER_BAR.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+            options={BEATS_PER_BAR.map(n => ({ value: n, label: String(n) }))}
+            onChange={setBeatsPerBar}
+          />
         </label>
 
         {/* The arm keeps the time this row is setting: it is handed the beat,

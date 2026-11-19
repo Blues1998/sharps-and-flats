@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChordCard } from '../components/ChordCard';
+import { Select } from '../components/Select';
 import { FitPanel } from '../components/FitPanel';
 import { VoicePanel } from '../components/VoicePanel';
 import { IconBest, IconPlay, IconSection } from '../components/Icons';
@@ -111,20 +112,19 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
             <p className="song-meta readout">
               {song.key || 'Key not set'} · {capoLabel(song.capo)} · {song.chart?.tempo ?? DEFAULT_CHART.tempo} bpm · {song.chart?.beatsPerBar ?? DEFAULT_CHART.beatsPerBar}/4
             </p>
-            <label className={`song-status is-${song.status}`}>
+            <Select<SongStatus>
+              className={`song-status is-${song.status}`}
+              label="Song status"
+              value={song.status}
+              options={STATUS_ORDER.map(s => ({ value: s, label: STATUS_LABEL[s] }))}
+              onChange={status => {
+                if (status === 'complete' && song.status !== 'complete') feel('celebrate');
+                void updateSong(song.id, { status });
+              }}
+            >
               <span className="song-status-dot" aria-hidden="true" />
-              <select
-                value={song.status}
-                aria-label="Song status"
-                onChange={e => {
-                  const status = e.target.value as SongStatus;
-                  if (status === 'complete' && song.status !== 'complete') feel('celebrate');
-                  void updateSong(song.id, { status });
-                }}
-              >
-                {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-              </select>
-            </label>
+              {STATUS_LABEL[song.status]}
+            </Select>
             {song.revisit && <span className="song-revisit-badge">Revisit</span>}
           </div>
         </div>

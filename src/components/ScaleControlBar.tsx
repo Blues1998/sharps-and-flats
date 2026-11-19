@@ -1,5 +1,6 @@
 import React from 'react';
 import { NOTE_NAMES, SCALE_FORMULAS } from '../utils/musicTheory';
+import { Select } from './Select';
 import type { ScaleFormula } from '../utils/musicTheory';
 import { SCALE_FEELINGS, shortScaleName } from '../utils/glossary';
 import { prettyNote } from '../utils/chords';
@@ -58,29 +59,23 @@ export const ScaleControlBar: React.FC<ScaleControlBarProps> = ({
       </div>
 
       <div className="theory-keybar-row">
-        {/* A real select, so a phone shows its own picker. */}
-        <label className="theory-mood">
+        <Select<string>
+          className="theory-mood"
+          label="Mood"
+          value={scale.name}
+          options={SCALE_FORMULAS.map(s => ({ value: s.name, label: SCALE_FEELINGS[s.name]?.feeling ?? s.name, hint: shortScaleName(s.name) }))}
+          onChange={name => {
+            const next = SCALE_FORMULAS.find(s => s.name === name);
+            if (next) onScaleChange(next);
+          }}
+        >
           <span className="theory-mood-text">
             {feeling} <small>{shortScaleName(scale.name)}</small>
           </span>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="6 9 12 15 18 9" />
           </svg>
-          <select
-            value={scale.name}
-            aria-label="Mood"
-            onChange={e => {
-              const next = SCALE_FORMULAS.find(s => s.name === e.target.value);
-              if (next) onScaleChange(next);
-            }}
-          >
-            {SCALE_FORMULAS.map(s => (
-              <option key={s.name} value={s.name}>
-                {SCALE_FEELINGS[s.name]?.feeling ?? s.name} · {shortScaleName(s.name)}
-              </option>
-            ))}
-          </select>
-        </label>
+        </Select>
         <button type="button" onClick={onPlay} className="btn btn-primary theory-play" aria-label={`Play ${prettyNote(root)} ${shortScaleName(scale.name)}`}>
           <PlayIcon />
           Play

@@ -149,9 +149,13 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
     return () => window.clearTimeout(t);
   }, [phase, song.id]);
 
-  const currentLine = holding ? lineAtBeat(chart, beat) : null;
+  // The transport counts beats on past the end when looping; the chart is read
+  // at the beat within this lap, and the last chord's next is the first again.
+  const lapBeat = isLooping && chart.totalBeats > 0 && beat >= 0 ? beat % chart.totalBeats : beat;
+  const currentLine = holding ? lineAtBeat(chart, lapBeat) : null;
+  const atLap = chordsAtBeat(chart, lapBeat);
   const { current, next } = holding
-    ? chordsAtBeat(chart, beat)
+    ? { current: atLap.current, next: atLap.next ?? (isLooping ? chordsAtBeat(chart, 0).current ?? chart.lines[0]?.chords[0] ?? null : null) }
     // Before it starts you hold the first chord, so what is next is the second.
     : { current: null, next: chordsAtBeat(chart, chart.lines[0]?.chords[0]?.beat ?? 0).next };
 
@@ -476,7 +480,7 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
                     line={line}
                     chart={chart}
                     isNow={currentLine?.index === line.index}
-                    beat={beat}
+                    beat={lapBeat}
                     live={holding ? current : null}
                   />
                 ))}

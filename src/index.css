@@ -15232,8 +15232,8 @@ a.btn {
   gap: 0.3rem;
 }
 
-.theory-select select {
-  max-width: 8.5rem;
+.ui-select-field.theory-select {
+  max-width: 9.5rem;
   min-height: 36px;
   padding: 0 0.5rem;
   border-radius: 8px;
@@ -16255,7 +16255,7 @@ a.btn {
 .streak-xp-t b { color: var(--text-primary); }
 .streak-xp-t small { font-size: 0.74rem; color: var(--text-muted); }
 .me-xp { margin: -0.4rem 0 0.2rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); }
-.me-select { width: auto; padding: 0.4rem 1.8rem 0.4rem 0.6rem; font-size: 0.85rem; }
+.me-select { width: auto; min-width: 8rem; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
 
 /* ===== Up the neck ==========================================================
    The Journey as a real fretboard. Rosewood with its grain running along the
@@ -17267,4 +17267,50 @@ body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 
   .mtop { position: sticky; top: 0; z-index: 40; }
 }
 /* The flame in the bar: the artboard's ground shadow reads as a loose smudge at this size. */
-.tstat-streak .rive-streak { clip-path: inset(0 0 17% 0); }
+/* The artwork's body sits below the canvas centre (sparks fill the top): lift it
+   so the flame's body, not its box, lines up with the text and the ring. */
+.tstat-streak .rive-streak { clip-path: inset(0 0 10% 0); position: relative; top: -4px; }
+
+/* ---- The app's dropdown (Select.tsx) -----------------------------------------
+   The standard field keeps .select-field's look with a real chevron; the list
+   opens as a bottom sheet on a phone and a small menu on a wide screen. */
+.ui-select-field { display: inline-flex; align-items: center; justify-content: space-between; gap: 0.5rem; text-align: left; background-image: none; padding-right: 0.6rem; min-height: 36px; }
+.ui-select-value { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ui-select-value.is-empty { color: var(--text-muted); }
+.ui-select-chevron { width: 14px; height: 14px; flex: none; color: var(--text-muted); transition: transform 0.2s ease; }
+.ui-select-field[aria-expanded="true"] .ui-select-chevron { transform: rotate(180deg); }
+
+.ui-sheet { position: fixed; inset: 0; z-index: 95; display: flex; align-items: flex-end; background: rgba(0, 0, 0, 0.5); animation: ui-sheet-fade 0.2s ease-out both; }
+.ui-sheet-panel { width: 100%; max-height: 72vh; display: flex; flex-direction: column; box-sizing: border-box; padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0; background: var(--surface-1, var(--rail-bg)); border-top: 1px solid var(--panel-border); animation: ui-sheet-up 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.ui-sheet.is-closing { animation: ui-sheet-fade 0.18s ease-in reverse both; }
+.ui-sheet.is-closing .ui-sheet-panel { animation: ui-sheet-up 0.18s ease-in reverse both; }
+.ui-sheet-grip { align-self: center; width: 36px; height: 4px; margin: 2px 0 10px; border-radius: 2px; background: var(--panel-border-hover); }
+.ui-sheet-title { margin: 0 8px 8px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.ui-sheet .ui-select-list { overflow-y: auto; overscroll-behavior: contain; }
+.ui-sheet .ui-select-item { min-height: 52px; font-size: 1rem; }
+@keyframes ui-sheet-fade { from { opacity: 0; } }
+@keyframes ui-sheet-up { from { transform: translateY(100%); } }
+
+.ui-menu-scrim { position: fixed; inset: 0; z-index: 94; }
+.ui-menu { position: fixed; z-index: 95; overflow-y: auto; padding: 6px; border-radius: 12px; border: 1px solid var(--panel-border); background: var(--surface-1, var(--rail-bg)); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); animation: ui-sheet-fade 0.12s ease-out both; }
+
+.ui-select-list { display: flex; flex-direction: column; gap: 2px; }
+.ui-select-item { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ui-select-item:hover, .ui-select-item:focus-visible { background: var(--surface-2); }
+.ui-select-item:active { background: var(--surface-3); }
+.ui-select-item.is-on { color: var(--primary); font-weight: 600; background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.ui-select-item[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+.ui-select-text { display: flex; flex-direction: column; min-width: 0; }
+.ui-select-hint { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); }
+.ui-select-tick { width: 18px; height: 18px; flex: none; }
+/* Custom triggers that used to hide a native select inside a label. */
+.theory-mood, .rh-pick, .song-status { font: inherit; }
+button.theory-mood, button.rh-pick { text-align: left; }
+button.song-status { border: none; padding-right: 1.6rem; }
+
+/* Compact standard fields inside rows of controls. */
+.tab-tone-select, .chart-signature .ui-select-field, .play-settings .ui-select-field, .palette-bar .ui-select-field { width: auto; min-width: 5.5rem; }
+
+/* Android app: no text selection or copy on long press, except where you type. */
+html.is-native, html.is-native body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+html.is-native input, html.is-native textarea, html.is-native [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }

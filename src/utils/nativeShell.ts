@@ -71,6 +71,13 @@ function watchTyping(): void {
 export async function initNativeShell(): Promise<void> {
   watchTyping();
   if (!Capacitor.isNativePlatform()) return;
+  // An app, not a page: text is not selectable and a long press opens no
+  // menu, except in the fields you type into (index.css, html.is-native).
+  document.documentElement.classList.add('is-native');
+  document.addEventListener('contextmenu', e => {
+    const t = e.target as HTMLElement | null;
+    if (!t?.closest('input, textarea, [contenteditable="true"]')) e.preventDefault();
+  });
   const { App } = await import('@capacitor/app');
   await App.addListener('backButton', ({ canGoBack }) => {
     // Anything open on top of the page (a sheet, a dialog, the search panel)

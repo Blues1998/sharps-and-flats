@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Segmented } from './Segmented';
+import { Select } from './Select';
 import { audio } from '../utils/audio';
 import { keyGroup, noteLabel } from '../utils/catalogue';
 import { comfortOf, preferredVoicing } from '../utils/chordbook';
@@ -89,14 +90,12 @@ export const ChordPalette: React.FC<ChordPaletteProps> = ({ onAdd }) => {
       <div className="palette-bar">
         <label className="catalogue-field">
           <span className="field-label">Key</span>
-          <select
-            className="select-field"
+          <Select<number>
+            label="Key"
             value={rootPc}
-            onChange={e => setRootPc(Number(e.target.value))}
-            aria-label="Key"
-          >
-            {NOTE_NAMES.map((name, pc) => <option key={name} value={pc}>{noteLabel(name)}</option>)}
-          </select>
+            options={NOTE_NAMES.map((name, pc) => ({ value: pc, label: noteLabel(name) }))}
+            onChange={setRootPc}
+          />
         </label>
         <Segmented<Mode> value={mode} onChange={setMode} options={MODES} ariaLabel="Major or minor" size="sm" />
         <label className="chart-toggle">

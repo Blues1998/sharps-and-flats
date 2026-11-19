@@ -1,5 +1,6 @@
 import { getTempoMarking } from '../utils/strum';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Select } from '../components/Select';
 import { Segmented } from '../components/Segmented';
 import { LabIcon } from '../components/LabIcon';
 import { Pendulum } from '../components/Pendulum';
@@ -701,40 +702,40 @@ export const RhythmLab: React.FC = () => {
           />
           <div className="rh-chips">
             <button type="button" className="chip-btn" onClick={tapTempo}>Tap tempo</button>
-            <label className="chip-btn rh-pick">
+            <Select<number>
+              className="chip-btn rh-pick"
+              label="Time signature"
+              value={timeSignature}
+              options={[{ value: 2, label: '2/4', hint: 'Duple' }, { value: 3, label: '3/4', hint: 'Waltz' }, { value: 4, label: '4/4', hint: 'Common' }, { value: 6, label: '6/8', hint: 'Compound' }]}
+              onChange={setTimeSignature}
+            >
               {timeSig} ▾
-              <select value={timeSignature} onChange={e => setTimeSignature(Number(e.target.value))} aria-label="Time signature">
-                <option value={2}>2/4 · Duple</option>
-                <option value={3}>3/4 · Waltz</option>
-                <option value={4}>4/4 · Common</option>
-                <option value={6}>6/8 · Compound</option>
-              </select>
-            </label>
+            </Select>
             {tab === 'play' && (
               <>
-                <label className="chip-btn rh-pick">
+                <Select<number>
+                  className="chip-btn rh-pick"
+                  label="Clicks per beat"
+                  value={subdivision}
+                  options={[1, 2, 3, 4].map(n => ({ value: n, label: `${n} click${n === 1 ? '' : 's'} a beat` }))}
+                  onChange={n => {
+                    setSubdivision(n);
+                    // Swing lives between pairs of eighths; with any other
+                    // count there is nothing for it to move.
+                    if (n !== 2) setSwing(0);
+                  }}
+                >
                   {subdivision === 1 ? '1 click a beat' : `${subdivision} clicks a beat`} ▾
-                  <select
-                    value={subdivision}
-                    onChange={e => {
-                      const n = Number(e.target.value);
-                      setSubdivision(n);
-                      // Swing lives between pairs of eighths; with any other
-                      // count there is nothing for it to move.
-                      if (n !== 2) setSwing(0);
-                    }}
-                    aria-label="Clicks per beat"
-                  >
-                    {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n} click{n === 1 ? '' : 's'} a beat</option>)}
-                  </select>
-                </label>
-                <label className="chip-btn rh-pick">
+                </Select>
+                <Select<'groove' | 'precision'>
+                  className="chip-btn rh-pick"
+                  label="View"
+                  value={metronomeVisual}
+                  options={[{ value: 'groove', label: 'Pulse' }, { value: 'precision', label: 'Pendulum' }]}
+                  onChange={setMetronomeVisual}
+                >
                   {metronomeVisual === 'groove' ? 'Pulse' : 'Pendulum'} ▾
-                  <select value={metronomeVisual} onChange={e => setMetronomeVisual(e.target.value as 'groove' | 'precision')} aria-label="View">
-                    <option value="groove">Pulse</option>
-                    <option value="precision">Pendulum</option>
-                  </select>
-                </label>
+                </Select>
               </>
             )}
           </div>

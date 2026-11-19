@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Segmented } from './Segmented';
+import { Select } from './Select';
 import { PitchTrace } from './PitchTrace';
 import { IconPlay, IconStop } from './Icons';
 import { useMicPitch } from '../hooks/useMicPitch';
@@ -426,9 +427,13 @@ export const VoiceTuner: React.FC = () => {
               size="sm"
             />
             {notation === 'sargam' && (
-              <select className="select-field voice-sa" value={sa} onChange={e => setVoice({ sa: Number(e.target.value) })} aria-label="Sa">
-                {SA_CHOICES.map(m => <option key={m} value={m}>Sa {prettyNote(m)}</option>)}
-              </select>
+              <Select<number>
+                className="voice-sa"
+                label="Sa"
+                value={sa}
+                options={SA_CHOICES.map(m => ({ value: m, label: `Sa ${prettyNote(m)}` }))}
+                onChange={m => setVoice({ sa: m })}
+              />
             )}
           </div>
         </div>
