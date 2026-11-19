@@ -17314,3 +17314,9 @@ button.song-status { border: none; padding-right: 1.6rem; }
 /* Android app: no text selection or copy on long press, except where you type. */
 html.is-native, html.is-native body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 html.is-native input, html.is-native textarea, html.is-native [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
+/* The tuner never squeezes below its own content (a session card above it
+   took the room and the dial ran under the mic button): the page scrolls instead. */
+.tunerstack .tunerface { min-height: max-content; flex-shrink: 0; }
+.tunerstack .tunerface-meter { min-height: auto; }
+.tunerstack .dial { min-height: 120px; }

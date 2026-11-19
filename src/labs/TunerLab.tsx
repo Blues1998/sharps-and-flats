@@ -45,8 +45,10 @@ function useFitViewport<T extends HTMLElement>() {
     const fit = () => {
       const top = el.getBoundingClientRect().top + window.scrollY;
       const below = main ? parseFloat(getComputedStyle(main).paddingBottom) || 0 : 0;
-      // Below this the controls stop fitting; a short landscape phone scrolls instead.
-      el.style.height = `${Math.max(460, window.innerHeight - top - below)}px`;
+      // At least the space left on screen, so the dial fills it; more when the
+      // controls need more (a session card above takes room), and the page
+      // scrolls rather than the dial running under the mic button.
+      el.style.minHeight = `${Math.max(460, window.innerHeight - top - below)}px`;
     };
     fit();
     // Once more after the page's entrance animation, which measures 6px low.
@@ -216,7 +218,8 @@ const InstrumentTuner: React.FC = () => {
         <div className="tunerface-meter" aria-hidden={!isMicrophoneActive}>
           <div className="tuner-note">
             <span className={`tuner-note-name readout${pitchData ? (gaugeInTune ? ' is-home' : ' is-live') : ''}`}>
-              {readNote ?? '-'}
+              {/* Nothing heard: an empty line of the same height, not a dash. */}
+              {readNote ?? '\u00A0'}
             </span>
             <span className="tuner-note-hz readout">
               {pitchData ? `${pitchData.frequency.toFixed(1)} Hz` : isMicrophoneActive ? 'silent' : 'not listening'}
