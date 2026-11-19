@@ -10,6 +10,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import rivUrl from '../assets/rive/streak.riv?url';
+// The same flame with its number made invisible (prepare.py --hide-text), for
+// the top bar, where the number sits beside the flame instead.
+import plainUrl from '../assets/rive/streak-badge.riv?url';
 import wasmUrl from '@rive-app/canvas-advanced/rive.wasm?url';
 
 type Rive = Awaited<ReturnType<typeof import('@rive-app/canvas-advanced').default>>;
@@ -18,19 +21,18 @@ type RiveFile = Awaited<ReturnType<Rive['load']>>;
 /** Long enough for the file's entry animations to finish, for a still frame. */
 const SETTLE_S = 2.5;
 
-let loading: Promise<{ rive: Rive; file: RiveFile }> | null = null;
-export function loadStreakRive() {
-  loading ??= (async () => {
-    const [{ default: init }, bytes] = await Promise.all([
-      import('@rive-app/canvas-advanced'),
-      fetch(rivUrl).then(r => r.arrayBuffer()),
-    ]);
-    const rive = await init({ locateFile: () => wasmUrl });
-    const file = await rive.load(new Uint8Array(bytes));
-    return { rive, file };
-  })();
-  loading.catch(() => { loading = null; });
-  return loading;
+let runtime: Promise<Rive> | null = null;
+const files = new Map<string, Promise<{ rive: Rive; file: RiveFile }>>();
+export function loadStreakRive(url: string = rivUrl) {
+  let hit = files.get(url);
+  if (!hit) {
+    runtime ??= import('@rive-app/canvas-advanced').then(({ default: init }) => init({ locateFile: () => wasmUrl }));
+    hit = Promise.all([runtime, fetch(url).then(r => r.arrayBuffer())])
+      .then(async ([rive, bytes]) => ({ rive, file: await rive.load(new Uint8Array(bytes)) }));
+    hit.catch(() => { files.delete(url); runtime = null; });
+    files.set(url, hit);
+  }
+  return hit;
 }
 
 interface Props {
@@ -39,6 +41,8 @@ interface Props {
   size: number;
   /** Animate every frame (the celebration); otherwise one settled frame. */
   live?: boolean;
+  /** Draw the flame without its number. */
+  plain?: boolean;
   onFail?: () => void;
   /** The first frame is on screen. */
   onReady?: () => void;
@@ -46,7 +50,7 @@ interface Props {
   canvasRef?: React.Ref<HTMLCanvasElement>;
 }
 
-export const RiveStreak: React.FC<Props> = ({ streak, size, live = false, onFail, onReady, className = '', canvasRef }) => {
+export const RiveStreak: React.FC<Props> = ({ streak, size, live = false, plain = false, onFail, onReady, className = '', canvasRef }) => {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const show = useRef<(n: number) => void>(() => {});
   const [ready, setReady] = useState(false);
@@ -55,7 +59,7 @@ export const RiveStreak: React.FC<Props> = ({ streak, size, live = false, onFail
     let dead = false;
     let raf = 0;
     let free = () => {};
-    loadStreakRive().then(({ rive, file }) => {
+    loadStreakRive(plain ? plainUrl : rivUrl).then(({ rive, file }) => {
       const el = canvas.current;
       if (dead || !el) return;
       const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -98,7 +102,7 @@ export const RiveStreak: React.FC<Props> = ({ streak, size, live = false, onFail
       free = () => { sm.delete(); artboard.delete(); renderer.delete(); };
     }).catch(() => { if (!dead) onFail?.(); });
     return () => { dead = true; cancelAnimationFrame(raf); show.current = () => {}; free(); };
-  }, [size, live]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [size, live, plain]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { show.current(streak); }, [streak]);
 

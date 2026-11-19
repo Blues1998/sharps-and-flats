@@ -12,8 +12,8 @@ import { answerOffer, goalOffer, offerShown, type GoalOffer } from '../utils/goa
 import { RiveStreak } from './RiveStreak';
 import { StreakCelebration } from './StreakCelebration';
 
-// The top bar on Today, where the app name used to be: what you are
-// learning, your streak, and how much of today's goal is done. Tapping one
+// The top bar on Today: what you are learning (a headstock badge) and today's
+// minutes on the left; on the right the streak, its flame inside the goal ring. Tapping one
 // opens a small panel right under the bar with its detail and, where there is
 // one, its setting. Me lives in the tab bar, not here.
 //
@@ -24,6 +24,8 @@ import { StreakCelebration } from './StreakCelebration';
 
 const GOAL_SEEN = 'cadenza-goal-seen-today';
 const STREAK_SHOWN = 'cadenza-streak-shown-on';
+const RING_R = 22;
+const RING_C = 2 * Math.PI * RING_R;
 
 type Pop = 'inst' | 'streak' | 'goal' | 'bump';
 
@@ -41,12 +43,12 @@ function useChanged(value: number | boolean, ms = 700): boolean {
   return on;
 }
 
-const Guitar = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M19.5 2.5l2 2-3.2 3.2-2-2z" fill="currentColor" stroke="none" />
-    <path d="M17.2 6.8l-5.6 5.6" />
-    <path d="M10.6 9.2c-1.3-.6-2.9-.4-3.9.6-.8.8-.9 1.8-1.7 2.5-.9.8-2.6.6-3.3 1.9-.9 1.7.2 4.4 2.1 6.1 1.7 1.9 4.4 3 6.1 2.1 1.3-.7 1.1-2.4 1.9-3.3.7-.8 1.7-.9 2.5-1.7 1-1 1.2-2.6.6-3.9" />
-    <circle cx="9.3" cy="14.7" r="1.6" />
+/** The instrument as a headstock, with its pegs: six for guitar, four for ukulele. */
+const Headstock: React.FC<{ uke: boolean }> = ({ uke }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path className="tstat-head" d="M8.5 2h7l1.2 10.5h-9.4Z" />
+    <rect className="tstat-head" x="10.6" y="12.5" width="2.8" height="10" rx="0.8" />
+    {(uke ? [5, 10] : [4.5, 8, 11.5]).flatMap(y => [6, 18].map(x => <circle key={`${x}-${y}`} className="tstat-peg" cx={x} cy={y} r="1.4" />))}
   </svg>
 );
 
@@ -88,8 +90,6 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
   const mins = minutesPractisedToday();
   const met = mins >= goal;
   const playedToday = mins > 0 || s.restDays.includes(today());
-  const r = 9;
-  const c = 2 * Math.PI * r;
   // The ring draws in from empty once, then follows the minutes.
   const [drawn, setDrawn] = useState(false);
   useEffect(() => { const id = requestAnimationFrame(() => setDrawn(true)); return () => cancelAnimationFrame(id); }, []);
@@ -170,21 +170,29 @@ export const TodayStatus: React.FC<{ className?: string }> = ({ className = '' }
 
   return (
     <div className={`tstat ${className}`} ref={barRef}>
-      <button type="button" className={`tstat-item tstat-inst${pop === 'inst' ? ' is-open' : ''}`} onClick={toggle('inst')} aria-expanded={pop === 'inst'} aria-label={`Learning on ${instrument}`}>
-        <Guitar /><span>{instrument}</span>
-      </button>
-      <button type="button" className={`tstat-item tstat-streak${playedToday ? ' is-lit' : ''}${ignite ? ' is-ignite' : ''}${pop === 'streak' ? ' is-open' : ''}`} onClick={toggle('streak')} aria-expanded={pop === 'streak'} aria-label={`${s.current} day streak`}>
-        {riveOk
-          ? <RiveStreak streak={s.current} size={44} canvasRef={flameRef} className={cele !== null ? 'is-away' : ''} onFail={() => setRiveOk(false)} />
-          : <><Flame lit={playedToday} /><span className={`readout${streakTick ? ' is-tick' : ''}`}>{s.current}</span></>}
-      </button>
-      <button type="button" ref={goalRef} className={`tstat-item tstat-goal${met ? ' is-met' : ''}${pulse ? ' is-pulse' : ''}${pop === 'goal' || pop === 'bump' ? ' is-open' : ''}`} onClick={toggle('goal')} aria-expanded={pop === 'goal'} aria-label={`${mins} of ${goal} minutes today`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r={r} className="tstat-ring-track" />
-          <circle cx="12" cy="12" r={r} className="tstat-ring-fill" strokeDasharray={`${(drawn ? c * Math.min(1, mins / goal) : 0).toFixed(1)} ${c.toFixed(1)}`} transform="rotate(-90 12 12)" />
-        </svg>
-        {/* The real minutes, past the goal too: 12 / 5 min, not 5 / 5. */}
-        <span className={`readout${minsTick ? ' is-tick' : ''}`}>{mins}<small> / {goal} min</small></span>
+      {/* Left: what you are learning, and how far into today's goal. */}
+      <div className="tstat-left">
+        <button type="button" className={`tstat-badge${pop === 'inst' ? ' is-open' : ''}`} onClick={toggle('inst')} aria-expanded={pop === 'inst'} aria-label={`Learning on ${instrument}`}>
+          <Headstock uke={profile.instrument === 'ukulele'} />
+        </button>
+        <button type="button" ref={goalRef} className={`tstat-goaltext readout${met ? ' is-met' : ''}${minsTick ? ' is-tick' : ''}${pop === 'goal' || pop === 'bump' ? ' is-open' : ''}`} onClick={toggle('goal')} aria-expanded={pop === 'goal'} aria-label={`${mins} of ${goal} minutes today`}>
+          {/* The real minutes, past the goal too. */}
+          {met ? `goal met · ${mins} min` : `${mins} of ${goal} min`}
+        </button>
+      </div>
+      {/* Right: the streak, its flame inside the goal ring. The ring fills with
+          today's minutes; the flame lights once today's practice keeps the streak. */}
+      <button type="button" className={`tstat-streak${playedToday ? ' is-lit' : ''}${met ? ' is-met' : ''}${pulse ? ' is-pulse' : ''}${ignite ? ' is-ignite' : ''}${pop === 'streak' ? ' is-open' : ''}`} onClick={toggle('streak')} aria-expanded={pop === 'streak'} aria-label={`${s.current} day streak, ${mins} of ${goal} minutes today`}>
+        <span className={`tstat-streak-num readout${streakTick ? ' is-tick' : ''}`}>{s.current}</span>
+        <span className="tstat-flamering">
+          <svg className="tstat-ring" viewBox="0 0 52 52" aria-hidden="true">
+            <circle cx="26" cy="26" r={RING_R} className="tstat-ring-track" />
+            <circle cx="26" cy="26" r={RING_R} className="tstat-ring-fill" strokeDasharray={`${(drawn ? RING_C * Math.min(1, mins / goal) : 0).toFixed(1)} ${RING_C.toFixed(1)}`} transform="rotate(-90 26 26)" />
+          </svg>
+          {riveOk
+            ? <RiveStreak streak={s.current} size={36} plain canvasRef={flameRef} className={cele !== null ? 'is-away' : ''} onFail={() => setRiveOk(false)} />
+            : <Flame lit={playedToday} />}
+        </span>
       </button>
 
       {cele !== null && <StreakCelebration to={cele} target={() => flameRef.current?.getBoundingClientRect() ?? null} onDone={() => setCele(null)} />}

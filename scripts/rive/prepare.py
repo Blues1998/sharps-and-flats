@@ -1,7 +1,7 @@
 """Prepare a Rive file for the app: cut its embedded fonts down to the digits
 and swap colours, writing a new .riv.
 
-    python3 scripts/rive/prepare.py in.riv out.riv [--color f2af0f=ff6a2a ...]
+    python3 scripts/rive/prepare.py in.riv out.riv [--color f2af0f=ff6a2a ...] [--hide-text]
 
 Needs fonttools (pip install fonttools). keys.json maps each property key to
 its type; it was generated from rive-runtime's include/rive/generated headers
@@ -10,6 +10,8 @@ new Rive editor writes properties it does not list (the script then stops
 with "unknown property").
 
 Colours keep their own alpha: only the RGB is swapped, so fades still fade.
+--hide-text makes the text's own fill transparent (the colour right under a
+TextStylePaint), for a copy that draws the artwork without its words.
 """
 import io, json, os, struct, sys
 
@@ -25,8 +27,11 @@ def varuint(n):
         else: out.append(c); return bytes(out)
 
 
+TEXT_STYLE_PAINT, SOLID_COLOR = 137, 18
+
+
 def parse(b):
-    """Yield (prop name, type, value start, value end, length-prefix start) for every property."""
+    """Yield (prop name, type, value start, value end, length-prefix start, object type, previous object type)."""
     p = 4
     def vu():
         nonlocal p
@@ -41,8 +46,9 @@ def parse(b):
     for k in toc:
         if bit == 8: cur = struct.unpack('<I', b[p:p + 4])[0]; p += 4; bit = 0
         toc_types[k] = ['Uint', 'String', 'Double', 'Color'][(cur >> bit) & 3]; bit += 2
+    prev = obj = None
     while p < len(b):
-        vu()  # object type
+        prev, obj = obj, vu()
         while (k := vu()) != 0:
             known = KEYS.get(k)
             ty = (known[2] if known and known[2] else None) or toc_types.get(k)
@@ -50,10 +56,10 @@ def parse(b):
             name = f'{known[0]}.{known[1]}' if known else str(k)
             if ty in ('Uint', 'Id', 'Int'): vu()
             elif ty in ('String', 'Bytes'):
-                pre = p; n = vu(); yield name, ty, p, p + n, pre; p += n
+                pre = p; n = vu(); yield name, ty, p, p + n, pre, obj, prev; p += n
             elif ty == 'Double': p += 4
             elif ty == 'Bool': p += 1
-            elif ty == 'Color': yield name, ty, p, p + 4, None; p += 4
+            elif ty == 'Color': yield name, ty, p, p + 4, None, obj, prev; p += 4
 
 
 def digits_only(font):
@@ -68,25 +74,29 @@ def digits_only(font):
 def main():
     src, dst, *rest = sys.argv[1:]
     swaps = {}
+    hide_text = '--hide-text' in rest
     for arg in rest:
-        if arg == '--color': continue
+        if arg in ('--color', '--hide-text'): continue
         a, z = arg.lower().split('='); swaps[int(a, 16)] = int(z, 16)
     b = bytearray(open(src, 'rb').read())
     size = len(b)
     # Colours first (in place, same length), then fonts from the back so earlier offsets stay valid.
     fonts = []
-    for name, ty, start, end, pre in parse(b):
+    hidden = 0
+    for name, ty, start, end, pre, obj, prev in parse(b):
         if ty == 'Color':
             v = struct.unpack('<I', b[start:end])[0]
             rgb = v & 0xFFFFFF
-            if rgb in swaps: b[start:end] = struct.pack('<I', (v & 0xFF000000) | swaps[rgb])
+            if rgb in swaps: v = (v & 0xFF000000) | swaps[rgb]
+            if hide_text and obj == SOLID_COLOR and prev == TEXT_STYLE_PAINT: v &= 0x00FFFFFF; hidden += 1
+            b[start:end] = struct.pack('<I', v)
         elif name == 'FileAssetContents.bytes' and b[start:start + 4] in (b'\x00\x01\x00\x00', b'true', b'OTTO'):
             fonts.append((pre, start, end))
     for pre, start, end in reversed(fonts):
         small = digits_only(bytes(b[start:end]))
         b[pre:end] = varuint(len(small)) + small
     open(dst, 'wb').write(b)
-    print(f'{src}: {size} -> {len(b)} bytes, {len(fonts)} font(s) cut to digits, {len(swaps)} colour swap(s)')
+    print(f'{src}: {size} -> {len(b)} bytes, {len(fonts)} font(s) cut to digits, {len(swaps)} colour swap(s), {hidden} text fill(s) hidden')
 
 
 if __name__ == '__main__':

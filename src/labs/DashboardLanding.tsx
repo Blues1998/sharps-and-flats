@@ -10,10 +10,9 @@ interface DashboardLandingProps {
 }
 
 /**
- * Today is the neck. The whole screen is your way through the course: a bar
- * with where you stand, a banner naming the fret you are on, and the frets
- * from the nut up, scrolling like a path. Songs, the week and the streak's
- * detail live on their own tabs.
+ * Today is the neck, drawn as a map: your unit's notes and one card with
+ * Start; finished units fold into their milestones. The bar says where you
+ * stand. The detailed neck, panels and all, is the Journey page.
  */
 export const DashboardLanding: React.FC<DashboardLandingProps> = ({ setActiveTab }) => (
   <div className="today">

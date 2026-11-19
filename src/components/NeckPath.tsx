@@ -145,7 +145,10 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     }
     return { tops, heights, length: y };
   }, [lastFret]);
-  const width = strings === 4 ? (narrow ? 132 : 148) : (narrow ? 166 : 190);
+  // Today draws the neck as a map: wider, flat, no panels or side text; your
+  // unit's notes and one card with Start; finished units fold into their medal.
+  const map = mode === 'today';
+  const width = map ? (strings === 4 ? 176 : 210) : strings === 4 ? (narrow ? 132 : 148) : (narrow ? 166 : 190);
   const edge = strings === 4 ? 20 : narrow ? 15 : 17;
   const strX = (s: number) => edge + (strings - s) * ((width - 2 * edge) / (strings - 1));
   const midY = (n: number) => geo.tops[n] + geo.heights[n] / 2;
@@ -518,7 +521,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   };
   const sectionTop = (n: number) => (n === 1 ? 0 : geo.tops[n]);
   const sectionEnd = (n: number) => geo.tops[n] + geo.heights[n];
-  const sections = (
+  const unitDone = (i: number) => FRETS.filter(f => f.n >= UNITS[i].from && f.n <= UNITS[i].to).every(f => fretDoneIn(f, shown));
+  const sections = map ? null : (
     <>
       {UNITS.map((_, i) => {
         const { u, ids, doneCount, state, stars } = unitState(i);
@@ -628,7 +632,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
             onClick={() => tapFret(f.n)}
             aria-label={`${f.check!.title}, ${passed ? 'reached' : 'milestone'}`}
           >
-            {state !== 'is-later' && <Note />}
+            {state === 'is-passed' && map ? <Check /> : state !== 'is-later' && <Note />}
           </button>
         ));
       })}
@@ -645,6 +649,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       {/* Steps: notes fretted just behind the wire, as a finger would. */}
       {FRETS.filter(f => !f.check).map(f => {
         const shape = shapeFor(f.steps.length, strings);
+        if (map && unitDone(unitOf(f.n))) return null;
         return f.steps.map((id, i) => {
           const level = levelOf(id);
           if (!level) return null;
@@ -674,7 +679,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           )}
         </svg>
       )}
-      {tag && focus === null && tag.place !== 'label' && (
+      {!map && tag && focus === null && tag.place !== 'label' && (
         <button
           type="button"
           className={`np-bubble${tag.place === 'below' ? ' is-below' : tag.place === 'tight' ? ' is-tight' : ''}`}
@@ -692,6 +697,32 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       )}
     </div>
   );
+
+  // ---- Today's card: your step, under your note, with Start ---------------------
+  const nowCard = (() => {
+    if (!curDef || !curNote) return null;
+    const { ids, doneCount } = unitState(myUnit);
+    const level = curDef.check ? null : levelOf(curDef.steps.find(id => !shown.has(id)) ?? '');
+    const title = curDef.check ? curDef.check.title : level?.title;
+    if (!title) return null;
+    const go = () => {
+      if (curDef.check) { feel('tap'); startLesson(checkId(curDef.n)); return; }
+      if (level) open(level);
+    };
+    // Centred under the note, kept inside the neck's column and the page.
+    const cardW = 228;
+    const left = Math.max(-40, Math.min(curNote.x - cardW / 2, width - cardW + 70));
+    return (
+      <div className="np-nowcard" style={{ top: curNote.y + 34, left: `calc(var(--np-left) + ${left}px)`, width: cardW, ['--arrow-x' as string]: `${curNote.x - left}px` } as React.CSSProperties}>
+        <div className="np-nowcard-head">
+          <span>{UNITS[myUnit].name}</span>
+          <span className="readout">{doneCount}/{ids.length}</span>
+        </div>
+        <b className="np-nowcard-title">{title}</b>
+        <button type="button" className="np-nowcard-go" data-feel="off" onClick={go}>Start</button>
+      </div>
+    );
+  })();
 
   // ---- Rows: the fret number, a unit divider where one starts, the label --------
   const focusedDef = focus !== null ? FRETS.find(f => f.n === focus) ?? null : null;
@@ -714,7 +745,12 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       >
         <button type="button" className="np-num" data-feel="off" onClick={() => tapFret(n)} aria-label={`Fret ${n}`} tabIndex={n > OCTAVE ? -1 : 0}>{n}</button>
         <div className="np-side">
-          {ahead ? null : f ? (
+          {map ? (f?.check ? (() => {
+            const i = unitOf(n);
+            // Your unit is named on its card; a name here would sit under it.
+            if (i === myUnit && !unitDone(i)) return null;
+            return <span className={`np-mapname${unitDone(i) ? ' is-done' : ''}`}>{UNITS[i].name}</span>;
+          })() : null) : ahead ? null : f ? (
             <>
               <button type="button" className="np-label-btn" data-feel="off" onClick={() => tapFret(n)} aria-pressed={focus === n}>{label(f)}</button>
               {songPill(f)}
@@ -738,6 +774,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
           {sections}
           {board}
           {rows}
+          {map && focus === null && nowCard}
           {focusedDef && (
             <div
               key={focusedDef.n}

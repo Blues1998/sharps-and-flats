@@ -17320,3 +17320,55 @@ html.is-native input, html.is-native textarea, html.is-native [contenteditable="
 .tunerstack .tunerface { min-height: max-content; flex-shrink: 0; }
 .tunerstack .tunerface-meter { min-height: auto; }
 .tunerstack .dial { min-height: 120px; }
+
+/* ---- Top bar on Today (TodayStatus): a headstock badge and today's minutes on
+   the left, the streak's flame inside the goal ring on the right. Grey until
+   earned, orange once it is. */
+.tstat-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tstat > .tstat-left > button { all: unset; box-sizing: border-box; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tstat .tstat-left .tstat-badge { width: 42px; height: 42px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); }
+.tstat .tstat-left .tstat-badge:active, .tstat .tstat-left .tstat-badge.is-open { background: var(--surface-3); }
+.tstat-badge svg { width: 22px; height: 22px; }
+.tstat-head { fill: var(--text-secondary); }
+.tstat-peg { fill: var(--primary); }
+.tstat .tstat-left .tstat-goaltext { padding: 10px 4px; font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.02em; color: var(--text-muted); white-space: nowrap; }
+.tstat .tstat-left .tstat-goaltext.is-met { color: var(--success); }
+.tstat > button.tstat-streak { gap: 10px; height: 52px; padding: 0 2px 0 10px; border-radius: 26px; }
+.tstat-streak-num { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 700; color: var(--text-secondary); }
+.tstat-streak.is-lit .tstat-streak-num { color: var(--primary); }
+.tstat-flamering { position: relative; width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 50%; transition: background 0.4s ease; }
+.tstat-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tstat-ring .tstat-ring-track { stroke-width: 4; }
+.tstat-ring .tstat-ring-fill { stroke: var(--primary); stroke-width: 4; }
+/* Goal met: the ring closes and the flame gets a soft glow behind it. */
+.tstat-streak.is-met .tstat-flamering { background: radial-gradient(closest-side, rgba(255, 106, 42, 0.24), rgba(255, 106, 42, 0)); }
+.tstat-streak.is-pulse .tstat-flamering { animation: np-goal-pulse 1.4s ease-out; }
+/* The flame sits in the ring: its body (the sparks fill the canvas top) centred. */
+.tstat-flamering .rive-streak { margin: 0; position: relative; top: -3px; clip-path: inset(0 0 10% 0); }
+.tstat-flamering .tstat-flame-wrap { transform: scale(0.95); }
+
+
+/* ---- Today's neck as a map (NeckPath mode="today") ---------------------------
+   Flat and dark instead of wood, strings as fine lines, no unit panels; a
+   finished unit is one glowing ticked medal with its name beside it, and your
+   step gets one card with Start under its note. */
+.neckpath.is-today { --np-left: 52px; --np-gap: 14px; }
+.neckpath.is-today .np-board { background: linear-gradient(180deg, #17191c, #191b1f 75%, #141518); box-shadow: inset 2px 0 0 #2c2f33, inset -2px 0 0 #2c2f33; }
+.neckpath.is-today .np-played { background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 4%, transparent), color-mix(in srgb, var(--primary) 12%, transparent)); }
+.neckpath.is-today .np-string { background: rgba(233, 228, 215, 0.26); box-shadow: none; }
+.neckpath.is-today .np-wire { background: #2e3135; box-shadow: none; }
+.neckpath.is-today .np-wire.is-octave { background: #44474c; }
+.neckpath.is-today .np-dbar { display: none; }
+.neckpath.is-today .np-num { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); }
+.neckpath.is-today .np-medal.is-passed { width: 34px; height: 34px; color: #1b0e06; background: var(--primary); box-shadow: 0 0 18px color-mix(in srgb, var(--primary) 50%, transparent); }
+.neckpath.is-today .np-medal.is-passed svg { width: 16px; height: 16px; }
+.np-mapname { font-size: 0.78rem; color: var(--text-muted); }
+.np-mapname.is-done { color: var(--text-secondary); }
+.np-mapname.is-now { color: var(--primary); font-weight: 600; }
+.np-nowcard { position: absolute; z-index: 6; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--surface-1); border: 1px solid var(--panel-border-hover); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45); animation: lp-pop 0.3s ease-out; }
+.np-nowcard::before { content: ''; position: absolute; top: -7px; left: var(--arrow-x); width: 12px; height: 12px; margin-left: -6px; background: inherit; border-left: 1px solid var(--panel-border-hover); border-top: 1px solid var(--panel-border-hover); transform: rotate(45deg); }
+.np-nowcard-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary); }
+.np-nowcard-head .readout { font-size: 0.72rem; letter-spacing: 0; color: var(--text-muted); font-weight: 500; }
+.np-nowcard-title { font-family: var(--font-display); font-size: 1.25rem; line-height: 1.15; color: var(--text-primary); }
+.np-nowcard-go { all: unset; box-sizing: border-box; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--primary); color: #1b0e06; font-weight: 700; font-size: 1rem; cursor: pointer; box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 60%, #000); -webkit-tap-highlight-color: transparent; }
+.np-nowcard-go:active { transform: translateY(2px); box-shadow: 0 1px 0 color-mix(in srgb, var(--primary) 60%, #000); }
