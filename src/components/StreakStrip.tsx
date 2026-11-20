@@ -1,4 +1,5 @@
-import React, { useEffect, useReducer } from 'react';
+import React, { useEffect, useReducer, useState } from 'react';
+import { RiveStreak } from './RiveStreak';
 import { minutesPractisedToday, shiftIso, streakRepair, streakState, today } from '../utils/library';
 import { XP_EVENT } from '../utils/xp';
 import { CLOCK_EVENT, getGoal } from '../utils/practiceClock';
@@ -35,6 +36,7 @@ export const StreakStrip: React.FC = () => {
     };
   }, []);
 
+  const [riveOk, setRiveOk] = useState(true);
   const s = streakState();
   const goal = getGoal();
   const mins = minutesPractisedToday();
@@ -61,7 +63,9 @@ export const StreakStrip: React.FC = () => {
     <section className="streak" aria-label="Your streak and today's goal">
       <div className="streak-row">
         <div className="streak-days">
-          <Flame lit={s.playedToday} />
+          {riveOk
+            ? <span className={`streak-rive${s.playedToday ? ' is-lit' : ''}`}><RiveStreak streak={s.current} size={40} plain onFail={() => setRiveOk(false)} /></span>
+            : <Flame lit={s.playedToday} />}
           <span className="streak-n readout">{s.current}</span>
           <span className="streak-l">{s.current === 1 ? 'day' : 'days'}<br />in a row</span>
         </div>

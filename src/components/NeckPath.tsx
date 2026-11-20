@@ -698,7 +698,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     </div>
   );
 
-  // ---- Today's card: your step, under your note, with Start ---------------------
+  // ---- Today's card: your step, above your note (the steps ahead stay in view) ---------------------
   const nowCard = (() => {
     if (!curDef || !curNote) return null;
     const { ids, doneCount } = unitState(myUnit);
@@ -709,11 +709,11 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       if (curDef.check) { feel('tap'); startLesson(checkId(curDef.n)); return; }
       if (level) open(level);
     };
-    // Centred under the note, kept inside the neck's column and the page.
-    const cardW = 228;
-    const left = Math.max(-40, Math.min(curNote.x - cardW / 2, width - cardW + 70));
+        // As wide as the neck, so the unit names beside it stay readable.
+    const cardW = Math.max(200, width);
+    const left = Math.max(-20, Math.min(curNote.x - cardW / 2, width - cardW + 4));
     return (
-      <div className="np-nowcard" style={{ top: curNote.y + 34, left: `calc(var(--np-left) + ${left}px)`, width: cardW, ['--arrow-x' as string]: `${curNote.x - left}px` } as React.CSSProperties}>
+      <div className="np-nowcard" style={{ top: curNote.y - 34, left: `calc(var(--np-left) + ${left}px)`, width: cardW, ['--arrow-x' as string]: `${curNote.x - left}px` } as React.CSSProperties}>
         <div className="np-nowcard-head">
           <span>{UNITS[myUnit].name}</span>
           <span className="readout">{doneCount}/{ids.length}</span>

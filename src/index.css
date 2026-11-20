@@ -16678,6 +16678,9 @@ a.btn {
 .streak-flame { fill: none; stroke: var(--primary); stroke-width: 1.6; }
 .streak-flame .streak-flame-core { fill: none; opacity: 1; }
 .streak-flame.is-lit { stroke: none; }
+.streak-rive { display: block; width: 40px; height: 40px; flex: none; }
+.streak-rive .rive-streak { margin: 0; position: relative; top: -3px; clip-path: inset(0 0 10% 0); }
+.streak-rive:not(.is-lit) .rive-streak { filter: grayscale(1) brightness(1.25) contrast(1.15); }
 .streak-n, .streak-goal-t .readout { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
 
 /* Small phones. */
@@ -17366,7 +17369,8 @@ html.is-native input, html.is-native textarea, html.is-native [contenteditable="
 .np-mapname.is-done { color: var(--text-secondary); }
 .np-mapname.is-now { color: var(--primary); font-weight: 600; }
 .np-nowcard { position: absolute; z-index: 6; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--surface-1); border: 1px solid var(--panel-border-hover); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45); animation: lp-pop 0.3s ease-out; }
-.np-nowcard::before { content: ''; position: absolute; top: -7px; left: var(--arrow-x); width: 12px; height: 12px; margin-left: -6px; background: inherit; border-left: 1px solid var(--panel-border-hover); border-top: 1px solid var(--panel-border-hover); transform: rotate(45deg); }
+.np-nowcard { translate: 0 -100%; }
+.np-nowcard::before { content: ''; position: absolute; bottom: -7px; left: var(--arrow-x); width: 12px; height: 12px; margin-left: -6px; background: inherit; border-right: 1px solid var(--panel-border-hover); border-bottom: 1px solid var(--panel-border-hover); transform: rotate(45deg); }
 .np-nowcard-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary); }
 .np-nowcard-head .readout { font-size: 0.72rem; letter-spacing: 0; color: var(--text-muted); font-weight: 500; }
 .np-nowcard-title { font-family: var(--font-display); font-size: 1.25rem; line-height: 1.15; color: var(--text-primary); }
