@@ -60,13 +60,21 @@ const currentIn = (done: Set<string>): number => {
 };
 
 /** "Lesson · 6 exercises · about 3 min", for a step with a lesson. */
-const lessonSummary = (id: string): string | null => {
+/** How long a lesson or check is, for the one line under its task. */
+const lessonFacts = (id: string): { count: number; line: string } | null => {
   const l = lessonFor(id);
   if (!l) return null;
   const xs = l.build();
   const mins = Math.max(2, Math.round(xs.reduce((a, x) => a + (x.type === 'play' || x.type === 'tap' ? 50 : 20), 0) / 60));
   const mic = xs.some(x => x.type === 'play');
-  return `${l.check ? 'Check' : 'Lesson'} · ${xs.length} ${l.check ? 'questions' : 'exercises'} · about ${mins} min${mic ? ' · uses the mic' : ''}`;
+  return { count: xs.length, line: `${xs.length} ${l.check ? 'questions' : 'exercises'} · ${mins} min${mic ? ' · mic' : ''}` };
+};
+
+/** What the next star asks for, in answers right first try (60%, 80%, all). */
+const nextStarLine = (stars: number, count: number): string | null => {
+  if (stars >= STARS || count === 0) return null;
+  const need = stars === 0 ? Math.ceil(count * 0.6) : stars === 1 ? Math.ceil(count * 0.8) : count;
+  return `Star ${stars + 1}: ${need} of ${count} right first try`;
 };
 
 const Check = () => (
@@ -393,11 +401,10 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       <div className={`np-card-song${passed ? '' : ' is-locked'}`}>
         <span className="np-card-song-mark" aria-hidden="true">♪</span>
         <span className="np-card-song-text">
-          <small>Unit song</small>
           <b>{sg.title}</b>
           {passed
-            ? <span className="np-card-stars is-small" aria-label={`${sg.stars} of ${STARS} stars`}>{Array.from({ length: STARS }, (_, i) => <span key={i} className={i < sg.stars ? 'is-on' : ''}><Star /></span>)}</span>
-            : <span className="np-card-song-lock"><Lock />Pass the milestone to open it</span>}
+            ? <span className="np-card-song-sub">{sg.stars ? `${sg.stars} of ${STARS} stars` : 'Not played yet'}</span>
+            : <span className="np-card-song-sub"><Lock />Opens when you pass</span>}
         </span>
         {passed && <button type="button" className="np-start is-quiet" data-feel="off" onClick={() => { feel('tap'); setFocus(null); startLesson(sg.id); }}>{sg.stars ? 'Play' : 'Learn it'}</button>}
       </div>
@@ -415,28 +422,45 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     );
   };
 
+  // A card says three things, in this order: where it stands (done, up next,
+  // locked), what to do if anything is left, and the one button that does it.
+  const status = (kind: 'done' | 'now' | 'locked', text: string) => (
+    <span className={`np-status is-${kind}`}>{kind === 'done' ? <Check /> : kind === 'locked' ? <Lock /> : null}{text}</span>
+  );
   const card = (f: FretDef) => {
     const locked = f.n > cur;
-    const unlock = <span className="np-unlock"><Lock />Finish fret {curFret} to unlock</span>;
+    const lockedPill = status('locked', `Finish fret ${curFret} first`);
     if (f.check) {
       const id = checkId(f.n);
       const passed = fretDoneIn(f, shown);
       const st = checkStars(id);
+      const facts = lessonFacts(id);
+      const starLine = passed && facts ? nextStarLine(st, facts.count) : null;
       return (
         <div className={`np-card is-check${locked ? ' is-locked' : ''}`}>
-          <small>{f.n === OCTAVE ? 'The octave' : 'Milestone'}{passed ? ' · passed' : ''}</small>
+          <div className="np-card-top">
+            {passed ? status('done', 'Passed') : locked ? lockedPill : status('now', 'Up next')}
+            <span className="np-card-kind">Fret {f.n}</span>
+          </div>
           <b>{f.check.title}</b>
-          <p>{f.check.task}</p>
-          <span className="np-card-stars" aria-label={`${st} of ${STARS} stars`}>
-            {Array.from({ length: STARS }, (_, i) => <span key={i} className={i < st ? 'is-on' : ''}><Star /></span>)}
-          </span>
-          {locked ? unlock : (
+          {!passed && <p>{f.check.task}</p>}
+          {passed && (
+            <div className="np-card-starrow">
+              <span className="np-card-stars" aria-hidden="true">
+                {Array.from({ length: STARS }, (_, i) => <span key={i} className={i < st ? 'is-on' : ''}><Star /></span>)}
+              </span>
+              <span>{st === STARS ? 'All 3 stars' : `${st} of ${STARS} stars`}</span>
+            </div>
+          )}
+          {starLine && <p className="np-card-meta">{starLine}</p>}
+          {!locked && (
             <>
-              <p className="np-card-meta">{lessonSummary(id)}</p>
-              {passed && st === 0 && <span className="np-soon">Passed before the checks arrived. Take it any time to earn its stars.</span>}
-              <button type="button" className="np-start" data-feel="off" onClick={() => { feel('tap'); setFocus(null); startLesson(id); }}>
-                {!passed ? 'Start the check' : st === STARS ? 'Take it again' : st > 0 ? 'Go for more stars' : 'Earn the stars'}
-              </button>
+              {!passed && facts && <p className="np-card-meta">{facts.line}</p>}
+              {(!passed || st < STARS) && (
+                <button type="button" className={`np-start${passed ? ' is-ghost' : ''}`} data-feel="off" onClick={() => { feel('tap'); setFocus(null); startLesson(id); }}>
+                  {!passed ? 'Start' : 'Retake for stars'}
+                </button>
+              )}
               {songCard(f, passed)}
             </>
           )}
@@ -445,43 +469,54 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     }
     const levels = f.steps.map(id => levelOf(id)).filter((l): l is JourneyLevel => !!l);
     const next = levels.find(l => !shown.has(l.id)) ?? null;
+    const doneN = levels.filter(l => shown.has(l.id)).length;
     if (next && f.n === cur) {
       const [met, needed] = levelProgress(next);
+      const facts = lessonFacts(next.id);
       return (
         <div className="np-card is-now">
-          <small>Fret {f.n} · Step {levels.indexOf(next) + 1} of {levels.length}{needed > 1 && !lessonFor(next.id) && <em>{met} of {needed} done</em>}</small>
+          <div className="np-card-top">
+            {status('now', `Step ${levels.indexOf(next) + 1} of ${levels.length}`)}
+            <span className="np-card-kind">Fret {f.n}</span>
+          </div>
           <b>{next.title}</b>
-          <p className="np-idea">{next.idea}</p>
-          <p>{lessonSummary(next.id) ?? next.task}</p>
+          {/* With a lesson, Start opens it; the task line is for steps done elsewhere in the app. */}
+          {!facts && <p>{next.task}</p>}
+          <p className="np-card-meta">{facts ? facts.line : needed > 1 ? `${met} of ${needed} done` : null}</p>
           <button type="button" className="np-start" data-feel="off" onClick={() => open(next)}>Start</button>
         </div>
       );
     }
+    const allDone = doneN === levels.length;
     return (
       <div className={`np-card${locked ? ' is-locked' : ''}`}>
-        <small>Fret {f.n} · {f.title}</small>
+        <div className="np-card-top">
+          {allDone ? status('done', 'Done') : locked ? lockedPill : status('now', `${doneN} of ${levels.length} done`)}
+          <span className="np-card-kind">Fret {f.n}</span>
+        </div>
+        <b>{f.title}</b>
+        {locked && doneN > 0 && !allDone && <p className="np-card-meta">{doneN} of {levels.length} already done</p>}
         <ul className="np-steps">
           {levels.map(l => {
             const done = shown.has(l.id);
+            const row = (
+              <>
+                <span className={`np-steps-dot${done ? ' is-done' : locked ? ' is-locked' : ''}`} aria-hidden="true">{done ? <Check /> : locked ? <Lock /> : null}</span>
+                <span className="np-steps-text"><b>{l.title}</b></span>
+              </>
+            );
             return (
               <li key={l.id}>
-                {locked ? (
-                  <div className="np-steps-row">
-                    <span className={`np-steps-dot${done ? ' is-done' : ' is-locked'}`} aria-hidden="true">{done ? <Check /> : <Lock />}</span>
-                    <span className="np-steps-text"><b>{l.title}</b><span>{l.idea}</span></span>
-                  </div>
-                ) : (
+                {locked ? <div className="np-steps-row">{row}</div> : (
                   <button type="button" className="np-steps-row" data-feel="off" onClick={() => open(l)}>
-                    <span className={`np-steps-dot${done ? ' is-done' : ''}`} aria-hidden="true">{done && <Check />}</span>
-                    <span className="np-steps-text"><b>{l.title}</b><span>{done ? 'Practise again' : l.idea}</span></span>
-                    <Chevron />
+                    {row}
+                    <span className="np-steps-go">{done ? 'Again' : 'Start'}</span>
                   </button>
                 )}
               </li>
             );
           })}
         </ul>
-        {locked && unlock}
       </div>
     );
   };

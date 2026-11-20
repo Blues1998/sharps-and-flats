@@ -17408,3 +17408,23 @@ html.is-native input, html.is-native textarea, html.is-native [contenteditable="
 .csheet-rate-btn.is-none { color: var(--danger); }
 .csheet-rate-btn.is-on.is-none { border-color: var(--danger); background: var(--danger-glow); }
 .song-chords-count { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); }
+
+/* Neck cards: status first, then the task, then one button. */
+.np-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.np-card-kind { font-size: 0.74rem; color: var(--text-muted); }
+.np-status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; }
+.np-status svg { width: 12px; height: 12px; }
+.np-status.is-done { color: var(--success); background: var(--success-glow); }
+.np-status.is-now { color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent); padding-left: 9px; }
+.np-status.is-locked { color: var(--text-muted); background: var(--surface-3); }
+.np-card > b { margin-top: 8px !important; }
+.np-card-starrow { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 0.84rem; color: var(--text-secondary); }
+.np-card-starrow .np-card-stars { margin-top: 0; }
+.np-card-meta { color: var(--text-muted) !important; font-size: 0.8rem !important; }
+.np-card .np-start { margin-top: 12px; }
+.np-steps-go { font-size: 0.8rem; font-weight: 700; color: var(--primary); }
+.np-steps li:has(.np-steps-dot.is-done) .np-steps-go { color: var(--text-muted); font-weight: 500; }
+.np-steps-dot.is-locked { border-color: transparent; color: var(--text-muted); }
+.np-card-song-sub { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--text-muted); }
+.np-card-song-sub svg { width: 12px; height: 12px; }
+.np-start.is-ghost { background: var(--surface-3); color: var(--text-primary); box-shadow: 0 3px 0 var(--panel-border); }
