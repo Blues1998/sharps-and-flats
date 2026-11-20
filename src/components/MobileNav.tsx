@@ -46,12 +46,18 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, o
               <polyline points="15 5 8 12 15 19" />
             </svg>
           </button>
-        ) : (
+        ) : mark.unseen && (
+          // No logo on the bar, except the gold one that hides the Sunburst finish.
           <button type="button" className={`mtop-brand${mark.gold ? ' is-gold' : ''}`} onClick={mark.onClick} aria-label="Today">
             <BrandMark />
           </button>
         )}
         <span className="mtop-title">{title ?? <Wordmark />}</span>
+        {activeTab === 'library' && !inSong && (
+          <button type="button" className="mtop-icon" onClick={() => window.dispatchEvent(new CustomEvent('songs:add'))} aria-label="Add song">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          </button>
+        )}
         <button type="button" className="mtop-icon" onClick={onJump} aria-label="Search">
           <IconJump size={18} aria-hidden="true" />
         </button>

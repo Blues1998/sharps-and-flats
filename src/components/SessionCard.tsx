@@ -44,9 +44,6 @@ let runVersion = 0;
 subscribeRun(() => { runVersion += 1; });
 const useRunVersion = () => useSyncExternalStore(subscribeRun, () => runVersion, () => 0);
 
-/** What a step says under its title on this page. */
-const stepWhy = (s: RunStep): string => (s.kind === 'song' ? 'Your song' : s.detail ?? s.note);
-
 /** Send someone to where a step happens, with its loop if it has one. */
 const goToStep = (s: RunStep) => {
   const loop = stepLoop(s);
@@ -95,7 +92,6 @@ const Steps: React.FC<{ steps: RunStep[]; at: number | null; skipped?: boolean[]
                 {s.title}
                 {at === i && <span className="tday-now">Now</span>}
               </b>
-              <small>{stepWhy(s)}</small>
             </span>
           </button>
         </li>

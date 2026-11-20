@@ -110,7 +110,7 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
           <p className="song-artist">{song.artist || 'Unknown artist'}</p>
           <div className="song-head-meta">
             <p className="song-meta readout">
-              {song.key || 'Key not set'} · {capoLabel(song.capo)} · {song.chart?.tempo ?? DEFAULT_CHART.tempo} bpm · {song.chart?.beatsPerBar ?? DEFAULT_CHART.beatsPerBar}/4
+              {song.key || 'Key not set'}{song.capo ? ` · ${capoLabel(song.capo)}` : ''} · {song.chart?.tempo ?? DEFAULT_CHART.tempo} bpm · {song.chart?.beatsPerBar ?? DEFAULT_CHART.beatsPerBar}/4
             </p>
             <Select<SongStatus>
               className={`song-status is-${song.status}`}

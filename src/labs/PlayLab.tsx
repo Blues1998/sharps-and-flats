@@ -11,7 +11,7 @@ import {
   CHORD_QUALITIES,
   SCALE_FORMULAS
 } from '../utils/musicTheory';
-import { SCALE_FEELINGS, CHORD_FEELINGS, shortScaleName } from '../utils/glossary';
+import { CHORD_FEELINGS, shortScaleName } from '../utils/glossary';
 import { bestClimb, markClimbed } from '../utils/feats';
 import { followedStep } from '../utils/journeyStep';
 import { reportProgress } from '../utils/progress';
@@ -90,7 +90,6 @@ export const PlayLab: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Scale climbs are timed from the first note heard to the last.
   const startedAtRef = useRef<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
   const [lastClimb, setLastClimb] = useState<{ key: string; seconds: number; previous?: number } | null>(null);
 
   // Session streak + persisted best streak per mode
@@ -131,7 +130,7 @@ export const PlayLab: React.FC = () => {
         targets,
         chipLabels: targets.map(pc => NOTE_NAMES[pc]),
         promptTitle: `Climb the ${NOTE_NAMES[rootPc]} ${shortScaleName(scale.name)} scale`,
-        promptDetail: `${SCALE_FEELINGS[scale.name]?.feeling ?? ''}. Play each note in order, any octave. Orange is the one to play now.`,
+        promptDetail: 'Each note in order, any octave.',
         contextPcs: targets,
         referenceMidis: refMidis,
         rewardMidis: refMidis,
@@ -151,7 +150,7 @@ export const PlayLab: React.FC = () => {
         targets,
         chipLabels: targets.map((pc, i) => `${NOTE_NAMES[pc]} · ${ordinal(i)}`),
         promptTitle: `Build ${NOTE_NAMES[rootPc]} ${quality.name} (${feeling})`,
-        promptDetail: `Play the chord's notes one at a time, root first. Any octave.`,
+        promptDetail: 'One note at a time, root first.',
         contextPcs: targets,
         referenceMidis: refMidis,
         rewardMidis: refMidis,
@@ -171,7 +170,7 @@ export const PlayLab: React.FC = () => {
       targets: [targetPc],
       chipLabels: ['?'],
       promptTitle: `Play a ${interval.name} above ${rootName}`,
-      promptDetail: `That's ${interval.semitones} semitone${interval.semitones === 1 ? '' : 's'} (frets) up. Any octave counts.`,
+      promptDetail: `${interval.semitones} fret${interval.semitones === 1 ? '' : 's'} up, any octave.`,
       contextPcs: [rootMidi % 12],
       referenceMidis: [rootMidi],
       rewardMidis: [rootMidi, rootMidi + interval.semitones],
@@ -192,7 +191,6 @@ export const PlayLab: React.FC = () => {
     setHoldPct(0);
     setRevealed(false);
     startedAtRef.current = null;
-    setElapsed(0);
     holdMsRef.current = 0;
     wrongMsRef.current = 0;
     wrongPcRef.current = null;
@@ -246,15 +244,6 @@ export const PlayLab: React.FC = () => {
     };
   }, []);
 
-  // The clock on screen, while a climb is under way.
-  useEffect(() => {
-    if (mode !== 'scale' || phase !== 'playing' || !isActive) return;
-    const id = window.setInterval(() => {
-      if (startedAtRef.current !== null) setElapsed((performance.now() - startedAtRef.current) / 1000);
-    }, 250);
-    return () => window.clearInterval(id);
-  }, [mode, phase, isActive, round]);
-
   // Rounds finished since the mic went on, for the summary.
   const roundsRef = useRef(0);
   const bestStreakRef = useRef(0);
@@ -279,7 +268,6 @@ export const PlayLab: React.FC = () => {
     roundsRef.current++;
     if (mode === 'scale' && round?.climbKey && startedAtRef.current !== null) {
       const seconds = Math.round((performance.now() - startedAtRef.current) / 100) / 10;
-      setElapsed(seconds);
       const { previous } = markClimbed(round.climbKey, seconds);
       setLastClimb({ key: round.climbKey, seconds, previous });
       if (!bestClimbRef.current || seconds < bestClimbRef.current.seconds) bestClimbRef.current = { key: round.climbKey, seconds, previous };
@@ -522,16 +510,10 @@ export const PlayLab: React.FC = () => {
           rootMidis={rootMidis}
           interactive={false}
         />
-        <div className="fb-legend">
-          <span><span className="fb-key is-target" />Play this now</span>
-          <span><span className="fb-key is-context" />{mode === 'interval' ? 'Reference note' : 'In this challenge'}</span>
-          {isActive && <span><span className="fb-key is-heard" />You</span>}
-        </div>
 
         <div className="play-stats readout">
           {mode === 'scale' ? (
             <>
-              <span>{fmtTime(elapsed)}</span>
               {scaleBest !== undefined && <span className="play-stat-best">best {fmtTime(scaleBest)}</span>}
             </>
           ) : (

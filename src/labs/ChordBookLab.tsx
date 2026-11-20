@@ -126,16 +126,6 @@ export const ChordBookLab: React.FC = () => {
       .sort((a, b) => b.songs.length - a.songs.length || a.difficulty - b.difficulty || a.symbol.localeCompare(b.symbol));
   }, [songs, skills, hidden]);
 
-  // The four are disjoint and add up to the total. An unrated chord is one you
-  // cannot play either, but counting it under both headings put the same four
-  // chords in the summary twice and made the line unreadable.
-  const counts = useMemo(() => ({
-    solid: entries.filter(e => e.comfort === 'solid').length,
-    shaky: entries.filter(e => e.comfort === 'shaky').length,
-    none: entries.filter(e => e.rated && e.comfort === 'none').length,
-    unrated: entries.filter(e => !e.rated).length
-  }), [entries]);
-
   // Unrated chords, easiest first: the stack in Learn. With no songs yet it
   // offers the common open chords, so the app learns your hands on day one.
   const unrated = useMemo(
@@ -317,16 +307,6 @@ export const ChordBookLab: React.FC = () => {
     <div className="chordbook">
       <header className="cb-head">
         <h2 className="lab-title"><LabIcon tab="chordbook" />Chords</h2>
-        {total > 0 && (
-          <p className="cb-summary">
-            <span className="readout"><strong>{counts.solid}</strong> of {total} solid</span>
-            <span className="tallybar is-wide" aria-hidden="true">
-              <span className="tallybar-seg is-solid" style={{ flexGrow: counts.solid }} />
-              <span className="tallybar-seg is-shaky" style={{ flexGrow: counts.shaky }} />
-              <span className="tallybar-seg is-none" style={{ flexGrow: counts.none + counts.unrated }} />
-            </span>
-          </p>
-        )}
       </header>
 
       <div className="cb-tabs" role="tablist" aria-label="Chords">

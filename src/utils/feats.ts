@@ -18,7 +18,7 @@ import { chordKey, getChordSkills } from './chordbook';
 import { getSongs, isReady, streakState } from './library';
 import { GOAL_MET_EVENT, clockEntries } from './practiceClock';
 import { getRecords } from './records';
-import { prettyNote, subscribeVoice } from './voice';
+import { subscribeVoice } from './voice';
 import { JOURNEY, isLevelComplete } from './journey';
 import { STORE_CHANGE_EVENT } from './db';
 import { award } from './xp';
@@ -545,19 +545,14 @@ const when = (at: number): string => {
 
 /** Every best the app knows of, in the order a player would look for them. */
 export function recordRows(): RecordRow[] {
+  // The few bests worth a glance; the voice tuner's own stay on its summary.
   const rows: RecordRow[] = [];
   const r = state.records;
-  if (r['hold-streak']) rows.push({ label: 'Longest hold streak', value: `${r['hold-streak'].value}`, sub: `Voice tuner · ${when(r['hold-streak'].at)}` });
-  if (r['hold-steadiest']) rows.push({ label: 'Steadiest hold', value: `±${r['hold-steadiest'].value}¢`, sub: `${r['hold-steadiest'].note ?? 'Voice tuner'} · ${when(r['hold-steadiest'].at)}` });
-  if (r['hold-perfect-run']) rows.push({ label: 'Most Perfect holds in a run', value: `${r['hold-perfect-run'].value}`, sub: `Voice tuner · ${when(r['hold-perfect-run'].at)}` });
-  const range = provenRange();
-  if (range && range.high > range.low) rows.push({ label: 'Landed range', value: `${prettyNote(range.low)} to ${prettyNote(range.high)}`, sub: `${range.high - range.low} semitones, Hold a note` });
-  if (r['ear-streak']) rows.push({ label: 'Ear training streak', value: `${r['ear-streak'].value}`, sub: `${r['ear-streak'].note ?? 'Ear Training'} · ${when(r['ear-streak'].at)}` });
-  if (r['tap-tightest']) rows.push({ label: 'Tightest tap test', value: `±${r['tap-tightest'].value} ms`, sub: `Rhythm · ${when(r['tap-tightest'].at)}` });
-  const fastest = getRecords().sort((a, b) => b.best - a.best)[0];
-  if (fastest) rows.push({ label: 'Fastest loop', value: `${fastest.best} bpm`, sub: `${fastest.chords.map(c => c[0]).join(' ')} · ${when(fastest.setAt)}` });
   const days = longestDailyStreak();
   if (days > 1) rows.push({ label: 'Longest daily streak', value: `${days} days`, sub: 'Practice on the calendar' });
-  if (state.holds > 0) rows.push({ label: 'Notes held, all time', value: `${state.holds}`, sub: 'Voice tuner' });
+  const fastest = getRecords().sort((a, b) => b.best - a.best)[0];
+  if (fastest) rows.push({ label: 'Fastest loop', value: `${fastest.best} bpm`, sub: `${fastest.chords.map(c => c[0]).join(' ')} · ${when(fastest.setAt)}` });
+  if (r['ear-streak']) rows.push({ label: 'Ear training streak', value: `${r['ear-streak'].value}`, sub: `${r['ear-streak'].note ?? 'Ear Training'} · ${when(r['ear-streak'].at)}` });
+  if (r['tap-tightest']) rows.push({ label: 'Tightest tap test', value: `±${r['tap-tightest'].value} ms`, sub: `Rhythm · ${when(r['tap-tightest'].at)}` });
   return rows;
 }

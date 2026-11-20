@@ -5,6 +5,7 @@ import { Keyboard } from '../components/Keyboard';
 import { LabIcon } from '../components/LabIcon';
 import { Fretboard } from '../components/Fretboard';
 import { Segmented } from '../components/Segmented';
+import { GameShelf } from '../games/GameShelf';
 import { audio } from '../utils/audio';
 import { reportProgress } from '../utils/progress';
 import {
@@ -14,7 +15,6 @@ import {
   resetMastery,
   unlockedCount
 } from '../utils/mastery';
-import { MasteryStrip } from '../components/MasteryStrip';
 import type { MasteryItem } from '../components/MasteryStrip';
 import {
   INTERVALS,
@@ -153,7 +153,7 @@ export const EarTrainingLab: React.FC = () => {
   // never asks the same thing twice running, and the strip marks whichever
   // bar just moved.
   const lastItemId = useRef<string | null>(null);
-  const [latestItemId, setLatestItemId] = useState<string | null>(null);
+  const [, setLatestItemId] = useState<string | null>(null);
   // Clearing the store has to repaint the strip, which reads it directly.
   const [, setMasteryTick] = useState(0);
 
@@ -567,7 +567,6 @@ export const EarTrainingLab: React.FC = () => {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20" /></svg>
                 Start
               </button>
-              <p className="ear-said">A set of {SET}. Hear it, then name it.</p>
               <button type="button" className="chip-btn ear-settings" onClick={() => setSettingsOpen(true)}>{settingsLine} ▾</button>
             </div>
           )
@@ -643,14 +642,15 @@ export const EarTrainingLab: React.FC = () => {
       </section>
 
       <section className="ear-mastery">
-        <MasteryStrip
-          items={strip.items}
-          unlocked={strip.unlocked}
-          highlightId={latestItemId}
-        />
+        <p className="ear-focus">Mastered <b className="readout">{strip.items.slice(0, strip.unlocked).filter(item => getMastery(item.id) >= 0.7).length}</b> of {strip.unlocked}.</p>
         {focus.length > 0 && (
           <p className="ear-focus">Auto is working on {focus.map(item => item.name).join(' and ')}.</p>
         )}
+      </section>
+
+      <section className="ear-games">
+        <h3 className="practice-label">Games</h3>
+        <GameShelf />
       </section>
 
       {settingsOpen && createPortal(

@@ -176,10 +176,6 @@ const FretboardComponent: React.FC<FretboardProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
-      {/* The ruler under the neck numbers every fret. On a phone the neck is
-          wider than the screen, so say that the rest is a swipe away. */}
-      <p className="fretboard-more">Swipe the neck for frets 7 to 12 →</p>
-
       <div
         ref={neckRef}
         className="fretboard-container"

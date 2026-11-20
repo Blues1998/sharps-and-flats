@@ -34,11 +34,13 @@ interface Props<T> {
   disabled?: boolean;
   title?: string;
   children?: React.ReactNode;
+  /** Extra controls above the options, inside the sheet or menu. */
+  head?: React.ReactNode;
 }
 
 const PHONE = '(max-width: 900px)';
 
-export function Select<T extends string | number>({ value, options, onChange, label, placeholder, className, disabled, title, children }: Props<T>) {
+export function Select<T extends string | number>({ value, options, onChange, label, placeholder, className, disabled, title, children, head }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -155,13 +157,14 @@ export function Select<T extends string | number>({ value, options, onChange, la
             <div className="ui-sheet-panel" role="dialog" aria-label={label} onClick={e => e.stopPropagation()}>
               <span className="ui-sheet-grip" aria-hidden="true" />
               <p className="ui-sheet-title">{label}</p>
+              {head && <div className="ui-select-head">{head}</div>}
               {items}
             </div>
           </div>
         ) : (
           <>
             <div className="ui-menu-scrim" onClick={close} />
-            <div className="ui-menu" style={menuAt}>{items}</div>
+            <div className="ui-menu" style={menuAt}>{head && <div className="ui-select-head">{head}</div>}{items}</div>
           </>
         ),
         document.body,

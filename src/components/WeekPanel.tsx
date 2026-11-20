@@ -92,13 +92,6 @@ export const WeekPanel: React.FC<{ recap: WeekRecap; style?: React.CSSProperties
         })}
       </div>
 
-      <p className="tday-fact">
-        {recap.quiet
-          ? 'Nothing logged this week yet.'
-          : facts.length > 0
-            ? facts.reduce<React.ReactNode[]>((all, f, i) => (i === 0 ? [f] : [...all, ' · ', f]), [])
-            : `${recap.played} of seven days played`}
-      </p>
     </section>
   );
 };

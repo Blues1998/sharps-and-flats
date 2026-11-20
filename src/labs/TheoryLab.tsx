@@ -29,14 +29,6 @@ const OCTAVE = 3;
 
 type InstrumentView = 'piano' | 'guitar';
 
-// What the colours on the neck and the keys mean.
-const HighlightLegend: React.FC = () => (
-  <div className="theory-legend">
-    <span><i style={{ background: 'var(--note-root)' }} />Home note</span>
-    <span><i style={{ background: 'var(--note-scale)' }} />In the scale</span>
-  </div>
-);
-
 // Interactive Whole vs Half Step Tone Ladder
 const ScaleStepLadder: React.FC<{
   rootName: string;
@@ -380,7 +372,6 @@ export const TheoryLab: React.FC = () => {
               onPlayNote={handlePlayNote}
               activeMidis={activeMidis}
             />
-            <p className="theory-note"><strong>H</strong> is a half step, one fret. <strong>W</strong> is a whole step, two frets. Tap a note to hear it.</p>
           </section>
 
           <section className="glass-panel theory-card">
@@ -395,7 +386,6 @@ export const TheoryLab: React.FC = () => {
                   { value: 'piano', label: 'Piano' }
                 ]}
               />
-              <HighlightLegend />
             </div>
 
             {instrument === 'piano' ? (

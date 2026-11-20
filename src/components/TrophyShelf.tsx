@@ -56,7 +56,6 @@ export const TrophyShelf: React.FC = () => {
         })}
       </div>
 
-      {!sel && <p className="trophy-hint">Tap a pick to see its tiers.</p>}
       {sel && <div className="trophy-detail" aria-live="polite">
         <h4>{sel.name}{selTier ? ` ${ROMAN[selTier]}` : ''}<span>{selTier ? `${MATERIALS[selTier]} pick` : 'Not earned yet'}</span></h4>
         <p>{sel.what} · {sel.page}</p>
@@ -71,6 +70,7 @@ export const TrophyShelf: React.FC = () => {
         <p className="trophy-next">{step ? `Next: ${step}` : 'Every tier earned.'}</p>
       </div>}
 
+      <h3 className="me-heading trophy-ones-head">Milestones</h3>
       <div className="trophy-ones">
         {ONE_OFFS.map(o => {
           const got = heldTier(o.id) > 0;

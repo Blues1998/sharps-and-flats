@@ -17376,3 +17376,24 @@ html.is-native input, html.is-native textarea, html.is-native [contenteditable="
 .np-nowcard-title { font-family: var(--font-display); font-size: 1.25rem; line-height: 1.15; color: var(--text-primary); }
 .np-nowcard-go { all: unset; box-sizing: border-box; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--primary); color: #1b0e06; font-weight: 700; font-size: 1rem; cursor: pointer; box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 60%, #000); -webkit-tap-highlight-color: transparent; }
 .np-nowcard-go:active { transform: translateY(2px); box-shadow: 0 1px 0 color-mix(in srgb, var(--primary) 60%, #000); }
+
+/* Mono is for numbers. Labels made of words use the UI font. */
+.tday-when, .tday-now, .tday-wins li small, .tday-tip small, .tday-lesson small,
+.channel-group-label, .song-carry-label, .sunburst-eyebrow, .np-eyebrow,
+.np-label small, .np-card small, .capo-bar-label { font-family: var(--font-ui); }
+.tstat .tstat-left .tstat-goaltext { font-family: var(--font-ui); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.ear-games { display: flex; flex-direction: column; gap: 10px; }
+.ear-mastery { padding: 0 0.25rem; background: none; box-shadow: none; gap: 0.25rem; }
+.hold-chime { all: unset; box-sizing: border-box; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--text-muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hold-chime.is-on { color: var(--primary); }
+.voice-stats .hold-tools { align-items: center; }
+.trophy-ones-head { margin-top: 0.75rem; }
+@media (max-width: 900px) { .songs-actions { display: none; } }
+.tabs-open { align-self: center; cursor: pointer; }
+.rhythm .pendulum-case { max-width: 93px; }
+.ui-select-head { padding: 0 16px 12px; }
+.ui-select-head .note-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; overflow: visible; }
+.ui-select-head .note-key { min-width: 0; }
+/* The bar names the page and holds the +, so Songs' own header has nothing left on a phone. */
+@media (max-width: 900px) { .songs-head { display: none; } }
+.ui-select-head .note-key:not(.is-selected) { background: var(--surface-2); color: var(--text-secondary); }

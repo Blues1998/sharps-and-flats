@@ -78,12 +78,12 @@ export const StreakStrip: React.FC = () => {
           <span className="streak-goal-t"><b className="readout">{Math.min(mins, 999)}</b> of {goal} min<small>today</small></span>
         </div>
 
-        <div className="streak-rests" title="A missed day uses a rest, and the streak carries on. One is earned every 7 days in a row.">
+        {s.rests > 0 && <div className="streak-rests" title="A missed day uses a rest, and the streak carries on. One is earned every 7 days in a row.">
           <span className="streak-rest-glyphs" style={{ fontFamily: MUSIC_FONT }} aria-hidden="true">
             {Array.from({ length: MAX_RESTS }, (_, i) => <i key={i} className={i < s.rests ? 'is-on' : ''}>𝄽</i>)}
           </span>
           <small>{s.rests === 1 ? '1 rest' : `${s.rests} rests`}</small>
-        </div>
+        </div>}
       </div>
       <p className="streak-line">{line}</p>
 

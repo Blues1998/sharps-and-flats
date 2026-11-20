@@ -9,8 +9,7 @@ import { weekRecap } from '../utils/weekly';
 import { useLibrary } from '../hooks/useLibrary';
 import { exportLibrary, getSongs, importLibrary, isoDate, practiceStats } from '../utils/library';
 import { saveTextFile } from '../utils/saveFile';
-import { CAN_REMIND, SLOTS, getReminders, reminderStats, setReminders, subscribeReminders } from '../utils/reminders';
-import { totalXp } from '../utils/xp';
+import { CAN_REMIND, SLOTS, getReminders, setReminders, subscribeReminders } from '../utils/reminders';
 import { peekShelfPick } from '../utils/feats';
 import { GOAL_CHOICES, getGoal, setGoal } from '../utils/practiceClock';
 import { BrandMark, PRIVACY_URL } from '../components/Brand';
@@ -23,7 +22,7 @@ import { HAS_HAPTICS, setHaptics, useHaptics } from '../utils/haptics';
 import { TELEMETRY_AVAILABLE, setTelemetry, useTelemetrySetting } from '../utils/telemetry';
 import { go } from '../hooks/useRoute';
 import type { Theme } from '../hooks/useTheme';
-import { restartOnboarding, setProfile, useProfile, type ProfileInstrument } from '../utils/profile';
+import { setProfile, useProfile, type ProfileInstrument } from '../utils/profile';
 import { prettyNote, setVoice, useVoice, type Notation } from '../utils/voice';
 
 // You, in three tabs, one per job: how you are doing (streak, week, bests),
@@ -99,10 +98,6 @@ const YourData: React.FC = () => {
           }}
         />
       </div>
-      <div className="me-row">
-        <span className="me-row-label">Welcome setup</span>
-        <button type="button" className="btn" onClick={restartOnboarding}>Run again</button>
-      </div>
       {TELEMETRY_AVAILABLE && (
         <div className="me-row">
           <span className="me-row-label">
@@ -126,7 +121,6 @@ const YourData: React.FC = () => {
 const Reminders: React.FC = () => {
   const s = useSyncExternalStore(subscribeReminders, () => JSON.stringify(getReminders()));
   const r = JSON.parse(s) as ReturnType<typeof getReminders>;
-  const stats = reminderStats();
   if (!CAN_REMIND) return null;
   return (
     <section className="glass-panel me-card me-settings">
@@ -134,7 +128,6 @@ const Reminders: React.FC = () => {
       <div className="me-row">
         <span className="me-row-label">
           Practice reminder
-          {r.on && stats.sent > 0 && <span className="me-row-sub">{stats.sent} sent · {stats.opened} opened</span>}
         </span>
         <Segmented<boolean>
           value={r.on}
@@ -211,7 +204,6 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
   type MeTab = 'progress' | 'trophies' | 'settings';
   // Opens on Progress (the top bar on Today lands here), or on Trophies when a pick sent you.
   const [tab, setTab] = useState<MeTab>(() => (peekShelfPick() ? 'trophies' : 'progress'));
-  const xp = totalXp();
 
   return (
     <div className="lab-narrow me">
@@ -233,7 +225,6 @@ export const MeLab: React.FC<MeLabProps> = ({ theme, toggleTheme }) => {
           <StreakStrip />
           <WeekPanel recap={weekRecap()} />
           <RecordsCard />
-          {xp > 0 && <p className="me-xp readout">{xp} XP in all</p>}
         </div>
       )}
 

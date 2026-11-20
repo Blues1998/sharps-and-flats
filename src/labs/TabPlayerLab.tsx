@@ -899,18 +899,6 @@ export const TabPlayerLab: React.FC = () => {
       <h2 className="lab-title"><LabIcon tab="tabs" />Tab Player</h2>
     </div>
     <section className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Before a score is open, say what this is for. A file box alone on a
-          black page told nobody what they would get by using it. */}
-      {!hasScore && (
-        <div className="tabs-intro">
-          <p className="tabs-intro-title">Play along with a tab</p>
-          <p className="tabs-intro-said">
-            Open a Guitar Pro or MusicXML file to see the tab, hear it played, slow it down and loop the hard bars. Tabs you open stay here for next time.
-          </p>
-          <p className="tabs-intro-formats readout">.gp3 · .gp4 · .gp5 · .gpx · .musicxml</p>
-        </div>
-      )}
-
       {libraryEntries.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Your tabs</div>
@@ -949,29 +937,16 @@ export const TabPlayerLab: React.FC = () => {
         </div>
       )}
 
-      {/* Drop zone / file picker */}
+      {/* One button to open a file; on a computer it takes a dropped one too. */}
       <label
+        className="btn btn-primary tabs-open"
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
-          padding: '1.25rem', borderRadius: '8px', cursor: 'pointer',
-          border: `2px dashed ${isDragging ? 'var(--primary)' : 'rgba(var(--surface-tint-rgb),0.12)'}`,
-          background: isDragging ? 'rgba(255, 106, 42, 0.05)' : 'rgba(var(--surface-tint-rgb),0.015)',
-          transition: 'border-color 0.15s ease, background 0.15s ease'
-        }}
+        style={isDragging ? { outline: '2px dashed var(--primary)', outlineOffset: 4 } : undefined}
       >
         <input type="file" accept={ACCEPTED_EXTENSIONS} onChange={handleFileInput} style={{ display: 'none' }} />
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-          <span className="keys-only">Drop a file here, or choose one</span>
-          <span className="touch-only">Choose a tab file</span>
-        </span>
+        Open a tab file
       </label>
 
       {error && (

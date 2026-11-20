@@ -613,12 +613,10 @@ export const PhysicsLab: React.FC = () => {
   useProgressTick();
   const [at, setAt] = useState(0);
   const done = LESSONS.map(l => getProgressCount(l.event) > 0);
-  const tried = done.filter(Boolean).length;
   return (
     <div className="lab-stack physics">
       <div className="lab-header ph-head">
         <h2 className="lab-title"><LabIcon tab="physics" />Sound Physics</h2>
-        <span className="ph-count readout">{tried} of 4 tried</span>
       </div>
       <div className="ph-steps" role="tablist" aria-label="Lessons">
         {LESSONS.map((l, i) => (

@@ -244,6 +244,6 @@ export const capoLabel = (capo: number | null | undefined): string =>
 
 /** "D minor · Capo 5", the one line that says how to pick the guitar up. */
 export function songSubtitle(key: string | undefined, capo: number | null | undefined): string {
-  const parts = [key?.trim(), capoLabel(capo)].filter(Boolean) as string[];
+  const parts = [key?.trim(), capo ? capoLabel(capo) : null].filter(Boolean) as string[];
   return parts.join(' · ');
 }

@@ -1,13 +1,12 @@
 import { getTempoMarking } from '../utils/strum';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Select } from '../components/Select';
-import { Segmented } from '../components/Segmented';
 import { LabIcon } from '../components/LabIcon';
 import { Pendulum } from '../components/Pendulum';
 import { PulseGrooveStage, SwingFeel } from '../components/PulseGrooveStage';
 import { usePlayKey } from '../hooks/usePlayKey';
 import { audio } from '../utils/audio';
-import { clearTempoLog, getTempoLog, heldLabel, logTempo, whenHeld, type TempoRun } from '../utils/tempoLog';
+import { logTempo } from '../utils/tempoLog';
 import { reportProgress } from '../utils/progress';
 import { feel } from '../utils/haptics';
 import { setRecord } from '../utils/feats';
@@ -219,59 +218,6 @@ const RAMPS: { value: number; label: string; title: string }[] = [
   { value: 5, label: '+5', title: `Five beats a minute faster every ${RAMP_BARS} bars` }
 ];
 
-/**
- * Where the click has been, as a shape rather than a list.
- *
- * Oldest on the left, because that is the direction time reads in. Each run
- * is a column up to the tempo it finished at, and the part of it above where
- * the run *started* is in the accent, so a session that climbed shows the
- * climb, and a page full of flat grey columns is telling you something true
- * about the week.
- *
- * The scale starts a little under the slowest run rather than at zero: the
- * question is never "is 96 more than nothing", it is "is tonight faster than
- * Tuesday", and a bar chart anchored at zero answers the wrong one.
- */
-const TempoHistory: React.FC<{ runs: TempoRun[]; onPick: (run: TempoRun) => void }> = ({ runs, onPick }) => {
-  const all = runs.flatMap(run => [run.from, run.to]);
-  // Both ends of the plot are labelled, so both ends have to be numbers the
-  // plot actually reaches, a top label sitting above the tallest bar is a
-  // chart telling a small lie about itself.
-  const hi = Math.ceil(Math.max(...all) / 4) * 4;
-  const lo = Math.max(0, Math.floor((Math.min(...all) - 8) / 4) * 4);
-  const at = (bpm: number) => ((bpm - lo) / (hi - lo)) * 100;
-
-  return (
-    <div className="tempohist">
-      <div className="tempohist-scale readout" aria-hidden="true">
-        <span>{hi}</span>
-        <span>{lo}</span>
-      </div>
-      <div className="tempohist-plot">
-        {[...runs].reverse().map(run => {
-          const top = at(run.to);
-          const climb = Math.max(0, top - at(run.from));
-          return (
-            <button
-              key={run.at}
-              type="button"
-              className="tempohist-col"
-              onClick={() => onPick(run)}
-              title={`${run.from === run.to ? `${run.to} bpm` : `${run.from} up to ${run.to} bpm`} in ${run.beatsPerBar}/4 · ${heldLabel(run.seconds)} · ${whenHeld(run.at)}. Press to go back to it`}
-            >
-              <span className="tempohist-bar" style={{ height: `${top}%` }}>
-                {climb > 0 && <span className="tempohist-climb" style={{ height: `${(climb / top) * 100}%` }} />}
-              </span>
-              <span className="tempohist-num readout">{run.to}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-
 export const RhythmLab: React.FC = () => {
   const [bpm, setBpm] = useState<number>(100);
   const [timeSignature, setTimeSignature] = useState<number>(4); // beats per bar
@@ -290,7 +236,6 @@ export const RhythmLab: React.FC = () => {
   const [ramp, setRamp] = useState<number>(0);
   // Bars heard so far this run, not bars scheduled, which is up to 120ms ahead.
   const [bars, setBars] = useState<number>(0);
-  const [tempoLog, setTempoLog] = useState<TempoRun[]>(() => getTempoLog());
   
   // Rhythm game states
   // Three jobs, three tabs: keep time with the click, test your timing, and
@@ -469,12 +414,12 @@ export const RhythmLab: React.FC = () => {
       schedulerTimerId.current = null;
     }
     if (runStarted.current > 0) {
-      setTempoLog(logTempo({
+      logTempo({
         from: runFrom.current,
         to: bpmRef.current,
         beatsPerBar: timeSignatureRef.current,
         seconds: (Date.now() - runStarted.current) / 1000
-      }));
+      });
       runStarted.current = 0;
     }
     setBars(0);
@@ -640,7 +585,6 @@ export const RhythmLab: React.FC = () => {
     window.setTimeout(() => setTouch(null), type === 'open' ? 1400 : 350);
   };
 
-  const last = tempoLog[0] ?? null;
   const climbed = isPlaying && bpm > runFrom.current ? bpm - runFrom.current : 0;
   // A verdict, once there are enough taps to mean something: the average
   // signed offset of the hits (misses are not timing, they are absence).
@@ -736,6 +680,16 @@ export const RhythmLab: React.FC = () => {
                 >
                   {metronomeVisual === 'groove' ? 'Pulse' : 'Pendulum'} ▾
                 </Select>
+                {/* Speeds the click up on its own, every few bars. */}
+                <Select<number>
+                  className="chip-btn rh-pick"
+                  label={`Build speed every ${RAMP_BARS} bars`}
+                  value={ramp}
+                  options={RAMPS.map(r => ({ value: r.value, label: r.value ? `${r.label} bpm` : 'Off', hint: r.title }))}
+                  onChange={setRamp}
+                >
+                  {ramp ? `Speed +${ramp}` : 'Speed steady'} ▾
+                </Select>
               </>
             )}
           </div>
@@ -761,36 +715,6 @@ export const RhythmLab: React.FC = () => {
               )}
           </div>
 
-          <section className="rh-card">
-            {/* "Clean twice in a row? Add 5 BPM" used to be a tip, which made it
-                the player's job to count bars. It is a thing a metronome can do. */}
-            <div className="rh-card-head">
-              <span className="surface-label">Build speed</span>
-              <span className="rh-sub">every {RAMP_BARS} bars</span>
-            </div>
-            <Segmented<number> value={ramp} onChange={setRamp} options={RAMPS} size="sm" ariaLabel="Speed up" />
-          </section>
-
-          <section className="rh-card">
-            <div className="rh-card-head">
-              <span className="surface-label">Your last runs</span>
-              {tempoLog.length > 0 && (
-                <button type="button" className="rhythm-forget" onClick={() => setTempoLog(clearTempoLog())}>Forget</button>
-              )}
-            </div>
-            {tempoLog.length === 0 ? (
-              <p className="rh-sub">Runs longer than 15 seconds show up here, so you can pick up where you left off.</p>
-            ) : (
-              <>
-                <TempoHistory runs={tempoLog} onPick={run => { setBpm(run.to); setTimeSignature(run.beatsPerBar); }} />
-                {last && last.to !== bpm && (
-                  <button type="button" className="btn rh-last" onClick={() => { setBpm(last.to); setTimeSignature(last.beatsPerBar); }}>
-                    Last time {last.to} bpm · Start there
-                  </button>
-                )}
-              </>
-            )}
-          </section>
         </>
       )}
 

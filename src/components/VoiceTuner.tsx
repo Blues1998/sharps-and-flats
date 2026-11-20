@@ -18,7 +18,7 @@ import { confetti } from '../utils/confetti';
 import { feel } from '../utils/haptics';
 import {
   SA_CHOICES, closestVoiceType, labelFor, prettyNote, setVoice, useVoice,
-  type NoteLabel, type Notation, type Range
+  type NoteLabel, type Range
 } from '../utils/voice';
 
 // The tuner, for a voice.
@@ -165,7 +165,6 @@ export const VoiceTuner: React.FC = () => {
   const targetRef = useRef(target);
   targetRef.current = target;
   const [holdMs, setHoldMs] = useState(0);
-  const [lastResult, setLastResult] = useState<{ note: number; spread: number } | null>(null);
   const holdRef = useRef({ ms: 0, last: 0, samples: [] as number[], quietUntil: 0 });
   const missMs = useRef(0);
   const lastPitch = useRef(performance.now());
@@ -289,7 +288,6 @@ export const VoiceTuner: React.FC = () => {
     hitChime(grade, target);
     feel('success');
     setFlash({ key: now, grade, text: GRADE_LABEL[grade], sub: `${prettyNote(target)} · ±${spread}¢` });
-    setLastResult({ note: target, spread });
     missMs.current = 0;
     setMissLeft(null);
     reportProgress('tuner-note-matched');
@@ -420,21 +418,17 @@ export const VoiceTuner: React.FC = () => {
             </span>
           </div>
           <div className="voice-controls">
-            <Segmented<Notation>
-              value={notation}
-              onChange={n => setVoice({ notation: n })}
-              options={[{ value: 'names', label: 'C D E' }, { value: 'sargam', label: 'Sa Re' }]}
-              size="sm"
+            {/* Note names, or sargam on a chosen Sa, in one picker. -1 is names. */}
+            <Select<number>
+              className="voice-sa"
+              label="Note names"
+              value={notation === 'sargam' ? sa : -1}
+              options={[
+                { value: -1, label: 'C D E' },
+                ...SA_CHOICES.map(m => ({ value: m, label: `Sa Re · Sa ${prettyNote(m)}` }))
+              ]}
+              onChange={m => setVoice(m < 0 ? { notation: 'names' } : { notation: 'sargam', sa: m })}
             />
-            {notation === 'sargam' && (
-              <Select<number>
-                className="voice-sa"
-                label="Sa"
-                value={sa}
-                options={SA_CHOICES.map(m => ({ value: m, label: `Sa ${prettyNote(m)}` }))}
-                onChange={m => setVoice({ sa: m })}
-              />
-            )}
           </div>
         </div>
 
@@ -516,13 +510,13 @@ export const VoiceTuner: React.FC = () => {
               </button>
               <button type="button" className="btn" onClick={() => newTarget()}>New</button>
             </div>
-            <div className="voice-stats readout">
-              <span>Held <strong>{run.held}</strong></span>
-              <span>Perfect <strong>{run.perfect}</strong></span>
-              <span>{lastResult ? `Last ±${lastResult.spread}¢` : 'Hold in the green band'}</span>
+            <div className="voice-stats">
               <span className="hold-tools">
-                <button type="button" className="linklike" aria-pressed={chimeOn} onClick={() => setChime(!chimeOn)}>
-                  {chimeOn ? 'Chime on' : 'Chime off'}
+                <button type="button" className={`hold-chime${chimeOn ? ' is-on' : ''}`} aria-pressed={chimeOn} aria-label={chimeOn ? 'Chime on' : 'Chime off'} onClick={() => setChime(!chimeOn)}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" />
+                    {!chimeOn && <line x1="4" y1="3" x2="20" y2="21" />}
+                  </svg>
                 </button>
                 {run.held > 0 && <button type="button" className="linklike" onClick={endRun}>End run</button>}
               </span>

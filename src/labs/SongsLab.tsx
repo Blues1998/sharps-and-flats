@@ -9,7 +9,6 @@ import {
   createSong,
   getSong,
   getSongs,
-  practiceStats,
   songChords,
   STATUS_LABEL,
   STATUS_ORDER,
@@ -31,8 +30,12 @@ interface SongsLabProps {
 
 type Filter = 'all' | SongStatus | 'revisit';
 
-/** Filters show once the list is long enough to need them. */
+/** Search and filters show once the list is long enough to need them. */
 const FILTER_FROM = 6;
+const SEARCH_FROM = 6;
+
+/** The + in the phone's top bar asks Songs for a new song. */
+export const ADD_SONG_EVENT = 'songs:add';
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -57,7 +60,6 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
   const [filter, setFilter] = useState<Filter>('all');
   const [draft, setDraft] = useState<ReturnType<typeof blankDraft> | null>(null);
 
-  const stats = practiceStats();
   const songs = getSongs();
 
   // Opening or closing a song is a page change inside one tab, so the window's
@@ -108,6 +110,12 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
     if (ready && focusSongId && !focused) onOpenSong(null, true);
   }, [ready, focusSongId, focused, onOpenSong]);
 
+  useEffect(() => {
+    const add = () => setDraft(d => d ?? blankDraft());
+    window.addEventListener(ADD_SONG_EVENT, add);
+    return () => window.removeEventListener(ADD_SONG_EVENT, add);
+  }, []);
+
   const submitDraft = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!draft || !draft.title.trim()) return;
@@ -137,14 +145,6 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
       <header className="songs-head">
         <div>
           <h2 className="lab-title"><LabIcon tab="library" />Songs</h2>
-          <p className="songs-count readout">
-            <strong>{songs.length}</strong> {songs.length === 1 ? 'song' : 'songs'}
-            {songs.length > 0 && (
-              <span className="songs-count-sub">
-                {stats.songsComplete} complete{stats.totalMinutes > 0 && ` · ${stats.totalMinutes} min logged`}
-              </span>
-            )}
-          </p>
         </div>
         <div className="songs-actions">
           <button type="button" className="btn btn-primary" onClick={() => setDraft(blankDraft())}>
@@ -205,7 +205,7 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
         </form>
       )}
 
-      {songs.length > 0 && (
+      {songs.length >= SEARCH_FROM && (
       <div className="songs-controls">
         <label className="songs-search">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

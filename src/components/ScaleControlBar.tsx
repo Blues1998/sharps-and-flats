@@ -29,7 +29,7 @@ const PlayIcon = () => (
   </svg>
 );
 
-// Three choices drive the whole page: the key, its mood, and Play. They stay
+// Two controls drive the whole page: one picker for the key and its scale, and Play. They stay
 // pinned with the tabs, so every tab answers to the same key.
 export const ScaleControlBar: React.FC<ScaleControlBarProps> = ({
   root,
@@ -44,24 +44,25 @@ export const ScaleControlBar: React.FC<ScaleControlBarProps> = ({
 
   return (
     <div className="theory-keybar">
-      <div className="note-strip" role="group" aria-label="Key">
-        {NOTE_NAMES.map(note => (
-          <button
-            key={note}
-            type="button"
-            onClick={() => onRootChange(note)}
-            aria-pressed={root === note}
-            className={`note-key${note.includes('#') ? ' is-accidental' : ''}${root === note ? ' is-selected' : ''}`}
-          >
-            {prettyNote(note)}
-          </button>
-        ))}
-      </div>
-
       <div className="theory-keybar-row">
         <Select<string>
           className="theory-mood"
-          label="Mood"
+          label="Key and scale"
+          head={
+            <div className="note-strip" role="group" aria-label="Key">
+              {NOTE_NAMES.map(note => (
+                <button
+                  key={note}
+                  type="button"
+                  onClick={() => onRootChange(note)}
+                  aria-pressed={root === note}
+                  className={`note-key${note.includes('#') ? ' is-accidental' : ''}${root === note ? ' is-selected' : ''}`}
+                >
+                  {prettyNote(note)}
+                </button>
+              ))}
+            </div>
+          }
           value={scale.name}
           options={SCALE_FORMULAS.map(s => ({ value: s.name, label: SCALE_FEELINGS[s.name]?.feeling ?? s.name, hint: shortScaleName(s.name) }))}
           onChange={name => {
@@ -70,7 +71,7 @@ export const ScaleControlBar: React.FC<ScaleControlBarProps> = ({
           }}
         >
           <span className="theory-mood-text">
-            {feeling} <small>{shortScaleName(scale.name)}</small>
+            {prettyNote(root)} {shortScaleName(scale.name)} <small>{feeling}</small>
           </span>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="6 9 12 15 18 9" />

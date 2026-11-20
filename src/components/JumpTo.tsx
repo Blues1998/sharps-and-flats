@@ -77,7 +77,7 @@ export const JumpTo: React.FC<{ onClose: () => void; onToggleTheme: () => void }
         id: `song-${song.id}`,
         label: song.title,
         group: 'Songs',
-        hint: [song.artist, song.key, capoLabel(song.capo)].filter(Boolean).join(' · '),
+        hint: [song.artist, song.key, song.capo ? capoLabel(song.capo) : null].filter(Boolean).join(' · '),
         tag: song.day ? <span className="readout">{String(song.day).padStart(2, '0')}</span> : undefined,
         run: () => go({ tab: 'library', songId: song.id })
       });

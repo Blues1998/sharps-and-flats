@@ -263,7 +263,6 @@ export const SongChartPanel: React.FC<SongChartPanelProps> = ({ song, visible, m
           <button type="button" className="song-player-go" onClick={start} disabled={!canPlay}>
             <IconPlay size={15} fill="currentColor" strokeWidth={1.5} />
             {!canPlay ? 'Add chords to play along' : phase === 'done' ? 'Play again' : 'Play along'}
-            {canPlay && <span className="readout">{settings.tempo} bpm</span>}
           </button>
         )
       ) : (
