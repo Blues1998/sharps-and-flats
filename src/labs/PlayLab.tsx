@@ -114,6 +114,7 @@ export const PlayLab: React.FC = () => {
   const wrongPcRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(0);
   const armedRef = useRef<boolean>(true);
+  const needGapRef = useRef(false);
   const eventPcRef = useRef<number | null>(null);
   const nextRoundTimer = useRef<number | null>(null);
   // While the app itself is playing sound, ignore the mic, otherwise speaker
@@ -307,6 +308,7 @@ export const PlayLab: React.FC = () => {
 
     // App audio is (or was just) playing, don't grade speaker bleed
     if (now < muteUntilRef.current) return;
+    if (needGapRef.current) { if (pitch === null) needGapRef.current = false; else return; }
 
     const targetPc = round.targets[progressIdx];
     const heardPc = pitch ? ((pitch.midi % 12) + 12) % 12 : null;
@@ -388,6 +390,9 @@ export const PlayLab: React.FC = () => {
     const now = audio.getCurrentTime();
     round.referenceMidis.forEach((m, i) => audio.playMidi(m, 0.9, now + i * 0.3));
     muteUntilRef.current = performance.now() + round.referenceMidis.length * 300 + 1200;
+    // Past the mute, wait for a moment of silence: the reference fading out
+    // in the room must never answer for you.
+    needGapRef.current = true;
   };
 
   const revealAnswer = () => {

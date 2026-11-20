@@ -7,7 +7,7 @@ import { Explore, Riff } from './LessonTab';
 import { Player } from './Player';
 import { playOne } from './nowPlaying';
 import { noteMiss } from './hints';
-import { appSounding, audioNow, hush, soundLength, startClicks } from './sound';
+import { appSoundEnd, appSounding, audioNow, hush, soundLength, startClicks } from './sound';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { feel } from '../utils/haptics';
 import { hitChime, missChime } from '../utils/chime';
@@ -172,7 +172,7 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void; check?: boolean }> 
   const holdFrom = useRef<number | null>(null);
   const tol = ex.tolerance ?? 35;
   const hold = ex.holdMs ?? 300;
-  const { start, stop } = mic;
+  const { start, stop, lastPluck } = mic;
 
   useEffect(() => { void start(); return () => stop(); }, [start, stop]);
   useEffect(() => {
@@ -187,14 +187,21 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void; check?: boolean }> 
     const id = window.setInterval(() => setQuiet(appSounding()), 100);
     return () => window.clearInterval(id);
   }, []);
-  const justHit = useRef<{ pc: number; until: number }>({ pc: -1, until: 0 });
-  const raw = quiet ? null : mic.pitch;
-  const echo = !!raw && ((raw.midi % 12) + 12) % 12 === justHit.current.pc && performance.now() < justHit.current.until;
-  const p = echo ? null : raw;
+  const justHit = useRef<{ pcs: number[]; until: number }>({ pcs: [], until: 0 });
+  const lastHitAt = useRef(0);
+  // Checked at render too: the interval above can be up to 100 ms late.
+  const silent = quiet || appSounding();
+  const raw = silent ? null : mic.pitch;
   const pcOf = (m: number) => ((m % 12) + 12) % 12;
+  const echo = !!raw && justHit.current.pcs.includes(pcOf(raw.midi)) && performance.now() < justHit.current.until;
+  const p = echo ? null : raw;
   const target = ex.notes[at];
   const onNote = !!p && (target === -1 || pcOf(p.midi) === target);
-  const hit = onNote && Math.abs(p!.cents) <= tol;
+  // Only a note plucked after the app went quiet is yours. The app's own
+  // example fading out keeps its pitch but never starts a new pluck.
+  // And each note needs its own pluck, so a repeated note is played twice.
+  const fresh = lastPluck() > Math.max(appSoundEnd(), lastHitAt.current);
+  const hit = onNote && fresh && Math.abs(p!.cents) <= tol;
 
   useEffect(() => {
     if (verdict || at >= ex.notes.length) return;
@@ -208,9 +215,11 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void; check?: boolean }> 
     }
     holdFrom.current = null;
     hitChime('great', p!.midi + 12);
-    // The chime and your still-ringing string are the note just found. Ignore
-    // that note for a moment, not the whole mic, so a scale can keep moving.
-    justHit.current = { pc: pcOf(p!.midi), until: performance.now() + 1100 };
+    // The chime (the note and its fifth) and your still-ringing string are
+    // not the next answer. Ignore those notes for a moment, not the whole mic,
+    // so a scale can keep moving.
+    justHit.current = { pcs: [pcOf(p!.midi), pcOf(p!.midi + 7)], until: performance.now() + 1300 };
+    lastHitAt.current = performance.now();
     feel('success');
     const next = at + 1;
     setAt(next);
@@ -250,6 +259,7 @@ const Play: React.FC<ExProps<'play'> & { onSkip: () => void; check?: boolean }> 
             : quiet ? 'Listening again once the sound stops.'
             : !p ? 'Play when you are ready.'
             : hit ? 'Hold it…'
+            : onNote && !fresh ? 'Pluck it now.'
             : onNote ? (p.cents > 0 ? 'Right note, a touch sharp.' : 'Right note, a touch flat.')
             : ex.names[at]?.hidden ? `That is ${heard}. Not this one yet.`
             : target === -1 ? `That is ${heard}.` : noteMiss(pcOf(p.midi), target)}

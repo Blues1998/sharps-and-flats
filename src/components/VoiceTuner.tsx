@@ -165,7 +165,7 @@ export const VoiceTuner: React.FC = () => {
   const targetRef = useRef(target);
   targetRef.current = target;
   const [holdMs, setHoldMs] = useState(0);
-  const holdRef = useRef({ ms: 0, last: 0, samples: [] as number[], quietUntil: 0 });
+  const holdRef = useRef({ ms: 0, last: 0, samples: [] as number[], quietUntil: 0, needGap: false });
   const missMs = useRef(0);
   const lastPitch = useRef(performance.now());
   const [missLeft, setMissLeft] = useState<number | null>(null);
@@ -205,7 +205,7 @@ export const VoiceTuner: React.FC = () => {
     }
     setStretch(isStretch);
     setTarget(next);
-    holdRef.current = { ms: 0, last: 0, samples: [], quietUntil: holdRef.current.quietUntil };
+    holdRef.current = { ms: 0, last: 0, samples: [], quietUntil: holdRef.current.quietUntil, needGap: holdRef.current.needGap };
     missMs.current = 0;
     setHoldMs(0);
   }, [pool, target, sa]);
@@ -215,6 +215,9 @@ export const VoiceTuner: React.FC = () => {
     audio.playMidi(note, 1.4);
     // Don't let the phone hear its own speaker and call that a match.
     holdRef.current.quietUntil = performance.now() + REFERENCE_MS;
+    // And past that, nothing counts until the mic hears a gap: the reference
+    // fading out in the room never goes quiet, a voice starting does.
+    holdRef.current.needGap = true;
   };
 
   const endRun = useCallback(() => {
@@ -251,6 +254,7 @@ export const VoiceTuner: React.FC = () => {
     const dt = h.last === 0 ? 16 : Math.min(100, now - h.last);
     h.last = now;
     if (now < h.quietUntil || unlockShowing()) return;
+    if (h.needGap) { if (live === null) h.needGap = false; return; }
 
     const inBand = live !== null && Math.abs(live - target) * 100 <= BAND_CENTS;
     if (inBand) {

@@ -42,7 +42,10 @@ function sine(freq: number, at: number, dur: number, gain = 0.16): void {
 /** Seconds the sound lasts, so a lesson knows when it has finished. */
 export function soundLength(s: Sound): number {
   switch (s.kind) {
-    case 'note': case 'chord': case 'sine': return 1.6;
+    // As long as schedule() lets each one ring (a note is played for 2 s, a strum 2.4 s).
+    case 'note': return 2;
+    case 'chord': return 2.4;
+    case 'sine': return 1.6;
     case 'pair': return 2.4;
     case 'notes': return s.midis.length * (s.gap ?? 0.45) + 1;
     case 'chords': return s.chords.length * (s.gap ?? 1.1) + 1;
@@ -55,7 +58,9 @@ export function soundLength(s: Sound): number {
 // When the lesson itself is making sound. The mic must not count the phone's
 // own speaker as the player, so listening pauses until this time has passed,
 // with room for the note to ring out and the room to go quiet.
-const TAIL_MS = 700;
+// Room for the ring-out, the speaker's own delay (Android can lag 200 ms or
+// more) and the room going quiet.
+const TAIL_MS = 900;
 let soundingUntil = 0;
 /** Mark the app as sounding for the next `ms` milliseconds. */
 export function hush(ms: number): void {
@@ -63,6 +68,12 @@ export function hush(ms: number): void {
 }
 /** True while a sound the app played could still reach the mic. */
 export const appSounding = (): boolean => performance.now() < soundingUntil;
+/**
+ * When the app last stopped sounding (performance.now ms). A note only counts
+ * if it was plucked after this: the app's own note fading out never starts a
+ * new pluck, so it can never answer for you, however long it rings.
+ */
+export const appSoundEnd = (): number => soundingUntil;
 
 /** Play a sound; returns a function that stops it, notes still to come included. */
 export function playSound(s: Sound): () => void {

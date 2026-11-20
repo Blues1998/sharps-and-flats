@@ -26,7 +26,7 @@ import type { RiffNote } from './riff';
 import { OPEN_MIDI, STRING_NAME, STRING_TINT, riffBeats, riffMidi } from './riff';
 import { Board } from './LessonTab';
 import type { Dot } from './LessonTab';
-import { audioNow } from './sound';
+import { appSoundEnd, appSounding, audioNow } from './sound';
 import { useMicPitch } from '../hooks/useMicPitch';
 import { audio } from '../utils/audio';
 import { feel } from '../utils/haptics';
@@ -225,6 +225,8 @@ export const Stage: React.FC<{
   // ---- With the guitar: the mic starts it, and hears each note ----
   useEffect(() => {
     if (screen || t0 !== null || !mic.pitch) return;
+    // The example the app just played may still ring: only a pluck after it starts the take.
+    if (appSounding() || lastPluck() <= appSoundEnd()) return;
     // After a restart the last note may still ring: wait for a new pluck.
     if (restartAt.current >= 0 && lastPluck() / 1000 - (performance.now() / 1000 - audioNow()) <= restartAt.current) return;
     if (pcOf(mic.pitch.midi) === pcOf(riffMidi(notes[0]))) {

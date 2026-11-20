@@ -17,7 +17,7 @@ import type { ExProps } from './LessonPlayer';
 import { Player } from './Player';
 import { OPEN_MIDI, STRING_NAME, riffBeats, riffMidi } from './riff';
 import type { RiffNote } from './riff';
-import { appSounding } from './sound';
+import { appSoundEnd, appSounding } from './sound';
 import { Stage } from './Stage';
 import type { StageResult } from './Stage';
 import { useMicPitch } from '../hooks/useMicPitch';
@@ -183,7 +183,7 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
     const id = window.setInterval(() => setQuiet(appSounding()), 80);
     return () => window.clearInterval(id);
   }, []);
-  const p = quiet ? null : mic.pitch;
+  const p = quiet || appSounding() ? null : mic.pitch;
   const pRef = useRef(p);
   pRef.current = p;
   const screenRef = useRef(screen);
@@ -198,8 +198,11 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
     if (screen || ex.time || verdict || at >= notes.length) return;
     const want = pcOf(riffMidi(notes[at]));
     const heardPc = p ? pcOf(p.midi) : null;
-    // The same note again needs a fresh pluck, not the one still ringing.
-    const fresh = at === 0 || pcOf(riffMidi(notes[at - 1])) !== want || lastPluck() > lastHit.current + 40;
+    // Only a pluck after the app went quiet is yours: its example fading out
+    // keeps its pitch but never starts a pluck. The same note again needs a
+    // fresh pluck too, not the one still ringing.
+    const afterApp = lastPluck() > appSoundEnd();
+    const fresh = afterApp && (at === 0 || pcOf(riffMidi(notes[at - 1])) !== want || lastPluck() > lastHit.current + 40);
     if (heardPc === want && Math.abs(p!.cents) <= 40 && fresh) {
       slipFrom.current = null;
       const now = performance.now();
@@ -218,7 +221,7 @@ export const Riff: React.FC<ExProps<'riff'> & { onSkip: () => void }> = ({ ex, v
     // A clear wrong note, held a moment, is a slip: counted once per pluck.
     // The note just played still rings while the hand moves on: not a slip.
     const ringing = at > 0 && heardPc === pcOf(riffMidi(notes[at - 1]));
-    if (heardPc !== null && heardPc !== want && !ringing && lastPluck() > lastHit.current + 40) {
+    if (heardPc !== null && heardPc !== want && !ringing && afterApp && lastPluck() > lastHit.current + 40) {
       const now = performance.now();
       const sf = slipFrom.current;
       if (!sf || sf.pc !== heardPc) slipFrom.current = { pc: heardPc, at: now, counted: false };
