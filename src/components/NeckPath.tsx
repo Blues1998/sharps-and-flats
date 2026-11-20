@@ -13,6 +13,8 @@ import { lessonOpen, startLesson, subscribeLesson } from '../lesson/store';
 import { UNIT_SONGS } from '../lesson/songs';
 import { lessonFor } from '../lesson/lessons';
 import { useBackToClose } from '../utils/nativeShell';
+import { GUITAR_IMG, fretY, stringX } from '../utils/guitarScale';
+import guitarUrl from '../assets/guitar.webp';
 import { AHEAD, FRETS, NECK_ORDER, OCTAVE, CHECKS_READY, UNITS, checkId, checkStars, doneSteps, fretHeight, levelOf, markSeen, seenSteps, unitOf } from '../utils/neck';
 import type { FretDef } from '../utils/neck';
 
@@ -142,9 +144,22 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
 
   // ---- Geometry ---------------------------------------------------------------
   const lastFret = AHEAD[AHEAD.length - 1].n;
+  // Today draws the neck as a map: no panels or side text; your unit's notes
+  // and one card with Start; finished units fold into their medal. On a
+  // guitar the map is a real one, at true scale (utils/guitarScale): the frets
+  // are where a guitar has them, and the headstock sits above the nut.
+  const map = mode === 'today';
+  const real = map && strings === 6;
   const geo = useMemo(() => {
     const tops: number[] = [];
     const heights: number[] = [];
+    if (real) {
+      for (let n = 1; n <= lastFret; n++) {
+        tops[n] = GUITAR_IMG.nutY + fretY(n - 1);
+        heights[n] = fretY(n) - fretY(n - 1);
+      }
+      return { tops, heights, length: GUITAR_IMG.height };
+    }
     let y = NUT;
     for (let n = 1; n <= lastFret; n++) {
       tops[n] = y;
@@ -152,20 +167,24 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       y += heights[n];
     }
     return { tops, heights, length: y };
-  }, [lastFret]);
-  // Today draws the neck as a map: wider, flat, no panels or side text; your
-  // unit's notes and one card with Start; finished units fold into their medal.
-  const map = mode === 'today';
-  const width = map ? (strings === 4 ? 176 : 210) : strings === 4 ? (narrow ? 132 : 148) : (narrow ? 166 : 190);
+  }, [lastFret, real]);
+  // On the real guitar x is measured from a box REAL_W wide around the centre line.
+  const REAL_W = 150;
+  const width = real ? REAL_W : map ? 176 : strings === 4 ? (narrow ? 132 : 148) : (narrow ? 166 : 190);
   const edge = strings === 4 ? 20 : narrow ? 15 : 17;
-  const strX = (s: number) => edge + (strings - s) * ((width - 2 * edge) / (strings - 1));
+  /** String s across the board; on the real guitar, where it runs at fret n. */
+  const strX = (s: number, n?: number) => real
+    ? REAL_W / 2 + stringX(s, (n ? geo.tops[n] + geo.heights[n] * 0.62 : GUITAR_IMG.nutY) - GUITAR_IMG.nutY)
+    : edge + (strings - s) * ((width - 2 * edge) / (strings - 1));
   const midY = (n: number) => geo.tops[n] + geo.heights[n] / 2;
-  const noteY = (n: number) => midY(n) + (geo.heights[n] > 90 ? 6 : 3);
+  const noteY = (n: number) => real ? geo.tops[n] + geo.heights[n] * 0.62 : midY(n) + (geo.heights[n] > 90 ? 6 : 3);
 
   // Land on a unit's top edge, just under the bar, so no card is cut in half:
   // the fret's own unit if the page can scroll that far, else the nearest
   // unit above it that still keeps the fret on screen. Failing both (a unit
   // taller than the screen), centre the fret.
+  const realRef = useRef(false);
+  realRef.current = real;
   const scrollToFret = useCallback((n: number, smooth = true) => {
     const fret = Math.min(n, OCTAVE);
     const el = rowRefs.current[fret];
@@ -176,6 +195,12 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     const bar = document.querySelector('.mtop')?.getBoundingClientRect().bottom ?? 0;
     const tabs = document.querySelector('.mtabs')?.getBoundingClientRect().top || window.innerHeight;
     const fretBottom = el.getBoundingClientRect().bottom;
+    // The real guitar: the card with Start sits above your note, so land with
+    // room for it under the bar (frets there are short; a unit's top would hide it).
+    if (realRef.current) {
+      window.scrollBy({ top: el.getBoundingClientRect().top - bar - 230, behavior });
+      return;
+    }
     const units = UNITS.filter(u => u.from <= fret).sort((x, y) => y.from - x.from);
     for (const u of units) {
       const first = rowRefs.current[u.from];
@@ -212,7 +237,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
         await wait(t(220));
         feel('fret');
         setRinging({ strings: [s], k: Date.now() });
-        setFloat({ x: strX(s), y: noteY(fret.n), k: Date.now() });
+        setFloat({ x: strX(s, fret.n), y: noteY(fret.n), k: Date.now() });
         await wait(t(800));
       }
       const after = currentIn(have);
@@ -598,7 +623,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
     if (!level) return null;
     // A lesson is all or nothing, so its ring stays empty until it is done.
     const [met, needed] = lessonFor(level.id) ? [0, 1] : levelProgress(level);
-    return { x: strX(shapeFor(curDef.steps.length, strings)[i] ?? 3), y: noteY(cur), pct: needed ? met / needed : 0, check: false };
+    return { x: strX(shapeFor(curDef.steps.length, strings)[i] ?? 3, cur), y: noteY(cur), pct: needed ? met / needed : 0, check: false };
   })();
 
   const tag = (() => {
@@ -613,7 +638,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       if (!f) return [] as { x: number; y: number; r: number }[];
       if (f.check) return (n === OCTAVE ? [width * 0.3, width * 0.7] : [width / 2]).map(x => ({ x, y: midY(n), r: 17 }));
       const shape = shapeFor(f.steps.length, strings);
-      return f.steps.map((_, i) => ({ x: strX(shape[i] ?? 3), y: noteY(n), r: 14 }));
+      return f.steps.map((_, i) => ({ x: strX(shape[i] ?? 3, n), y: noteY(n), r: 14 }));
     };
     const near = (n: number) => things(n).filter(o => Math.abs(o.x - curNote.x) < half + o.r);
     const ceiling = Math.max(cur === 1 ? geo.tops[1] : -Infinity, ...near(cur - 1).map(o => o.y + o.r));
@@ -626,9 +651,11 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   })();
 
   const board = (
-    <div className="np-board" style={{ width, height: geo.length }}>
+    <div className={`np-board${real ? ' is-real' : ''}`} style={{ width, height: geo.length }}>
+      {real && <img className="np-guitar" src={guitarUrl} alt="" draggable={false} style={{ left: REAL_W / 2 - GUITAR_IMG.centre, width: GUITAR_IMG.width, height: GUITAR_IMG.height }} />}
       {/* The wood you have played, lit warm from the nut to your note. */}
-      <i className="np-played" style={{ height: playedTo }} />
+      {!real && <i className="np-played" style={{ height: playedTo }} />}
+      {!real && <>
       <div className="np-nut" style={{ height: NUT }}>
         {Array.from({ length: strings }, (_, k) => <i key={k} style={{ left: strX(k + 1) }} />)}
       </div>
@@ -642,7 +669,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       <i className="np-beyond" style={{ top: geo.tops[OCTAVE + 1] }} />
       {/* A pearl at 15, as a real neck has. */}
       <span className="np-inlay is-far" style={{ top: midY(15), left: width / 2 }} />
-      {Array.from({ length: strings }, (_, k) => {
+      </>}
+      {!real && Array.from({ length: strings }, (_, k) => {
         const s = k + 1;
         const ring = ringing && (ringing.strings === 'all' || ringing.strings.includes(s));
         return (
@@ -657,7 +685,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       {FRETS.filter(f => f.check).map(f => {
         const passed = fretDoneIn(f, shown);
         const state = passed ? 'is-passed' : f.n === nextMilestone ? 'is-next' : 'is-later';
-        const xs = f.n === OCTAVE ? [width * 0.3, width * 0.7] : [width / 2];
+        const half = real ? (stringX(1, midY(f.n) - GUITAR_IMG.nutY) - stringX(6, midY(f.n) - GUITAR_IMG.nutY)) / 2 * 1.13 * 0.42 : width * 0.2;
+        const xs = f.n === OCTAVE ? [width / 2 - half, width / 2 + half] : [width / 2];
         return xs.map((x, j) => (
           <button
             key={`m${f.n}-${j}`}
@@ -698,7 +727,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
               type="button"
               data-feel="off"
               className={`np-dot ${state}${press === id ? ' is-press' : ''}${shake?.id === id ? ' is-shake' : ''}`}
-              style={{ left: strX(shape[i] ?? 3), top: noteY(f.n) }}
+              style={{ left: strX(shape[i] ?? 3, f.n), top: noteY(f.n) }}
               onClick={() => tapFret(f.n, id)}
               aria-label={`${level.title}${done ? ', done' : isNow ? ', next' : ''}`}
             >
@@ -746,8 +775,10 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       if (level) open(level);
     };
         // As wide as the neck, so the unit names beside it stay readable.
-    const cardW = Math.max(200, width);
-    const left = Math.max(-20, Math.min(curNote.x - cardW / 2, width - cardW + 4));
+    // On the real guitar the card is centred on the neck and no wider than the
+    // gap between the fret numbers and the unit names.
+    const cardW = real ? 172 : Math.max(200, width);
+    const left = real ? (width - cardW) / 2 : Math.max(-20, Math.min(curNote.x - cardW / 2, width - cardW + 4));
     return (
       <div className="np-nowcard" style={{ top: curNote.y - 34, left: `calc(var(--np-left) + ${left}px)`, width: cardW, ['--arrow-x' as string]: `${curNote.x - left}px` } as React.CSSProperties}>
         <div className="np-nowcard-head">
@@ -765,7 +796,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   const arrowX = (f: FretDef): number => {
     if (f.check) return width / 2;
     const i = Math.max(0, f.steps.findIndex(id => !shown.has(id)));
-    return strX(shapeFor(f.steps.length, strings)[i] ?? 3);
+    return strX(shapeFor(f.steps.length, strings)[i] ?? 3, f.n);
   };
 
   const rows = Array.from({ length: lastFret }, (_, k) => {
@@ -798,7 +829,7 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
   });
 
   return (
-    <section className={`neckpath is-${mode}${strings === 4 ? ' is-uke' : ''}`} aria-label="Your progress up the neck">
+    <section className={`neckpath is-${mode}${strings === 4 ? ' is-uke' : ''}${real ? ' is-real' : ''}`} aria-label="Your progress up the neck">
       {intro && (
         <div className="np-intro" role="note">
           <p><b>Each note is a step.</b> Finish a fret's notes to move up the neck. Milestones sit on the pearl inlays, and fret 12 is the octave.</p>

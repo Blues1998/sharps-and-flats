@@ -17442,3 +17442,17 @@ html.is-native input, html.is-native textarea, html.is-native [contenteditable="
   background-blend-mode: overlay, normal, normal;
 }
 .neckpath.is-today .np-board { box-shadow: inset 2px 0 0 #2c2f33, inset -2px 0 0 #2c2f33; }
+
+/* Today on a guitar: the whole instrument at true scale, one still picture
+   (scripts/guitar.py). The neck sits on the page's centre line; the board
+   element is a 150 px box around it that the notes and medals measure from. */
+.neckpath.is-real { --np-left: calc(50% - 75px); }
+.neckpath.is-real .np-board { background: none; box-shadow: none; border-radius: 0; }
+.np-guitar { position: absolute; top: 0; max-width: none; z-index: 0; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.neckpath.is-real .np-played { left: 8px; right: 8px; z-index: 1; clip-path: polygon(2% 0, 98% 0, 100% 100%, 0 100%); mix-blend-mode: screen; }
+.neckpath.is-real .np-view::before { content: ''; position: absolute; left: 50%; top: 0; width: 620px; height: 100%; transform: translateX(-50%); pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 140, 70, 0.10), rgba(255, 140, 70, 0.035) 55%, transparent 100%); }
+.neckpath.is-real .np-dot { width: 22px; height: 22px; }
+.neckpath.is-real .np-medal.is-passed { width: 28px; height: 28px; }
+.neckpath.is-real .np-medal.is-passed svg { width: 13px; height: 13px; }
+.neckpath.is-real .np-num { left: 6px; }
