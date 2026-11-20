@@ -17428,3 +17428,17 @@ html.is-native input, html.is-native textarea, html.is-native [contenteditable="
 .np-card-song-sub { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--text-muted); }
 .np-card-song-sub svg { width: 12px; height: 12px; }
 .np-start.is-ghost { background: var(--surface-3); color: var(--text-primary); box-shadow: 0 3px 0 var(--panel-border); }
+
+/* The fretboard's wood: one neutral grain image (scripts/wood-grain.py), tinted
+   by the colour under it through an overlay blend, so the same file can be
+   rosewood here and maple in a light theme. It is a still picture: no cost
+   once drawn. --wood is the base colour, the gradient rounds the edges. */
+.neckpath { --wood: #34211a; }
+.np-board, .neckpath.is-today .np-board {
+  background:
+    url('./assets/wood-grain.webp') 0 0 / 100% auto repeat-y,
+    linear-gradient(90deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0) 16%, rgba(255,255,255,0.03) 50%, rgba(0,0,0,0) 84%, rgba(0,0,0,0.38) 100%),
+    var(--wood);
+  background-blend-mode: overlay, normal, normal;
+}
+.neckpath.is-today .np-board { box-shadow: inset 2px 0 0 #2c2f33, inset -2px 0 0 #2c2f33; }
