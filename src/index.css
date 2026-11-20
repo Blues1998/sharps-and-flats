@@ -16530,7 +16530,7 @@ a.btn {
 .np-wire.is-done::after { display: none; }
 .np-wire.is-octave { height: 6px; background: linear-gradient(180deg, #fff6df 0%, #e9cf96 35%, #b9944e 70%, #7c5f2a 100%); box-shadow: 0 2px 3px rgba(0,0,0,0.6), 0 0 12px rgba(217,178,106,0.35); }
 .np-octave-tag { position: absolute; left: 50%; transform: translateX(-50%); z-index: 4; padding: 2px 8px; border-radius: 999px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1d1608; background: linear-gradient(180deg, #ecd197, var(--warning)); box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-.np-beyond { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; pointer-events: none; background: linear-gradient(180deg, rgba(17,18,20,0.35), var(--page-bg) 92%); }
+.np-beyond { position: absolute; left: 0; right: 0; bottom: -8px; z-index: 5; pointer-events: none; background: linear-gradient(180deg, rgba(17,18,20,0.35), var(--page-bg) 92%); }
 
 /* Milestone medallions, where a neck has its pearl inlays. */
 .np-medal { all: unset; box-sizing: border-box; cursor: pointer; position: absolute; z-index: 4; width: 30px; height: 30px; transform: translate(-50%, -50%); border-radius: 50%; display: grid; place-items: center; }
@@ -17397,3 +17397,14 @@ html.is-native input, html.is-native textarea, html.is-native [contenteditable="
 /* The bar names the page and holds the +, so Songs' own header has nothing left on a phone. */
 @media (max-width: 900px) { .songs-head { display: none; } }
 .ui-select-head .note-key:not(.is-selected) { background: var(--surface-2); color: var(--text-secondary); }
+/* Phone: a page header whose title is hidden still took a row and the column gap above the first card. */
+@media (max-width: 1000px) {
+  .ph-head, .cb-head, .ear-head:not(:has(.ear-score)) { display: none; }
+}
+/* Big display numbers: Space Grotesk's 1 is narrow, so fixed-width digits left a gap ("5 1"). */
+.tday-big, .rh-bpm-num, .streak-n, .tday-big.readout, .rh-bpm-num.readout { font-variant-numeric: proportional-nums; }
+.tday-letter, .chordcard-shape, .song-meta, .revisit-flag, .shapepick-label { font-family: var(--font-ui); }
+/* "Not yet" gets its own colour, as Solid and Shaky do; plain white read as the chosen one. */
+.csheet-rate-btn.is-none { color: var(--danger); }
+.csheet-rate-btn.is-on.is-none { border-color: var(--danger); background: var(--danger-glow); }
+.song-chords-count { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); }

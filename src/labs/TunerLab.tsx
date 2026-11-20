@@ -221,8 +221,8 @@ const InstrumentTuner: React.FC = () => {
               {/* Nothing heard: an empty line of the same height, not a dash. */}
               {readNote ?? '\u00A0'}
             </span>
-            <span className="tuner-note-hz readout">
-              {pitchData ? `${pitchData.frequency.toFixed(1)} Hz` : isMicrophoneActive ? 'silent' : 'not listening'}
+            <span className={`tuner-note-hz${pitchData ? ' readout' : ''}`}>
+              {pitchData ? `${pitchData.frequency.toFixed(1)} Hz` : isMicrophoneActive ? 'Silent' : '\u00A0'}
             </span>
           </div>
 
@@ -260,11 +260,11 @@ const InstrumentTuner: React.FC = () => {
       <section className="glass-panel strings tunerdock">
         <div className="surface-label">
           <span>{tuning.name}</span>
-          <span className="readout">
-            {isMicrophoneActive
-              ? tunedCount === targets.length ? `all ${targets.length === 4 ? 'four' : 'six'} in tune` : `${tunedCount} of ${targets.length} in tune`
-              : 'tap a string to hear it'}
-          </span>
+          {isMicrophoneActive && (
+            <span className="tunerdock-count">
+              {tunedCount === targets.length ? `All ${targets.length === 4 ? 'four' : 'six'} in tune` : `${tunedCount} of ${targets.length} in tune`}
+            </span>
+          )}
           {isMicrophoneActive && tunedCount > 0 && (
             <button type="button" className="strings-again" onClick={() => setTuned({})}>Start again</button>
           )}

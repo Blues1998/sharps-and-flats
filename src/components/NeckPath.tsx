@@ -597,7 +597,8 @@ export const NeckPath: React.FC<Props> = ({ mode, setActiveTab }) => {
       <div className="np-nut" style={{ height: NUT }}>
         {Array.from({ length: strings }, (_, k) => <i key={k} style={{ left: strX(k + 1) }} />)}
       </div>
-      {Array.from({ length: lastFret }, (_, k) => {
+      {/* The board ends at the last fret, so no wire there: it would sit on the fade's edge. */}
+      {Array.from({ length: lastFret - 1 }, (_, k) => {
         const n = k + 1;
         const cls = ['np-wire', n === OCTAVE ? 'is-octave' : '', sweep === n ? 'is-sweep' : '', lit !== null && n <= lit ? 'is-lit' : ''].join(' ');
         return <i key={`w${n}`} className={cls} style={{ top: geo.tops[n] + geo.heights[n] - (n === OCTAVE ? 3 : 2) }} />;

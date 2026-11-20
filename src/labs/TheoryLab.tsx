@@ -3,6 +3,7 @@ import { Keyboard } from '../components/Keyboard';
 import { LabIcon } from '../components/LabIcon';
 import { Fretboard } from '../components/Fretboard';
 import { Term } from '../components/Term';
+import { prettyNote } from '../utils/chords';
 import { ScaleChords } from '../components/ScaleChords';
 import { ScaleControlBar, type TheoryTab } from '../components/ScaleControlBar';
 import { Segmented } from '../components/Segmented';
@@ -320,10 +321,10 @@ export const TheoryLab: React.FC = () => {
 
           {/* Text Labels */}
           <text onClick={handleMajorClick} x={labelX_maj} y={labelY_maj} fill={isSelected ? 'var(--primary)' : 'var(--text-primary)'} fontSize="13.5" fontWeight={isSelected ? 'bold' : 'normal'} textAnchor="middle">
-            {keyInfo.name}
+            {prettyNote(keyInfo.name)}
           </text>
           <text onClick={handleMinorClick} x={labelX_min} y={labelY_min} fill={isSelected ? 'var(--secondary)' : 'var(--text-secondary)'} fontSize="10.5" textAnchor="middle">
-            {keyInfo.relativeMinor}
+            {prettyNote(keyInfo.relativeMinor)}
           </text>
         </g>
       );
@@ -332,8 +333,8 @@ export const TheoryLab: React.FC = () => {
 
   const feeling = SCALE_FEELINGS[selectedScale.name];
   const relative = inMinorKey
-    ? { label: 'Relative major', value: `${activeCircleKey.name} major` }
-    : { label: 'Relative minor', value: activeCircleKey.relativeMinor };
+    ? { label: 'Relative major', value: `${prettyNote(activeCircleKey.name)} major` }
+    : { label: 'Relative minor', value: prettyNote(activeCircleKey.relativeMinor) };
   const accidentals = activeCircleKey.sharps === 0
     ? 'None'
     : activeCircleKey.sharps > 0
@@ -457,13 +458,13 @@ export const TheoryLab: React.FC = () => {
         <div className="theory-panel" role="tabpanel" id="theory-panel-keys" aria-labelledby="theory-tab-keys">
           <section className="glass-panel theory-card theory-keys-card">
             <p className="theory-note">
-              <Term k="circleOfFifths">The circle of fifths</Term>: neighbours share all but one note. Tap a key to switch to it and hear its home chord.
+              <Term k="circleOfFifths">The circle of fifths</Term>: neighbours share all but one note.
             </p>
             <svg className="theory-circle" width="320" height="320" viewBox="0 0 320 320" role="group" aria-label="Circle of fifths">
               {renderCircleSectors()}
               <circle cx="160" cy="160" r="55" fill="var(--input-bg)" stroke="rgba(var(--surface-tint-rgb), 0.08)" strokeWidth="0.5" />
               <text x="160" y="167" fill="var(--primary)" fontSize="20" fontWeight="bold" textAnchor="middle">
-                {inMinorKey ? activeCircleKey.relativeMinor : activeCircleKey.name}
+                {prettyNote(inMinorKey ? activeCircleKey.relativeMinor : activeCircleKey.name)}
               </text>
             </svg>
             <div className="theory-facts">

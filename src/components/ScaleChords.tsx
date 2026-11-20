@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChordDiagram } from './ChordDiagram';
 import { Select } from './Select';
-import { Term } from './Term';
 import { SCALE_FORMULAS, NOTE_NAMES, CHORD_QUALITIES, noteNameToMidi } from '../utils/musicTheory';
 import type { ScaleFormula } from '../utils/musicTheory';
 import { CHORD_FEELINGS, shortScaleName } from '../utils/glossary';
@@ -150,9 +149,6 @@ export const ScaleChords: React.FC<ScaleChordsProps> = ({ rootName, scale, onStr
         </>
       )}
 
-      <p className="theory-note">
-        <Term k="romanNumerals">Numerals</Term>: uppercase is major, lowercase minor, ° tense. Play a few in a row and you have a progression.
-      </p>
 
       <div className="theory-rows">
         <div className="theory-row">

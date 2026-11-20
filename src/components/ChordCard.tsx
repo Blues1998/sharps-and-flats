@@ -164,7 +164,7 @@ export const ChordCard: React.FC<ChordCardProps> = ({
       )}
 
       {voicing && (
-        <span className={`chordcard-shape readout tier-${voicing.tier}`}>
+        <span className={`chordcard-shape tier-${voicing.tier}`}>
           {voicing.substituteFor ? `${voicing.label} · for ${voicing.substituteFor}` : voicing.label}
         </span>
       )}

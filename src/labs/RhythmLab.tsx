@@ -764,7 +764,6 @@ export const RhythmLab: React.FC = () => {
                 if (amount > 0 && subdivision !== 2) setSubdivision(2);
               }}
             />
-            <p className="rh-sub">Press Start to hear it on the click.</p>
           </section>
           <section className="rh-card">
             <span className="surface-label">Open or muted</span>

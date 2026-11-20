@@ -109,7 +109,7 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
           <h2 className="lab-title">{song.title}</h2>
           <p className="song-artist">{song.artist || 'Unknown artist'}</p>
           <div className="song-head-meta">
-            <p className="song-meta readout">
+            <p className="song-meta">
               {song.key || 'Key not set'}{song.capo ? ` · ${capoLabel(song.capo)}` : ''} · {song.chart?.tempo ?? DEFAULT_CHART.tempo} bpm · {song.chart?.beatsPerBar ?? DEFAULT_CHART.beatsPerBar}/4
             </p>
             <Select<SongStatus>
@@ -169,7 +169,7 @@ export const SongPage: React.FC<SongPageProps> = ({ song, onBack }) => {
             <div className="surface-label">
               <IconSection kind="chords" /><span>Your chords</span>
               {chords.length > 0 && (
-                <span className="readout">{chordStanding.solid + chordStanding.shaky} of {chords.length} in your hands</span>
+                <span className="song-chords-count">{chordStanding.solid + chordStanding.shaky} of {chords.length} in your hands</span>
               )}
             </div>
             {chords.length > 0 ? (

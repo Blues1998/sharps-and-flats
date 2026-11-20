@@ -485,8 +485,8 @@ export const QuickPlay: React.FC<QuickPlayProps> = ({ slots, onChange, onClose, 
               ))}
             </span>
           )}
-          <span className="cdock-sub readout">
-            {slots.length === 0 ? "Empty · tap a chord's + to add it" : `Loop · ${tempo} bpm · ${bars} bar${bars === 1 ? '' : 's'}`}
+          <span className={`cdock-sub${slots.length ? ' readout' : ''}`}>
+            {slots.length === 0 ? 'Empty' : `Loop · ${tempo} bpm · ${bars} bar${bars === 1 ? '' : 's'}`}
           </span>
         </button>
         {running && (

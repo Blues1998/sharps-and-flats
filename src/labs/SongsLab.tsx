@@ -259,7 +259,7 @@ export const SongsLab: React.FC<SongsLabProps> = ({ focusSongId, onOpenSong, ope
                   <span className="songrow-name">
                     <span className="songrow-titleline">
                       <span className="songrow-title">{song.title}</span>
-                      {song.revisit && <span className="revisit-flag readout">revisit</span>}
+                      {song.revisit && <span className="revisit-flag">revisit</span>}
                     </span>
                     <span className="songrow-artist">
                       {song.artist && <>{song.artist} · </>}

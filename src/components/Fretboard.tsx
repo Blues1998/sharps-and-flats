@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GUITAR_STRINGS, midiToNoteName } from '../utils/musicTheory';
+import { prettyNote } from '../utils/chords';
 import { useNotePress } from '../hooks/useNotePress';
 
 interface FretboardProps {
@@ -274,7 +275,7 @@ const FretboardComponent: React.FC<FretboardProps> = ({
                       >
                         {showNote && (
                           <div className={`guitar-note-marker ${isActive ? 'active' : isRoot ? 'highlight-root' : isCorrect ? 'highlight-correct' : ''}`}>
-                            {noteInfo.name}
+                            {prettyNote(noteInfo.name)}
                           </div>
                         )}
                       </div>
